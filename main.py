@@ -11,15 +11,12 @@ from torch.utils.data import TensorDataset, dataloader
 from src.models.MT_CNN import MTCNNModel
 from src.datasets.dataset import data_create,transform_after_split
 from src.training.train import training_MT
-from src.test.test import test_MT
+from src.test.test import test_MT,fold_evaluate
 
 #reg_list = ['pH','Available.P']
 #reg_list = ['CEC', 'Exchangeable.Ca', 'Exchangeable.K','Exchangeable.Mg']
-#reg_list = ['CEC', 'Humus']
-reg_list = ['EC', 'NH4.N','NO3.N','Inorganic.N']
-
-asv,chem= data_create('data\\raw\\taxon_data\\taxon_lv6.csv','data\\raw\\chem_data.xlsx',reg_list)
-
+reg_list = ['CEC', 'Humus']
+#reg_list = ['EC', 'NH4.N','NO3.N','Inorganic.N']
 
 exclude_ids = [
     '041_20_Sait_Carr', '042_20_Sait_Eggp', '043_20_Sait_Carr', '044_20_Sait_Broc',
@@ -28,6 +25,13 @@ exclude_ids = [
     '067_20_Naga_Pump', '331_22_Niig_jpea', '332_22_Niig_jpea'
 ]
 
+url1 = 'data\\raw\\taxon_data\\taxon_lv6.csv'
+url2 = 'data\\raw\\chem_data.xlsx'
+
+fold_evaluate(feature_path = url1, target_path = url2, reg_list = reg_list, exclude_ids = exclude_ids, 
+                output_path ='a',k = 5,early_stopping = True, epochs = 10000)
+
+exit()
 mask = ~chem['crop-id'].isin(exclude_ids)
 asv, chem = asv[mask], chem[mask]
 
