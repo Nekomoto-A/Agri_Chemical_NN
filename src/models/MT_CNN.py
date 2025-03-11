@@ -7,7 +7,7 @@ class MTCNNModel(nn.Module):
         self.input_sizes = input_dim
 
         self.sharedconv = nn.Sequential(
-            nn.Conv1d(1, 64, kernel_size=3, stride=1, padding=1),
+            nn.Conv1d(1, 64, kernel_size=5, stride=1, padding=1),
             nn.BatchNorm1d(64),
             nn.ReLU(),
             nn.MaxPool1d(kernel_size=2),
