@@ -5,30 +5,25 @@ from torch.utils.data import DataLoader
 from sklearn.metrics import r2_score,mean_squared_error
 import matplotlib.pyplot as plt
 
-def test_MT(x_te,y_te,model,output_dims,reg_list,scalers):
+def test_MT(x_te,y_te,model,reg_list,scalers):
     model.eval()  # モデルを評価モードに
     # 出力ごとの予測と実際のデータをリストに格納
     r2_scores = []
     mse_scores = []
 
+    predicts = {}
+    trues = {}
     with torch.no_grad():
         outputs = model(x_te)  # 予測値を取得
+
         #print(outputs)
         # 各出力の予測結果と実際の値をリストに格納
         for i,reg in enumerate(reg_list):
-            #print(i,i,i,i,i)
-            #print(outputs[i])
-            #print(y_te[i])
-
             output = scalers[reg].inverse_transform(outputs[i].numpy())
             true = scalers[reg].inverse_transform(y_te[i].numpy())
-            #output = outputs[i].numpy()
-            #true = y_te[i].numpy()
 
-            plt.figure()
-            plt.scatter(true,output)
-            plt.title(reg_list[i])
-            plt.show()
+            predicts[reg] = output
+            trues[reg] = true
 
             r2 = r2_score(true,output)
             #print(r2)
@@ -36,45 +31,76 @@ def test_MT(x_te,y_te,model,output_dims,reg_list,scalers):
             mse = mean_squared_error(true,output)
             #print(mse)
             mse_scores.append(mse)
-    
-    #print(r2_scores, mse_scores)
-    return output, true, r2_scores, mse_scores
 
-from src.datasets.dataset import data_create,transform_after_split
+    #print(r2_scores, mse_scores)
+    return predicts, trues, r2_scores, mse_scores
+
 from src.training.train import training_MT
 from src.test.test import test_MT
 from src.models.MT_CNN import MTCNNModel
 
-from sklearn.model_selection import KFold
 import numpy as np
+import os
+import pandas as pd
 
-def fold_evaluate(feature_path, target_path, reg_list, exclude_ids,
-                  output_path ='a',k = 5, val_size = 0.2, early_stopping = True, epochs = 10000, lr=0.0001):
-    asv,chem= data_create(feature_path, target_path, reg_list)
-    mask = ~chem['crop-id'].isin(exclude_ids)
-    X, Y = asv[mask], chem[mask]
+def write_result(r2_results, mse_results, columns_list, csv_dir, method, ind):
+    index_tuples = list(zip(method, ind))
+    metrics = ["R2 Score", "MSE"]
+    index = pd.MultiIndex.from_tuples(index_tuples, names=["method", "fold"])
+    columns = pd.MultiIndex.from_product([metrics, columns_list])
 
-    kf = KFold(n_splits=k, shuffle=True, random_state=42)
-    for fold, (train_index, test_index) in enumerate(kf.split(X, Y)):
-        X_train, X_test = X.iloc[train_index], X.iloc[test_index]
-        Y_train, Y_test = Y.iloc[train_index], Y.iloc[test_index]
+    result = np.concatenate([np.array(r2_results).reshape(1,-1),
+            np.array(mse_results).reshape(1,-1)
+            ], 1)
+    result_data = pd.DataFrame(result,index = index,columns = columns)
+    # 既存のCSVのヘッダーを取得
+    if os.path.exists(csv_dir):
+        existing_data = pd.read_csv(csv_dir, index_col=[0,1], header=[0, 1])  # MultiIndexのヘッダーを読み込む
+        existing_columns = existing_data.columns
+    else:
+        existing_columns = result_data.columns.tolist()  # CSVがなければそのまま使用
 
-        X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers = transform_after_split(X_train,X_test,Y_train,Y_test,reg_list = reg_list,
-                                                                                                                         val_size = val_size)
+    # `result_data` のカラムを既存のCSVの順番に合わせ、足りないカラムを追加
+    aligned_data = result_data.reindex(columns=existing_columns, fill_value="")  # 足りない列は空白で補完
 
-        input_dim = X_train.shape[1]
-        output_dims = np.ones(len(reg_list), dtype="int16")
+    #result_data.to_csv(csv_dir, mode="a", header=not file_exists, index=True, encoding="utf-8")
+    aligned_data.to_csv(csv_dir, mode="a", header=not os.path.exists(csv_dir), index=True, encoding="utf-8")
 
-        model = MTCNNModel(input_dim = input_dim,output_dims = output_dims)
-        # 回帰用の損失関数（MSE）
-        loss_fn = nn.MSELoss()
-        optimizer = optim.Adam(model.parameters(), lr=lr)
+def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predictions, tests, 
+                  input_dim, method, index, reg_list, csv_dir, 
+                  early_stopping = True, epochs = 10000, lr=0.0001
+                  ):
 
-        epochs = epochs
-        model_trained = training_MT(X_train_tensor,X_val_tensor,Y_train_tensor,Y_val_tensor,model,epochs,loss_fn,optimizer, output_path,output_dim=output_dims,early_stopping = early_stopping)
+    output_dims = np.ones(len(reg_list), dtype="int16")
+    model = MTCNNModel(input_dim = input_dim,output_dims = output_dims)
+    # 回帰用の損失関数（MSE）
+    loss_fn = nn.MSELoss()
+    optimizer = optim.Adam(model.parameters(), lr=lr)
 
-        outputs, trues, r2_results, mse_results = test_MT(X_test_tensor,Y_test_tensor,model_trained,output_dims,reg_list,scalers)
+    epochs = epochs
+    model_trained = training_MT(X_train,X_val,Y_train,Y_val,model,epochs,loss_fn,optimizer, 
+                                output_dim=output_dims,early_stopping = early_stopping, 
+                                patience = 10)
 
-        # --- 4. 結果を表示 ---
-        for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
-            print(f"Output {i+1} ({reg_list[i]}): R^2 Score = {r2:.4f}, MSE = {mse:.4f}")
+    predicts, trues, r2_results, mse_results = test_MT(X_test,Y_test,model_trained,reg_list,scalers)
+
+    # --- 4. 結果を表示 ---
+    for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
+        print(f"Output {i+1} ({reg_list[i]}): R^2 Score = {r2:.4f}, MSE = {mse:.4f}")
+    
+    write_result(r2_results, mse_results, columns_list = reg_list, csv_dir = csv_dir, method = method, ind = index, )
+    
+    for key, value in predicts.items():
+        if key not in predictions:
+            predictions[key] = value  # 最初の値を追加
+        else:
+            predictions[key] = np.concatenate((predictions[key], value))  # 既存のリストに追加
+
+    for key, value in trues.items():
+        if key not in tests:
+            tests[key] = value  # 最初の値を追加
+        else:
+            tests[key] = np.concatenate((tests[key], value))  # 既存のリストに追加
+    
+    return predictions, tests, r2_results, mse_results
+

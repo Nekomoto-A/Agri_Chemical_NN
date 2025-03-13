@@ -26,7 +26,7 @@ class NormalizedLoss(nn.Module):
             normalized_losses.append(normalized_loss)
         return sum(normalized_losses)
 
-def training_MT(x_tr,x_val,y_tr,y_val,model,epochs,regression_criterion,optimizer, output_path,output_dim,patience = 10,early_stopping = True):
+def training_MT(x_tr,x_val,y_tr,y_val,model,epochs,regression_criterion,optimizer, output_dim,patience = 10,early_stopping = True):
     loss_fn = NormalizedLoss(len(output_dim))
     best_loss = float('inf')  # 初期値は無限大
     for epoch in range(epochs):
@@ -36,8 +36,8 @@ def training_MT(x_tr,x_val,y_tr,y_val,model,epochs,regression_criterion,optimize
         train_losses = []
         for j in range(len(output_dim)):
             train_losses.append(regression_criterion(outputs[j], y_tr[j]))
-        #train_loss = loss_fn(train_losses)
-        train_loss = sum(train_losses)
+        train_loss = loss_fn(train_losses)
+        #train_loss = sum(train_losses)
         
         optimizer.zero_grad()
         train_loss.backward()
@@ -51,8 +51,8 @@ def training_MT(x_tr,x_val,y_tr,y_val,model,epochs,regression_criterion,optimize
             val_losses = []
             for j in range(len(output_dim)):
                 val_losses.append(regression_criterion(outputs[j], y_val[j]))
-            #val_loss = loss_fn(val_losses)
-            val_loss = sum(val_losses)
+            val_loss = loss_fn(val_losses)
+            #val_loss = sum(val_losses)
         print(f"Epoch [{epoch+1}/{epochs}], "
             f"Train Loss: {train_loss:.4f}, "
             f"Validation Loss: {val_loss:.4f}"
