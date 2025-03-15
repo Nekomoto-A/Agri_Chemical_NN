@@ -32,7 +32,6 @@ def test_MT(x_te,y_te,model,reg_list,scalers):
             #print(mse)
             mse_scores.append(mse)
 
-    #print(r2_scores, mse_scores)
     return predicts, trues, r2_scores, mse_scores
 
 from src.training.train import training_MT
@@ -68,7 +67,7 @@ def write_result(r2_results, mse_results, columns_list, csv_dir, method, ind):
 
 def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predictions, tests, 
                   input_dim, method, index, reg_list, csv_dir, 
-                  early_stopping = True, epochs = 10000, lr=0.0001
+                  early_stopping = True, epochs = 10000, lr=0.0001, patience = 10
                   ):
 
     output_dims = np.ones(len(reg_list), dtype="int16")
@@ -80,15 +79,15 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
     epochs = epochs
     model_trained = training_MT(X_train,X_val,Y_train,Y_val,model,epochs,loss_fn,optimizer, 
                                 output_dim=output_dims,early_stopping = early_stopping, 
-                                patience = 10)
+                                patience = patience)
 
     predicts, trues, r2_results, mse_results = test_MT(X_test,Y_test,model_trained,reg_list,scalers)
 
     # --- 4. 結果を表示 ---
     for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
-        print(f"Output {i+1} ({reg_list[i]}): R^2 Score = {r2:.4f}, MSE = {mse:.4f}")
+        print(f"Output {i+1} ({reg_list[i]}): R^2 Score = {r2:.3f}, MSE = {mse:.3f}")
     
-    write_result(r2_results, mse_results, columns_list = reg_list, csv_dir = csv_dir, method = method, ind = index, )
+    write_result(r2_results, mse_results, columns_list = reg_list, csv_dir = csv_dir, method = method, ind = index)
     
     for key, value in predicts.items():
         if key not in predictions:
