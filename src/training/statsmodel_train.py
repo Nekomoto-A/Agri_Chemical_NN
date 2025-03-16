@@ -21,5 +21,5 @@ def statsmodel_train(X,Y,scalers,reg):
     # モデルの学習
     for name, model in models.items():
         model.fit(X, Y)
-    print(models)
+    #print(models)
     return models
