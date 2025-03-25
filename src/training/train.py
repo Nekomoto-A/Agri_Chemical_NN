@@ -2,6 +2,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
+from src.experiments.visualize import visualize_tsne
+import matplotlib.pyplot as plt
+import os
 
 class NormalizedLoss(nn.Module):
     def __init__(self, num_tasks,epsilon=1e-8):
@@ -26,19 +29,27 @@ class NormalizedLoss(nn.Module):
             normalized_losses.append(normalized_loss)
         return sum(normalized_losses)
 
-def training_MT(x_tr,x_val,y_tr,y_val,model,epochs,regression_criterion,optimizer, output_dim,patience = 10,early_stopping = True):
+def training_MT(x_tr,x_val,y_tr,y_val,model,epochs,regression_criterion,optimizer, output_dim, reg_list, output_dir, model_name, 
+                patience = 10,early_stopping = True):
     loss_fn = NormalizedLoss(len(output_dim))
     best_loss = float('inf')  # 初期値は無限大
+    train_loss_history = {}
+    val_loss_history = {}
+    last_epoch = 1
     for epoch in range(epochs):
         model.train()
         torch.autograd.set_detect_anomaly(True)
         outputs = model(x_tr)
         train_losses = []
         for j in range(len(output_dim)):
-            train_losses.append(regression_criterion(outputs[j], y_tr[j]))
+            loss = regression_criterion(outputs[j], y_tr[j])
+            train_losses.append(loss)
+            train_loss_history.setdefault(reg_list[j], []).append(loss.item())
         train_loss = loss_fn(train_losses)
         #train_loss = sum(train_losses)
         
+        train_loss_history.setdefault('SUM', []).append(train_loss.item())
+    
         optimizer.zero_grad()
         train_loss.backward()
         optimizer.step()
@@ -50,14 +61,22 @@ def training_MT(x_tr,x_val,y_tr,y_val,model,epochs,regression_criterion,optimize
             outputs = model(x_val)
             val_losses = []
             for j in range(len(output_dim)):
-                val_losses.append(regression_criterion(outputs[j], y_val[j]))
+                loss = regression_criterion(outputs[j], y_val[j])
+                val_losses.append(loss)
+                val_loss_history.setdefault(reg_list[j], []).append(loss.item())
             val_loss = loss_fn(val_losses)
             #val_loss = sum(val_losses)
+            val_loss_history.setdefault('SUM', []).append(val_loss.item())
         print(f"Epoch [{epoch+1}/{epochs}], "
             f"Train Loss: {train_loss:.4f}, "
             f"Validation Loss: {val_loss:.4f}"
             )
-        
+        last_epoch += 1
+
+        if epoch % 10 == 0:
+            vis_name = f'{epoch}epoch.png'
+            visualize_tsne(model = model, model_name = model_name , X = x_tr, Y = y_tr, reg_list = reg_list, output_dir = output_dir, file_name = vis_name)
+
         if early_stopping == True:
                 # --- 早期終了の判定 ---
             if val_loss.item() < best_loss:
@@ -72,6 +91,26 @@ def training_MT(x_tr,x_val,y_tr,y_val,model,epochs,regression_criterion,optimize
             if patience_counter >= patience:
                 print("Early stopping triggered!")
                 break
+            # 学習過程の可視化
+    train_dir = os.path.join(output_dir, 'train')
+    for reg in val_loss_history.keys():
+        reg_dir = os.path.join(train_dir, f'{reg}')
+        os.makedirs(reg_dir,exist_ok=True)
+        train_loss_history_dir = os.path.join(reg_dir, f'{last_epoch}epoch.png')
+        # 学習過程の可視化
+        plt.figure(figsize=(8, 6))
+        plt.plot(range(1, last_epoch), train_loss_history[reg], label="Train Loss", marker="o")
+        plt.plot(range(1, last_epoch), val_loss_history[reg], label="Validation Loss", marker="s")
+        plt.xlabel("Epochs")
+        plt.ylabel("Loss")
+        plt.title("Training and Validation Loss per Epoch")
+        plt.legend()
+        plt.grid()
+        plt.tight_layout()
+        #plt.show()
+        plt.savefig(train_loss_history_dir)
+        plt.close()
+
     # ベストモデルの復元
     model.load_state_dict(best_model_state)
     return model
