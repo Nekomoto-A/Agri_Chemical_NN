@@ -37,6 +37,7 @@ def test_MT(x_te,y_te,model,reg_list,scalers):
 from src.training.train import training_MT
 from src.test.test import test_MT
 from src.models.MT_CNN import MTCNNModel
+from src.models.MT_NN import MTNNModel
 
 import numpy as np
 import os
@@ -66,12 +67,16 @@ def write_result(r2_results, mse_results, columns_list, csv_dir, method, ind):
     aligned_data.to_csv(csv_dir, mode="a", header=not os.path.exists(csv_dir), index=True, encoding="utf-8")
 
 def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predictions, tests, 
-                  input_dim, method, index, reg_list, csv_dir, 
-                  early_stopping = True, epochs = 10000, lr=0.0001, patience = 10
+                  input_dim, method, index, reg_list, csv_dir, vis_dir, 
+                  early_stopping = True, epochs = 10000, lr=0.0001, patience = 10, 
+                  model_name = 'CNN'
                   ):
 
     output_dims = np.ones(len(reg_list), dtype="int16")
-    model = MTCNNModel(input_dim = input_dim,output_dims = output_dims)
+    if model_name == 'CNN':
+        model = MTCNNModel(input_dim = input_dim,output_dims = output_dims)
+    else:
+        model = MTNNModel(input_dim = input_dim,output_dims = output_dims, hidden_layers=[128, 64, 64])
     # 回帰用の損失関数（MSE）
     loss_fn = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -79,7 +84,8 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
     epochs = epochs
     model_trained = training_MT(X_train,X_val,Y_train,Y_val,model,epochs,loss_fn,optimizer, 
                                 output_dim=output_dims,early_stopping = early_stopping, 
-                                patience = patience)
+                                patience = patience, reg_list = reg_list, output_dir = vis_dir, 
+                                model_name = model_name)
 
     predicts, trues, r2_results, mse_results = test_MT(X_test,Y_test,model_trained,reg_list,scalers)
 

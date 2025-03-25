@@ -30,7 +30,6 @@ def fold_evaluate(feature_path, target_path, reg_list, exclude_ids,
     mask = ~chem['crop-id'].isin(exclude_ids)
     X, Y = asv[mask], chem[mask]
 
-
     input_dim = X.shape[1]
     method = 'MT'
     method_st = 'ST'
@@ -48,32 +47,35 @@ def fold_evaluate(feature_path, target_path, reg_list, exclude_ids,
 
         X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers = transform_after_split(X_train,X_test,Y_train,Y_test, reg_list = reg_list,
                                                                                                                          val_size = val_size)
-
+        
+        fold_dir = os.path.join(sub_dir, index[0])
+        os.makedirs(fold_dir,exist_ok=True)
+        
+        vis_dir = os.path.join(fold_dir, method)
+        os.makedirs(vis_dir,exist_ok=True)
         predictions, tests, r2_results, mse_results = train_and_test(
             X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor, 
             scalers, predictions, tests, input_dim, method, index , reg_list, csv_dir,epochs = epochs, 
-            patience = patience,lr=lr
+            patience = patience,lr=lr, vis_dir = vis_dir
             )
 
         for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
             scores.setdefault('R2', {}).setdefault(method, {}).setdefault(reg_list[i], []).append(r2)
             scores.setdefault('MSE', {}).setdefault(method, {}).setdefault(reg_list[i], []).append(mse)
-            #r2_scores.setdefault(method, {}).setdefault(r, []).append(r2_results[i])
-            #mse_scores.setdefault(method, {}).setdefault(r, []).append(mse_results[i])
-
+        vis_dir = os.path.join(fold_dir, method_st)
+        os.makedirs(vis_dir,exist_ok=True)
         for i,r in enumerate(reg_list):
             Y_train_single, Y_val_single, Y_test_single =[Y_train_tensor[i]], [Y_val_tensor[i]], [Y_test_tensor[i]]
             reg = [r]
+
             predictions, tests, r2_result, mse_result = train_and_test(
             X_train_tensor, X_val_tensor, X_test_tensor, Y_train_single, Y_val_single, Y_test_single, 
             scalers, predictions, tests, input_dim, method, index , reg, csv_dir, 
-            epochs = epochs, patience = patience, lr=lr
+            epochs = epochs, patience = patience, lr=lr,vis_dir = vis_dir
             )
 
             scores.setdefault('R2', {}).setdefault(method_st, {}).setdefault(reg_list[i], []).append(r2_result[0])
             scores.setdefault('MSE', {}).setdefault(method_st, {}).setdefault(reg_list[i], []).append(mse_result[0])
-            #r2_scores.setdefault(method_st, {}).setdefault(r, []).append(r2_result[0])
-            #mse_scores.setdefault(method_st, {}).setdefault(r, []).append(mse_result[0])
 
             stats_scores = stats_models_result(X_train = X_train_tensor, Y_train = Y_train_single, 
                                         X_test = X_test_tensor, Y_test = Y_test_single, scalers = scalers, reg = r, 
@@ -84,8 +86,6 @@ def fold_evaluate(feature_path, target_path, reg_list, exclude_ids,
                         scores.setdefault(metrics, {}).setdefault(model_name, {}).setdefault(reg_name, []).append(value[0])
                         
     pprint.pprint(scores)
-
-    # 各Metric（MSE, R2）の中のMethodをソート
     
     # 平均値を格納する辞書
     avg_std = {}

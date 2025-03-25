@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 class MTCNNModel(nn.Module):
-    def __init__(self, input_dim, output_dims, conv_layers=[(64, 5, 1, 1)], hidden_dim=128):
+    def __init__(self, input_dim, output_dims, conv_layers=[(64, 3, 1, 1)], hidden_dim=128):
         super(MTCNNModel, self).__init__()
         self.input_sizes = input_dim
         self.hidden_dim = hidden_dim

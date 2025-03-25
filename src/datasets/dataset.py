@@ -6,6 +6,8 @@ from sklearn.model_selection import train_test_split
 import numpy as np
 from sklearn.preprocessing import StandardScaler,MinMaxScaler,PowerTransformer
 from torch.utils.data import TensorDataset, dataloader
+from sklearn.neighbors import LocalOutlierFactor
+
 
 class data_create:
     def __init__(self,path_asv,path_chem,reg_list):
@@ -13,11 +15,12 @@ class data_create:
         self.chem_data = pd.read_excel(path_chem)
         self.reg_list = reg_list
     def __iter__(self):
+        asv_data = self.asv_data
+        chem_data = self.chem_data
         for r in self.reg_list:
-            ind = self.chem_data[self.chem_data[r].isna()].index
-            asv_data = self.asv_data.drop(ind)
-            chem_data = self.chem_data.drop(ind)
-
+            ind = chem_data[self.chem_data[r].isna()].index
+            asv_data = asv_data.drop(ind)
+            chem_data = chem_data.drop(ind)
         yield asv_data
         yield chem_data
 
@@ -43,7 +46,27 @@ def clr_transform(data, geometric_mean=None,adjust = 1e-10):
     return clr_data, geometric_mean
 
 def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = 0.2):
+    '''
+    for r in reg_list:
+        Q1 = y_train[r].quantile(0.25)
+        Q3 = y_train[r].quantile(0.75)
+        IQR = Q3 - Q1
+
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+
+        y_train['outlier_iqr'] = (y_train[r] < lower_bound) | (y_train[r] > upper_bound)
+        out_ind = y_train[y_train['outlier_iqr']==True].index
+        print(len(out_ind))
+        x_train = x_train.drop(out_ind)
+        y_train = y_train.drop(out_ind)
+    '''
+
     x_train_split,x_val,y_train_split,y_val = train_test_split(x_train,y_train,test_size = val_size,random_state=0)
+
+    print('学習データ数:',len(x_train))
+    print('検証データ数:',len(x_val))
+    print('テストデータ数:',len(x_test))
 
     x_train_split_clr,mean = clr_transform(x_train_split.astype(float))
     x_val_clr,_ = clr_transform(x_val.astype(float),mean)
@@ -81,4 +104,3 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = 0.2)
         #test_set = TensorDataset(X_test_tensor, Y_test_tensor)
 
     return X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers
-
