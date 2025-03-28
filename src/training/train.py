@@ -29,7 +29,7 @@ class NormalizedLoss(nn.Module):
             normalized_losses.append(normalized_loss)
         return sum(normalized_losses)
 
-def training_MT(x_tr,x_val,y_tr,y_val,model,epochs,regression_criterion,optimizer, output_dim, reg_list, output_dir, model_name, 
+def training_MT(x_tr,x_val,y_tr,y_val,model,epochs,regression_criterion, classification_criterion, optimizer, output_dim, reg_list, output_dir, model_name, 
                 patience = 10,early_stopping = True):
     loss_fn = NormalizedLoss(len(output_dim))
     best_loss = float('inf')  # 初期値は無限大
@@ -42,9 +42,15 @@ def training_MT(x_tr,x_val,y_tr,y_val,model,epochs,regression_criterion,optimize
         outputs = model(x_tr)
         train_losses = []
         for j in range(len(output_dim)):
-            loss = regression_criterion(outputs[j], y_tr[j])
+            if torch.is_floating_point(y_tr[j]):
+                loss = regression_criterion(outputs[j], y_tr[j])
+            else:
+                loss = classification_criterion(outputs[j], y_tr[j])
+                #print(target)
+                #print(y_tr[j])
             train_losses.append(loss)
             train_loss_history.setdefault(reg_list[j], []).append(loss.item())
+
         train_loss = loss_fn(train_losses)
         #train_loss = sum(train_losses)
         
@@ -61,12 +67,17 @@ def training_MT(x_tr,x_val,y_tr,y_val,model,epochs,regression_criterion,optimize
             outputs = model(x_val)
             val_losses = []
             for j in range(len(output_dim)):
-                loss = regression_criterion(outputs[j], y_val[j])
+                if torch.is_floating_point(y_val[j]):
+                    loss = regression_criterion(outputs[j], y_val[j])
+                else:
+                    #target = torch.argmax(y_val[j], dim=-1)
+                    loss = classification_criterion(outputs[j], y_val[j])
                 val_losses.append(loss)
                 val_loss_history.setdefault(reg_list[j], []).append(loss.item())
             val_loss = loss_fn(val_losses)
             #val_loss = sum(val_losses)
             val_loss_history.setdefault('SUM', []).append(val_loss.item())
+            
         print(f"Epoch [{epoch+1}/{epochs}], "
             f"Train Loss: {train_loss:.4f}, "
             f"Validation Loss: {val_loss:.4f}"

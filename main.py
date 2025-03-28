@@ -6,10 +6,13 @@ from src.test.fold_eval import fold_evaluate
 #reg_list = ['EC', 'NH4.N','NO3.N','Inorganic.N']
 
 
-reg_list = [['pH','Available.P'],
-['CEC', 'Exchangeable.Ca', 'Exchangeable.K','Exchangeable.Mg'],
-['CEC', 'Humus'],
-['EC', 'NH4.N','NO3.N','Inorganic.N']]
+reg_list = [['pH','crop'],
+            ['CEC','crop'],
+            ['EC','crop'],
+            ['NH4.N','crop'],
+            ['NO3.N','crop'],
+            ['Inorganic.N','crop'],
+            ['Humus','crop']]
 
 exclude_ids = [
     '041_20_Sait_Carr', '042_20_Sait_Eggp', '043_20_Sait_Carr', '044_20_Sait_Broc',
@@ -23,10 +26,10 @@ exclude_ids = [
 url1 = 'data\\raw\\taxon_data\\taxon_lv6.csv'
 url2 = 'data\\raw\\chem_data.xlsx'
 
-epoch = 1000
+epoch = 200
 
 for reg in reg_list:
     fold_evaluate(feature_path = url1, target_path = url2, reg_list = reg, exclude_ids = exclude_ids,
-                    epochs = epoch, patience = epoch, lr=0.00001,
-                    output_dir = f'result_{epoch}')
+                    epochs = epoch, patience = 5, lr=0.0001,
+                    output_dir = f'result_{epoch}_pat')
 

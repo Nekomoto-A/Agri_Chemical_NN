@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 import os
 import umap
+from sklearn.preprocessing import MinMaxScaler
 
 # t-SNE による可視化関数
 def visualize_tsne(model, X, Y, reg_list, output_dir,file_name, model_name):
@@ -36,6 +37,8 @@ def visualize_tsne(model, X, Y, reg_list, output_dir,file_name, model_name):
                     plt.legend(*scatter.legend_elements(), title="Classes")
                 else:
                     # 連続値ラベルの場合
+                    scaler = MinMaxScaler()
+                    Y_single = scaler.fit_transform(Y_single)
                     scatter = plt.scatter(reduced_features[:, 0], reduced_features[:, 1], c=Y_single, cmap='viridis')
                     plt.colorbar(label="Label Value")  # 連続値の場合はカラーバーを表示
             else:

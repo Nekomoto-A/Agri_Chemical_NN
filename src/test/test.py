@@ -2,8 +2,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from sklearn.metrics import r2_score,mean_squared_error
+from sklearn.metrics import accuracy_score, r2_score, mean_squared_error, f1_score
 import matplotlib.pyplot as plt
+from src.experiments.visualize import visualize_tsne
 
 def test_MT(x_te,y_te,model,reg_list,scalers):
     model.eval()  # モデルを評価モードに
@@ -19,19 +20,32 @@ def test_MT(x_te,y_te,model,reg_list,scalers):
         #print(outputs)
         # 各出力の予測結果と実際の値をリストに格納
         for i,reg in enumerate(reg_list):
-            output = scalers[reg].inverse_transform(outputs[i].numpy())
-            true = scalers[reg].inverse_transform(y_te[i].numpy())
+            if torch.is_floating_point(y_te[i]) == True:
+                output = scalers[reg].inverse_transform(outputs[i].numpy())
+                true = scalers[reg].inverse_transform(y_te[i].numpy())
 
-            predicts[reg] = output
-            trues[reg] = true
+                predicts[reg] = output
+                trues[reg] = true
 
-            r2 = r2_score(true,output)
-            #print(r2)
-            r2_scores.append(r2)
-            mse = mean_squared_error(true,output)
-            #print(mse)
-            mse_scores.append(mse)
+                r2 = r2_score(true,output)
+                #print(r2)
+                r2_scores.append(r2)
+                mse = mean_squared_error(true,output)
+                #print(mse)
+                mse_scores.append(mse)
+            else:
+                output = torch.argmax(outputs[i], dim=-1).numpy()
+                true = y_te[i].numpy()
 
+                predicts[reg] = output
+                trues[reg] = true
+
+                r2 = accuracy_score(true,output)
+                #print(r2)
+                r2_scores.append(r2)
+                mse = f1_score(true,output, average='macro')
+                #print(mse)
+                mse_scores.append(mse)
     return predicts, trues, r2_scores, mse_scores
 
 from src.training.train import training_MT
@@ -45,7 +59,7 @@ import pandas as pd
 
 def write_result(r2_results, mse_results, columns_list, csv_dir, method, ind):
     index_tuples = list(zip(method, ind))
-    metrics = ["R2 Score", "MSE"]
+    metrics = ["accuracy", "Loss"]
     index = pd.MultiIndex.from_tuples(index_tuples, names=["method", "fold"])
     columns = pd.MultiIndex.from_product([metrics, columns_list])
 
@@ -67,22 +81,34 @@ def write_result(r2_results, mse_results, columns_list, csv_dir, method, ind):
     aligned_data.to_csv(csv_dir, mode="a", header=not os.path.exists(csv_dir), index=True, encoding="utf-8")
 
 def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predictions, tests, 
-                  input_dim, method, index, reg_list, csv_dir, vis_dir, 
+                  input_dim, method, index, reg_list, csv_dir, vis_dir,
                   early_stopping = True, epochs = 10000, lr=0.0001, patience = 10, 
                   model_name = 'CNN'
                   ):
 
-    output_dims = np.ones(len(reg_list), dtype="int16")
+    output_dims = []
+    #print(Y_train)
+    for num in range(len(reg_list)):
+        all = torch.cat((Y_train[num],Y_val[num], Y_test[num]), dim=0)
+        if torch.is_floating_point(all) == True:
+            output_dims.append(1)
+        else:
+            #print(torch.unique(all))
+            output_dims.append(len(torch.unique(all)))
+    #output_dims = np.ones(len(reg_list), dtype="int16")
+
     if model_name == 'CNN':
         model = MTCNNModel(input_dim = input_dim,output_dims = output_dims)
     else:
         model = MTNNModel(input_dim = input_dim,output_dims = output_dims, hidden_layers=[128, 64, 64])
     # 回帰用の損失関数（MSE）
-    loss_fn = nn.MSELoss()
+    reg_loss = nn.MSELoss()
+    class_loss = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
     epochs = epochs
-    model_trained = training_MT(X_train,X_val,Y_train,Y_val,model,epochs,loss_fn,optimizer, 
+    model_trained = training_MT(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val,model = model, epochs = epochs,
+                                regression_criterion=reg_loss, classification_criterion = class_loss, optimizer = optimizer, 
                                 output_dim=output_dims,early_stopping = early_stopping, 
                                 patience = patience, reg_list = reg_list, output_dir = vis_dir, 
                                 model_name = model_name)
