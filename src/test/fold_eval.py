@@ -26,9 +26,7 @@ def fold_evaluate(feature_path, target_path, reg_list, exclude_ids,
     if os.path.exists(csv_dir):
         os.remove(csv_dir)
 
-    asv,chem= data_create(feature_path, target_path, reg_list)
-    mask = ~chem['crop-id'].isin(exclude_ids)
-    X, Y = asv[mask], chem[mask]
+    X,Y,_ = data_create(feature_path, target_path, reg_list,exclude_ids)
 
     input_dim = X.shape[1]
     method = 'MT'
@@ -80,6 +78,7 @@ def fold_evaluate(feature_path, target_path, reg_list, exclude_ids,
             stats_scores = stats_models_result(X_train = X_train_tensor, Y_train = Y_train_single, 
                                         X_test = X_test_tensor, Y_test = Y_test_single, scalers = scalers, reg = r, 
                                         result_dir = csv_dir, index = index)
+            
             for metrics, dict in stats_scores.items():
                 for model_name, regs in dict.items():
                       for reg_name, value in regs.items():

@@ -7,22 +7,36 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler,MinMaxScaler,PowerTransformer
 from torch.utils.data import TensorDataset, dataloader
 from sklearn.neighbors import LocalOutlierFactor
-
+from sklearn.preprocessing import LabelEncoder
 
 class data_create:
-    def __init__(self,path_asv,path_chem,reg_list):
+    def __init__(self,path_asv,path_chem,reg_list,exclude_ids):
         self.asv_data = pd.read_csv(path_asv).drop('index',axis = 1)
         self.chem_data = pd.read_excel(path_chem)
         self.reg_list = reg_list
+        self.exclude_ids = exclude_ids
     def __iter__(self):
         asv_data = self.asv_data
         chem_data = self.chem_data
+        mask = ~chem_data['crop-id'].isin(self.exclude_ids)
+        asv_data,chem_data = asv_data[mask], chem_data[mask]
+        label_encoders = {}
         for r in self.reg_list:
             ind = chem_data[self.chem_data[r].isna()].index
             asv_data = asv_data.drop(ind)
             chem_data = chem_data.drop(ind)
+            
+            if np.issubdtype(chem_data[r].dtype, np.floating):
+                pass  # `float64` の場合はそのまま
+            else:
+                le = LabelEncoder()
+                chem_data[r] = le.fit_transform(chem_data[r])
+                label_encoders[r] = le  # 後でデコードするために保存
+                #print(chem_data[r].unique())
+                
         yield asv_data
         yield chem_data
+        yield label_encoders
 
 def clr_transform(data, geometric_mean=None,adjust = 1e-10):
     """
@@ -84,23 +98,25 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = 0.2)
     Y_train_tensor, Y_val_tensor, Y_test_tensor = [], [], []
 
     for reg in reg_list:
-        pp = StandardScaler()
-        #pp = MinMaxScaler()
-        #pp = PowerTransformer(method='yeo-johnson')
+        if np.issubdtype(y_train_split[reg].dtype, np.floating):
+            pp = StandardScaler()
+            #pp = MinMaxScaler()
+            #pp = PowerTransformer(method='yeo-johnson')
 
-        pp = pp.fit(y_train_split[reg].values.reshape(-1, 1))
-        y_train_split_pp = pp.transform(y_train_split[reg].values.reshape(-1, 1))
-        y_val_pp = pp.transform(y_val[reg].values.reshape(-1, 1))
-        y_test_pp = pp.transform(y_test[reg].values.reshape(-1, 1))
+            pp = pp.fit(y_train_split[reg].values.reshape(-1, 1))
+            y_train_split_pp = pp.transform(y_train_split[reg].values.reshape(-1, 1))
+            y_val_pp = pp.transform(y_val[reg].values.reshape(-1, 1))
+            y_test_pp = pp.transform(y_test[reg].values.reshape(-1, 1))
 
-        scalers[reg] = pp  # スケーラーを保存
+            scalers[reg] = pp  # スケーラーを保存
 
-        Y_train_tensor.append(torch.tensor(y_train_split_pp, dtype=torch.float32))
-        Y_val_tensor.append(torch.tensor(y_val_pp, dtype=torch.float32))
-        Y_test_tensor.append(torch.tensor(y_test_pp, dtype=torch.float32))
+            Y_train_tensor.append(torch.tensor(y_train_split_pp, dtype=torch.float32))
+            Y_val_tensor.append(torch.tensor(y_val_pp, dtype=torch.float32))
+            Y_test_tensor.append(torch.tensor(y_test_pp, dtype=torch.float32))
 
-        #train_set = TensorDataset(X_train_tensor, Y_train_tensor)
-        #val_set = TensorDataset(X_val_tensor, Y_val_tensor)
-        #test_set = TensorDataset(X_test_tensor, Y_test_tensor)
-
+        else:
+            #print(y_train_split[reg])
+            Y_train_tensor.append(torch.tensor(y_train_split[reg].values, dtype=torch.int64))
+            Y_val_tensor.append(torch.tensor(y_val[reg].values, dtype=torch.int64))
+            Y_test_tensor.append(torch.tensor(y_test[reg].values, dtype=torch.int64))
     return X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers
