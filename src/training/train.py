@@ -5,6 +5,13 @@ from torch.utils.data import DataLoader
 from src.experiments.visualize import visualize_tsne
 import matplotlib.pyplot as plt
 import os
+import yaml
+
+yaml_path = 'config.yaml'
+script_name = os.path.basename(__file__)
+with open(yaml_path, "r") as file:
+    config = yaml.safe_load(file)[script_name]
+
 
 class NormalizedLoss(nn.Module):
     def __init__(self, num_tasks,epsilon=1e-8):
@@ -29,13 +36,15 @@ class NormalizedLoss(nn.Module):
             normalized_losses.append(normalized_loss)
         return sum(normalized_losses)
 
-def training_MT(x_tr,x_val,y_tr,y_val,model,epochs,regression_criterion, classification_criterion, optimizer, output_dim, reg_list, output_dir, model_name, 
-                patience = 10,early_stopping = True):
+def training_MT(x_tr,x_val,y_tr,y_val,model,regression_criterion, classification_criterion, optimizer, output_dim, reg_list, output_dir, model_name, 
+                epochs = config['epochs'], patience = config['patience'],early_stopping = config['early_stopping'],loss_sum = config['loss_sum'],visualize = config['visualize']):
     loss_fn = NormalizedLoss(len(output_dim))
     best_loss = float('inf')  # 初期値は無限大
     train_loss_history = {}
     val_loss_history = {}
     last_epoch = 1
+
+
     for epoch in range(epochs):
         model.train()
         torch.autograd.set_detect_anomaly(True)
@@ -50,12 +59,13 @@ def training_MT(x_tr,x_val,y_tr,y_val,model,epochs,regression_criterion, classif
                 #print(y_tr[j])
             train_losses.append(loss)
             train_loss_history.setdefault(reg_list[j], []).append(loss.item())
-
-        train_loss = loss_fn(train_losses)
-        #train_loss = sum(train_losses)
+        if loss_sum == 'Normalized':
+            train_loss = loss_fn(train_losses)
+        else:
+            train_loss = sum(train_losses)
         
         train_loss_history.setdefault('SUM', []).append(train_loss.item())
-    
+
         optimizer.zero_grad()
         train_loss.backward()
         optimizer.step()
@@ -84,12 +94,27 @@ def training_MT(x_tr,x_val,y_tr,y_val,model,epochs,regression_criterion, classif
             )
         last_epoch += 1
 
-        if epoch % 10 == 0:
-            vis_name = f'{epoch}epoch.png'
-            visualize_tsne(model = model, model_name = model_name , X = x_tr, Y = y_tr, reg_list = reg_list, output_dir = output_dir, file_name = vis_name)
+        #print(loss)[]
+        if visualize == True:
+            if epoch % 10 == 0:
+                vis_name = f'{epoch+1}epoch.png'
+                visualize_tsne(model = model, model_name = model_name , X = x_tr, Y = y_tr, reg_list = reg_list, output_dir = output_dir, file_name = vis_name)
+
+                vis_losses = []
+                loss_list = []
+                for j,reg in enumerate(reg_list):
+                    if torch.is_floating_point(y_tr[j]):
+                        vis_loss = torch.abs(y_tr[j] - model(x_tr)[j])
+                        vis_losses.append(vis_loss)
+                        loss_list.append(reg)
+                #print(vis_losses)
+                #print(y_tr)
+                vis_name_loss = f'{epoch+1}epoch_loss.png'
+                visualize_tsne(model = model, model_name = model_name , X = x_tr, Y = vis_losses, reg_list = loss_list, output_dir = output_dir, file_name = vis_name_loss)
+
 
         if early_stopping == True:
-                # --- 早期終了の判定 ---
+            # --- 早期終了の判定 ---
             if val_loss.item() < best_loss:
             #if val_reg_loss.item() < best_loss:
                 best_loss = val_loss.item()
@@ -101,8 +126,11 @@ def training_MT(x_tr,x_val,y_tr,y_val,model,epochs,regression_criterion, classif
             
             if patience_counter >= patience:
                 print("Early stopping triggered!")
+                model.load_state_dict(best_model_state)
                 break
+                # ベストモデルの復元
             # 学習過程の可視化
+    
     train_dir = os.path.join(output_dir, 'train')
     for reg in val_loss_history.keys():
         reg_dir = os.path.join(train_dir, f'{reg}')
@@ -121,7 +149,4 @@ def training_MT(x_tr,x_val,y_tr,y_val,model,epochs,regression_criterion, classif
         #plt.show()
         plt.savefig(train_loss_history_dir)
         plt.close()
-
-    # ベストモデルの復元
-    model.load_state_dict(best_model_state)
     return model

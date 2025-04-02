@@ -11,9 +11,15 @@ import pandas as pd
 import collections
 import csv
 
-def fold_evaluate(feature_path, target_path, reg_list, exclude_ids,
-                  k = 5, val_size = 0.2, output_dir = 'result', csv_path = f'fold_result.csv', 
-                  final_output = 'result.csv',epochs = 10000, patience = 10,lr=0.0001
+import yaml
+yaml_path = 'config.yaml'
+script_name = os.path.basename(__file__)
+with open(yaml_path, "r") as file:
+    config = yaml.safe_load(file)[script_name]
+
+def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path = config['target_path'], exclude_ids = config['exclude_ids'],
+                  k = config['k_fold'], output_dir = config['result_dir'], csv_path = config['result_fold'], 
+                  final_output = config['result_average']
                   ):
 
     os.makedirs(output_dir,exist_ok=True)
@@ -43,8 +49,7 @@ def fold_evaluate(feature_path, target_path, reg_list, exclude_ids,
         X_train, X_test = X.iloc[train_index], X.iloc[test_index]
         Y_train, Y_test = Y.iloc[train_index], Y.iloc[test_index]
 
-        X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers = transform_after_split(X_train,X_test,Y_train,Y_test, reg_list = reg_list,
-                                                                                                                         val_size = val_size)
+        X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers = transform_after_split(X_train,X_test,Y_train,Y_test, reg_list = reg_list)
         
         fold_dir = os.path.join(sub_dir, index[0])
         os.makedirs(fold_dir,exist_ok=True)
@@ -53,8 +58,8 @@ def fold_evaluate(feature_path, target_path, reg_list, exclude_ids,
         os.makedirs(vis_dir,exist_ok=True)
         predictions, tests, r2_results, mse_results = train_and_test(
             X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor, 
-            scalers, predictions, tests, input_dim, method, index , reg_list, csv_dir,epochs = epochs, 
-            patience = patience,lr=lr, vis_dir = vis_dir
+            scalers, predictions, tests, input_dim, method, index , reg_list, csv_dir,
+            vis_dir = vis_dir
             )
 
         for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
@@ -69,7 +74,7 @@ def fold_evaluate(feature_path, target_path, reg_list, exclude_ids,
             predictions, tests, r2_result, mse_result = train_and_test(
             X_train_tensor, X_val_tensor, X_test_tensor, Y_train_single, Y_val_single, Y_test_single, 
             scalers, predictions, tests, input_dim, method, index , reg, csv_dir, 
-            epochs = epochs, patience = patience, lr=lr,vis_dir = vis_dir
+            vis_dir = vis_dir
             )
 
             scores.setdefault('R2', {}).setdefault(method_st, {}).setdefault(reg_list[i], []).append(r2_result[0])

@@ -6,6 +6,14 @@ from sklearn.metrics import accuracy_score, r2_score, mean_squared_error, f1_sco
 import matplotlib.pyplot as plt
 from src.experiments.visualize import visualize_tsne
 
+import yaml
+import os
+yaml_path = 'config.yaml'
+script_name = os.path.basename(__file__)
+with open(yaml_path, "r") as file:
+    config = yaml.safe_load(file)[script_name]
+
+
 def test_MT(x_te,y_te,model,reg_list,scalers):
     model.eval()  # モデルを評価モードに
     # 出力ごとの予測と実際のデータをリストに格納
@@ -82,8 +90,7 @@ def write_result(r2_results, mse_results, columns_list, csv_dir, method, ind):
 
 def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predictions, tests, 
                   input_dim, method, index, reg_list, csv_dir, vis_dir,
-                  early_stopping = True, epochs = 10000, lr=0.0001, patience = 10, 
-                  model_name = 'CNN'
+                  lr=config['learning_rate'], model_name = config['model_name']
                   ):
 
     output_dims = []
@@ -104,13 +111,12 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
     # 回帰用の損失関数（MSE）
     reg_loss = nn.MSELoss()
     class_loss = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=lr)
+    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=0.0001)
 
-    epochs = epochs
-    model_trained = training_MT(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val,model = model, epochs = epochs,
+    model_trained = training_MT(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val,model = model,
                                 regression_criterion=reg_loss, classification_criterion = class_loss, optimizer = optimizer, 
-                                output_dim=output_dims,early_stopping = early_stopping, 
-                                patience = patience, reg_list = reg_list, output_dir = vis_dir, 
+                                output_dim=output_dims,
+                                reg_list = reg_list, output_dir = vis_dir, 
                                 model_name = model_name)
 
     predicts, trues, r2_results, mse_results = test_MT(X_test,Y_test,model_trained,reg_list,scalers)
