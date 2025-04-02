@@ -9,6 +9,13 @@ from torch.utils.data import TensorDataset, dataloader
 from sklearn.neighbors import LocalOutlierFactor
 from sklearn.preprocessing import LabelEncoder
 
+import yaml
+import os
+yaml_path = 'config.yaml'
+script_name = os.path.basename(__file__)
+with open(yaml_path, "r") as file:
+    config = yaml.safe_load(file)[script_name]
+
 class data_create:
     def __init__(self,path_asv,path_chem,reg_list,exclude_ids):
         self.asv_data = pd.read_csv(path_asv).drop('index',axis = 1)
@@ -59,7 +66,7 @@ def clr_transform(data, geometric_mean=None,adjust = 1e-10):
     clr_data = np.log(data + 1).subtract(np.log(geometric_mean), axis=1)
     return clr_data, geometric_mean
 
-def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = 0.2):
+def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = config['val_size']):
     '''
     for r in reg_list:
         Q1 = y_train[r].quantile(0.25)
