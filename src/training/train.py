@@ -37,7 +37,7 @@ class NormalizedLoss(nn.Module):
         return sum(normalized_losses)
 
 def training_MT(x_tr,x_val,y_tr,y_val,model,regression_criterion, classification_criterion, optimizer, output_dim, reg_list, output_dir, model_name, 
-                epochs = config['epochs'], patience = config['patience'],early_stopping = config['early_stopping'],loss_sum = config['loss_sum'],visualize = config['visualize']):
+                epochs = config['epochs'], patience = config['patience'],early_stopping = config['early_stopping'],loss_sum = config['loss_sum'],visualize = config['visualize'],val = config['validation']):
     loss_fn = NormalizedLoss(len(output_dim))
     best_loss = float('inf')  # 初期値は無限大
     train_loss_history = {}
@@ -70,66 +70,66 @@ def training_MT(x_tr,x_val,y_tr,y_val,model,regression_criterion, classification
         train_loss.backward()
         optimizer.step()
 
-        # モデルを評価モードに設定（検証データ用）
-        model.eval()
-        val_loss = 0
-        with torch.no_grad():
-            outputs = model(x_val)
-            val_losses = []
-            for j in range(len(output_dim)):
-                if torch.is_floating_point(y_val[j]):
-                    loss = regression_criterion(outputs[j], y_val[j])
+        if val == True:
+            # モデルを評価モードに設定（検証データ用）
+            model.eval()
+            val_loss = 0
+            with torch.no_grad():
+                outputs = model(x_val)
+                val_losses = []
+                for j in range(len(output_dim)):
+                    if torch.is_floating_point(y_val[j]):
+                        loss = regression_criterion(outputs[j], y_val[j])
+                    else:
+                        #target = torch.argmax(y_val[j], dim=-1)
+                        loss = classification_criterion(outputs[j], y_val[j])
+                    val_losses.append(loss)
+                    val_loss_history.setdefault(reg_list[j], []).append(loss.item())
+                val_loss = loss_fn(val_losses)
+                #val_loss = sum(val_losses)
+                val_loss_history.setdefault('SUM', []).append(val_loss.item())
+                
+            print(f"Epoch [{epoch+1}/{epochs}], "
+                f"Train Loss: {train_loss:.4f}, "
+                f"Validation Loss: {val_loss:.4f}"
+                )
+            last_epoch += 1
+
+            #print(loss)[]
+            if visualize == True:
+                if epoch % 10 == 0:
+                    vis_name = f'{epoch+1}epoch.png'
+                    visualize_tsne(model = model, model_name = model_name , X = x_tr, Y = y_tr, reg_list = reg_list, output_dir = output_dir, file_name = vis_name)
+
+                    vis_losses = []
+                    loss_list = []
+                    for j,reg in enumerate(reg_list):
+                        if torch.is_floating_point(y_tr[j]):
+                            vis_loss = torch.abs(y_tr[j] - model(x_tr)[j])
+                            vis_losses.append(vis_loss)
+                            loss_list.append(reg)
+                    #print(vis_losses)
+                    #print(y_tr)
+                    vis_name_loss = f'{epoch+1}epoch_loss.png'
+                    visualize_tsne(model = model, model_name = model_name , X = x_tr, Y = vis_losses, reg_list = loss_list, output_dir = output_dir, file_name = vis_name_loss)
+
+            if early_stopping == True:
+                # --- 早期終了の判定 ---
+                if val_loss.item() < best_loss:
+                #if val_reg_loss.item() < best_loss:
+                    best_loss = val_loss.item()
+                    #best_loss = val_reg_loss.item()
+                    patience_counter = 0  # 改善したのでリセット
+                    best_model_state = model.state_dict()  # ベストモデルを保存
                 else:
-                    #target = torch.argmax(y_val[j], dim=-1)
-                    loss = classification_criterion(outputs[j], y_val[j])
-                val_losses.append(loss)
-                val_loss_history.setdefault(reg_list[j], []).append(loss.item())
-            val_loss = loss_fn(val_losses)
-            #val_loss = sum(val_losses)
-            val_loss_history.setdefault('SUM', []).append(val_loss.item())
-            
-        print(f"Epoch [{epoch+1}/{epochs}], "
-            f"Train Loss: {train_loss:.4f}, "
-            f"Validation Loss: {val_loss:.4f}"
-            )
-        last_epoch += 1
-
-        #print(loss)[]
-        if visualize == True:
-            if epoch % 10 == 0:
-                vis_name = f'{epoch+1}epoch.png'
-                visualize_tsne(model = model, model_name = model_name , X = x_tr, Y = y_tr, reg_list = reg_list, output_dir = output_dir, file_name = vis_name)
-
-                vis_losses = []
-                loss_list = []
-                for j,reg in enumerate(reg_list):
-                    if torch.is_floating_point(y_tr[j]):
-                        vis_loss = torch.abs(y_tr[j] - model(x_tr)[j])
-                        vis_losses.append(vis_loss)
-                        loss_list.append(reg)
-                #print(vis_losses)
-                #print(y_tr)
-                vis_name_loss = f'{epoch+1}epoch_loss.png'
-                visualize_tsne(model = model, model_name = model_name , X = x_tr, Y = vis_losses, reg_list = loss_list, output_dir = output_dir, file_name = vis_name_loss)
-
-
-        if early_stopping == True:
-            # --- 早期終了の判定 ---
-            if val_loss.item() < best_loss:
-            #if val_reg_loss.item() < best_loss:
-                best_loss = val_loss.item()
-                #best_loss = val_reg_loss.item()
-                patience_counter = 0  # 改善したのでリセット
-                best_model_state = model.state_dict()  # ベストモデルを保存
-            else:
-                patience_counter += 1  # 改善していないのでカウントアップ
-            
-            if patience_counter >= patience:
-                print("Early stopping triggered!")
-                model.load_state_dict(best_model_state)
-                break
-                # ベストモデルの復元
-            # 学習過程の可視化
+                    patience_counter += 1  # 改善していないのでカウントアップ
+                
+                if patience_counter >= patience:
+                    print("Early stopping triggered!")
+                    model.load_state_dict(best_model_state)
+                    break
+                    # ベストモデルの復元
+                # 学習過程の可視化
     
     train_dir = os.path.join(output_dir, 'train')
     for reg in val_loss_history.keys():
@@ -139,7 +139,8 @@ def training_MT(x_tr,x_val,y_tr,y_val,model,regression_criterion, classification
         # 学習過程の可視化
         plt.figure(figsize=(8, 6))
         plt.plot(range(1, last_epoch), train_loss_history[reg], label="Train Loss", marker="o")
-        plt.plot(range(1, last_epoch), val_loss_history[reg], label="Validation Loss", marker="s")
+        if val == True:
+            plt.plot(range(1, last_epoch), val_loss_history[reg], label="Validation Loss", marker="s")
         plt.xlabel("Epochs")
         plt.ylabel("Loss")
         plt.title("Training and Validation Loss per Epoch")
@@ -149,4 +150,5 @@ def training_MT(x_tr,x_val,y_tr,y_val,model,regression_criterion, classification
         #plt.show()
         plt.savefig(train_loss_history_dir)
         plt.close()
+
     return model

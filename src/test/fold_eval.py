@@ -4,6 +4,7 @@ from sklearn.model_selection import KFold
 import os
 from src.test.test import train_and_test,write_result
 from src.test.statsmodel_test import stats_models_result
+from src.experiments.visualize import reduce_feature
 import matplotlib.pyplot as plt
 import numpy as np
 import pprint
@@ -19,9 +20,8 @@ with open(yaml_path, "r") as file:
 
 def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path = config['target_path'], exclude_ids = config['exclude_ids'],
                   k = config['k_fold'], output_dir = config['result_dir'], csv_path = config['result_fold'], 
-                  final_output = config['result_average']
+                  final_output = config['result_average'], model_name = config['model_name'], reduced_feature_path = config['reduced_feature']
                   ):
-
     os.makedirs(output_dir,exist_ok=True)
     sub_dir = os.path.join(output_dir, f'{reg_list}')
     os.makedirs(sub_dir,exist_ok=True)
@@ -42,6 +42,8 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
     predictions = {}
     tests = {}
 
+    reduced = {}
+
     scores = {}
 
     for fold, (train_index, test_index) in enumerate(kf.split(X, Y)):
@@ -56,29 +58,37 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
         
         vis_dir = os.path.join(fold_dir, method)
         os.makedirs(vis_dir,exist_ok=True)
-        predictions, tests, r2_results, mse_results = train_and_test(
+
+        predictions, tests, r2_results, mse_results,model_trained = train_and_test(
             X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor, 
             scalers, predictions, tests, input_dim, method, index , reg_list, csv_dir,
-            vis_dir = vis_dir
+            vis_dir = vis_dir, model_name = model_name
             )
+        
+        reduced_features = reduce_feature(model = model_trained, X = X_test_tensor, model_name = model_name)
+        reduced.setdefault(method, {}).setdefault('all', []).append(reduced_features)
 
         for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
             scores.setdefault('R2', {}).setdefault(method, {}).setdefault(reg_list[i], []).append(r2)
             scores.setdefault('MSE', {}).setdefault(method, {}).setdefault(reg_list[i], []).append(mse)
         vis_dir = os.path.join(fold_dir, method_st)
         os.makedirs(vis_dir,exist_ok=True)
+
         for i,r in enumerate(reg_list):
             Y_train_single, Y_val_single, Y_test_single =[Y_train_tensor[i]], [Y_val_tensor[i]], [Y_test_tensor[i]]
             reg = [r]
 
-            predictions, tests, r2_result, mse_result = train_and_test(
+            predictions, tests, r2_result, mse_result, model_trained = train_and_test(
             X_train_tensor, X_val_tensor, X_test_tensor, Y_train_single, Y_val_single, Y_test_single, 
-            scalers, predictions, tests, input_dim, method, index , reg, csv_dir, 
-            vis_dir = vis_dir
+            scalers, predictions, tests, input_dim, method_st, index , reg, csv_dir, 
+            vis_dir = vis_dir, model_name = model_name
             )
 
-            scores.setdefault('R2', {}).setdefault(method_st, {}).setdefault(reg_list[i], []).append(r2_result[0])
-            scores.setdefault('MSE', {}).setdefault(method_st, {}).setdefault(reg_list[i], []).append(mse_result[0])
+            reduced_features = reduce_feature(model = model_trained, X = X_test_tensor, model_name = model_name)
+            reduced.setdefault(method_st, {}).setdefault(r, []).append(reduced_features)
+
+            scores.setdefault('R2', {}).setdefault(method_st, {}).setdefault(r, []).append(r2_result[0])
+            scores.setdefault('MSE', {}).setdefault(method_st, {}).setdefault(r, []).append(mse_result[0])
 
             stats_scores = stats_models_result(X_train = X_train_tensor, Y_train = Y_train_single, 
                                         X_test = X_test_tensor, Y_test = Y_test_single, scalers = scalers, reg = r, 
@@ -88,8 +98,61 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
                 for model_name, regs in dict.items():
                       for reg_name, value in regs.items():
                         scores.setdefault(metrics, {}).setdefault(model_name, {}).setdefault(reg_name, []).append(value[0])
-                        
-    pprint.pprint(scores)
+
+    predictions = {
+    model: {key: np.concatenate(value) for key, value in sub_dict.items()}
+    for model, sub_dict in predictions.items()
+    }
+
+    tests = {
+    model: {key: np.concatenate(value) for key, value in sub_dict.items()}
+    for model, sub_dict in tests.items()
+    }
+
+    reduced = {
+    model: {key: np.concatenate(value) for key, value in sub_dict.items()}
+    for model, sub_dict in reduced.items()
+    }
+
+    print(tests)
+    print(predictions)
+    reduced_feature_dir = os.path.join(sub_dir, reduced_feature_path)
+    os.makedirs(reduced_feature_dir,exist_ok=True)
+    for key, features in reduced.items():
+        model_dir = os.path.join(reduced_feature_dir, key)
+        os.makedirs(model_dir,exist_ok=True)
+
+        for reg in reg_list:
+            reg_dir = os.path.join(model_dir, f'{reg}.png')
+            
+            if key == 'MT':
+                x = features['all']
+            else:
+                x = features[reg]
+            y = tests[key][reg]
+            plt.figure(figsize=(8, 6))
+            if Y is not None:
+                if np.issubdtype(y.dtype, np.integer):  
+                    # カテゴリ（離散ラベル）の場合（20クラス未満）
+                    scatter = plt.scatter(x[:, 0], x[:, 1], c=y, cmap='tab10')
+                    plt.legend(*scatter.legend_elements(), title="Classes")
+                else:
+                    scatter = plt.scatter(x[:, 0], x[:, 1], c=y, cmap='viridis')
+                    plt.colorbar(label="Label Value")  # 連続値の場合はカラーバーを表示
+            else:
+                # ラベルなし
+                plt.scatter(x[:, 0], x[:, 1], alpha=0.7)
+            
+            #plt.title("t-SNE Visualization of Shared Layer Features")
+            plt.xlabel("t-SNE Component 1")
+            plt.ylabel("t-SNE Component 2")
+            plt.tight_layout()
+            #plt.show()
+            plt.savefig(reg_dir)
+            plt.close()
+
+    pprint.pprint(reduced)
+    #pprint.pprint(scores)
     
     # 平均値を格納する辞書
     avg_std = {}
@@ -109,7 +172,8 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
         return collections.OrderedDict((key, method_dict[key]) for key in sorted_keys)
     
     sorted_avg_std = {metric: sort_methods(methods) for metric, methods in avg_std.items()}
-    pprint.pprint(sorted_avg_std)
+    
+    #pprint.pprint(sorted_avg_std)
 
     with open(final_dir, mode='w', newline='') as file:
         writer = csv.writer(file)

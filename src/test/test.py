@@ -13,7 +13,6 @@ script_name = os.path.basename(__file__)
 with open(yaml_path, "r") as file:
     config = yaml.safe_load(file)[script_name]
 
-
 def test_MT(x_te,y_te,model,reg_list,scalers):
     model.eval()  # モデルを評価モードに
     # 出力ごとの予測と実際のデータをリストに格納
@@ -89,8 +88,8 @@ def write_result(r2_results, mse_results, columns_list, csv_dir, method, ind):
     aligned_data.to_csv(csv_dir, mode="a", header=not os.path.exists(csv_dir), index=True, encoding="utf-8")
 
 def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predictions, tests, 
-                  input_dim, method, index, reg_list, csv_dir, vis_dir,
-                  lr=config['learning_rate'], model_name = config['model_name']
+                  input_dim, method, index, reg_list, csv_dir, vis_dir, model_name, 
+                  lr=config['learning_rate']
                   ):
 
     output_dims = []
@@ -119,25 +118,19 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                 reg_list = reg_list, output_dir = vis_dir, 
                                 model_name = model_name)
 
-    predicts, trues, r2_results, mse_results = test_MT(X_test,Y_test,model_trained,reg_list,scalers)
+    predicts, true, r2_results, mse_results = test_MT(X_test,Y_test,model_trained,reg_list,scalers)
+
+    visualize_tsne(model = model_trained, model_name = model_name , X = X_test, Y = Y_test, reg_list = reg_list, output_dir = vis_dir, file_name = 'test.png')
 
     # --- 4. 結果を表示 ---
     for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
         print(f"Output {i+1} ({reg_list[i]}): R^2 Score = {r2:.3f}, MSE = {mse:.3f}")
-    
-    write_result(r2_results, mse_results, columns_list = reg_list, csv_dir = csv_dir, method = method, ind = index)
-    
-    for key, value in predicts.items():
-        if key not in predictions:
-            predictions[key] = value  # 最初の値を追加
-        else:
-            predictions[key] = np.concatenate((predictions[key], value))  # 既存のリストに追加
 
-    for key, value in trues.items():
-        if key not in tests:
-            tests[key] = value  # 最初の値を追加
-        else:
-            tests[key] = np.concatenate((tests[key], value))  # 既存のリストに追加
-    
-    return predictions, tests, r2_results, mse_results
+    for reg in reg_list:
+        predictions.setdefault(method, {}).setdefault(reg, []).append(predicts[reg])
+        tests.setdefault(method, {}).setdefault(reg, []).append(true[reg])
+
+    write_result(r2_results, mse_results, columns_list = reg_list, csv_dir = csv_dir, method = method, ind = index)
+  
+    return predictions, tests, r2_results, mse_results, model_trained
 

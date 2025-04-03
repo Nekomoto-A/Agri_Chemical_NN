@@ -5,15 +5,17 @@ train.py:
   patience: 5
   loss_sum: 'Normalized'
   visualize: False
-  epochs: 1
+  epochs: 100
+  validation: True
 test.py:
-  model_name: 'CNN'
   learning_rate: 0.0001
 fold_eval.py:
   k_fold: 5
+  model_name: 'CNN'
   result_dir: 'result'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
+  'reduced_feature': reduced_feature
   exclude_ids: [
     '041_20_Sait_Carr', '042_20_Sait_Eggp', '043_20_Sait_Carr', '044_20_Sait_Broc',
     '045_20_Sait_Broc', '046_20_Sait_Burd', '047_20_Sait_Burd', '048_20_Sait_Yama',
@@ -28,5 +30,30 @@ main.py:
             ['NH4.N','pref'],
             ['NO3.N','pref'],
             ['Inorganic.N','pref'],
-            ['Humus','pref']]
+            ['Humus','pref'],
+            ['pH','pref'],
+            ['Available.P','pref'],
+
+            ['CEC','crop'],
+            ['EC','crop'],
+            ['NH4.N','crop'],
+            ['NO3.N','crop'],
+            ['Inorganic.N','crop'],
+            ['Humus','crop'],
+            ['pH','crop'],
+            ['Available.P','crop'],
+            
+            ['CEC','pref','crop'],
+            ['EC','pref','crop'],
+            ['NH4.N','pref','crop'],
+            ['NO3.N','pref','crop'],
+            ['Inorganic.N','pref','crop'],
+            ['Humus','pref','crop'],
+            ['pH','pref','crop'],
+            ['Available.P','pref','crop'],
+
+            ['pH','Available.P'],
+            ['CEC','Humus'],
+            ['EC','NH4.N','NO3.N','Inorganic.N']
+            ]
 
