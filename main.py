@@ -6,7 +6,6 @@ script_name = os.path.basename(__file__)
 with open(yaml_path, "r") as file:
     config = yaml.safe_load(file)[script_name]
 
-
 reg_list = config['reg_list']
 
 def main():
