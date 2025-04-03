@@ -1,4 +1,5 @@
 dataset.py:
+  non_outlier: True
   val_size: 0.2
 train.py:
   early_stopping: False

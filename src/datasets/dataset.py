@@ -34,7 +34,19 @@ class data_create:
             chem_data = chem_data.drop(ind)
             
             if np.issubdtype(chem_data[r].dtype, np.floating):
-                pass  # `float64` の場合はそのまま
+                if config['non_outlier'] == True:
+                    Q1 = chem_data[r].quantile(0.25)
+                    Q3 = chem_data[r].quantile(0.75)
+                    IQR = Q3 - Q1
+
+                    lower_bound = Q1 - 1.5 * IQR
+                    upper_bound = Q3 + 1.5 * IQR
+
+                    chem_data['outlier_iqr'] = (chem_data[r] < lower_bound) | (chem_data[r] > upper_bound)
+                    out_ind = chem_data[chem_data['outlier_iqr']==True].index
+                    #print(len(out_ind))
+                    asv_data = asv_data.drop(out_ind)
+                    chem_data = chem_data.drop(out_ind)
             else:
                 le = LabelEncoder()
                 chem_data[r] = le.fit_transform(chem_data[r])
@@ -67,22 +79,6 @@ def clr_transform(data, geometric_mean=None,adjust = 1e-10):
     return clr_data, geometric_mean
 
 def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = config['val_size']):
-    '''
-    for r in reg_list:
-        Q1 = y_train[r].quantile(0.25)
-        Q3 = y_train[r].quantile(0.75)
-        IQR = Q3 - Q1
-
-        lower_bound = Q1 - 1.5 * IQR
-        upper_bound = Q3 + 1.5 * IQR
-
-        y_train['outlier_iqr'] = (y_train[r] < lower_bound) | (y_train[r] > upper_bound)
-        out_ind = y_train[y_train['outlier_iqr']==True].index
-        print(len(out_ind))
-        x_train = x_train.drop(out_ind)
-        y_train = y_train.drop(out_ind)
-    '''
-
     x_train_split,x_val,y_train_split,y_val = train_test_split(x_train,y_train,test_size = val_size,random_state=0)
 
     print('学習データ数:',len(x_train))
