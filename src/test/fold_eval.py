@@ -151,8 +151,8 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
             plt.savefig(reg_dir)
             plt.close()
 
-    pprint.pprint(reduced)
-    #pprint.pprint(scores)
+    #pprint.pprint(reduced)
+    pprint.pprint(scores)
     
     # 平均値を格納する辞書
     avg_std = {}
@@ -173,7 +173,7 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
     
     sorted_avg_std = {metric: sort_methods(methods) for metric, methods in avg_std.items()}
     
-    #pprint.pprint(sorted_avg_std)
+    pprint.pprint(sorted_avg_std)
 
     with open(final_dir, mode='w', newline='') as file:
         writer = csv.writer(file)
