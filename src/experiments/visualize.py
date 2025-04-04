@@ -14,7 +14,7 @@ def reduce_feature(model,X,model_name):
             shared_features = model.sharedconv(X.unsqueeze(1)).cpu().numpy()  # 共有層の出力を取得
             #print(shared_features.shape)
             shared_features = shared_features.reshape(shared_features.shape[0], -1)
-        else:
+        elif model_name == 'NN':
             shared_features = model.sharedfc(X).cpu().numpy()  # 共有層の出力を取得
         
         # t-SNE で2次元に圧縮

@@ -8,6 +8,7 @@ from sklearn.preprocessing import StandardScaler,MinMaxScaler,PowerTransformer
 from torch.utils.data import TensorDataset, dataloader
 from sklearn.neighbors import LocalOutlierFactor
 from sklearn.preprocessing import LabelEncoder
+from sklearn.cluster import DBSCAN
 
 import yaml
 import os
@@ -25,16 +26,18 @@ class data_create:
     def __iter__(self):
         asv_data = self.asv_data
         chem_data = self.chem_data
+
         mask = ~chem_data['crop-id'].isin(self.exclude_ids)
         asv_data,chem_data = asv_data[mask], chem_data[mask]
         label_encoders = {}
+        
         for r in self.reg_list:
             ind = chem_data[self.chem_data[r].isna()].index
             asv_data = asv_data.drop(ind)
             chem_data = chem_data.drop(ind)
             
             if np.issubdtype(chem_data[r].dtype, np.floating):
-                if config['non_outlier'] == True:
+                if config['non_outlier'] == 'Q':
                     Q1 = chem_data[r].quantile(0.25)
                     Q3 = chem_data[r].quantile(0.75)
                     IQR = Q3 - Q1
@@ -47,6 +50,16 @@ class data_create:
                     #print(len(out_ind))
                     asv_data = asv_data.drop(out_ind)
                     chem_data = chem_data.drop(out_ind)
+
+                if config['non_outlier'] == 'DBSCAN':
+                    db = DBSCAN(eps=0.5, min_samples=3)
+                    chem_data['labels'] = db.fit_predict(chem_data[r].values.reshape(-1, 1))
+
+                    out_ind = chem_data[chem_data['labels'] == -1].index
+                    asv_data = asv_data.drop(out_ind)
+                    chem_data = chem_data.drop(out_ind)                    
+                else:
+                    pass
             else:
                 le = LabelEncoder()
                 chem_data[r] = le.fit_transform(chem_data[r])
@@ -81,7 +94,7 @@ def clr_transform(data, geometric_mean=None,adjust = 1e-10):
 def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = config['val_size']):
     x_train_split,x_val,y_train_split,y_val = train_test_split(x_train,y_train,test_size = val_size,random_state=0)
 
-    print('学習データ数:',len(x_train))
+    print('学習データ数:',len(x_train_split))
     print('検証データ数:',len(x_val))
     print('テストデータ数:',len(x_test))
 

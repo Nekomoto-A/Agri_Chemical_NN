@@ -36,13 +36,23 @@ class NormalizedLoss(nn.Module):
             normalized_losses.append(normalized_loss)
         return sum(normalized_losses)
 
-def training_MT(x_tr,x_val,y_tr,y_val,model,regression_criterion, classification_criterion, optimizer, output_dim, reg_list, output_dir, model_name, 
+def training_MT(x_tr,x_val,y_tr,y_val,model, optimizer, output_dim, reg_list, output_dir, model_name, 
                 epochs = config['epochs'], patience = config['patience'],early_stopping = config['early_stopping'],loss_sum = config['loss_sum'],visualize = config['visualize'],val = config['validation']):
     loss_fn = NormalizedLoss(len(output_dim))
+    
+    personal_losses = []
+    for out in output_dim:
+        if out == 1:
+            personal_losses.append(nn.MSELoss())
+        else:
+            personal_losses.append(nn.CrossEntropyLoss())
+    
     best_loss = float('inf')  # 初期値は無限大
     train_loss_history = {}
     val_loss_history = {}
     last_epoch = 1
+
+    
 
 
     for epoch in range(epochs):
@@ -51,12 +61,11 @@ def training_MT(x_tr,x_val,y_tr,y_val,model,regression_criterion, classification
         outputs = model(x_tr)
         train_losses = []
         for j in range(len(output_dim)):
-            if torch.is_floating_point(y_tr[j]):
-                loss = regression_criterion(outputs[j], y_tr[j])
-            else:
-                loss = classification_criterion(outputs[j], y_tr[j])
-                #print(target)
-                #print(y_tr[j])
+
+            loss = personal_losses[j](outputs[j], y_tr[j])
+
+            #print(target)
+            #print(y_tr[j])
             train_losses.append(loss)
             train_loss_history.setdefault(reg_list[j], []).append(loss.item())
         if loss_sum == 'Normalized':
@@ -78,11 +87,8 @@ def training_MT(x_tr,x_val,y_tr,y_val,model,regression_criterion, classification
                 outputs = model(x_val)
                 val_losses = []
                 for j in range(len(output_dim)):
-                    if torch.is_floating_point(y_val[j]):
-                        loss = regression_criterion(outputs[j], y_val[j])
-                    else:
-                        #target = torch.argmax(y_val[j], dim=-1)
-                        loss = classification_criterion(outputs[j], y_val[j])
+                    loss = personal_losses[j](outputs[j], y_val[j])
+
                     val_losses.append(loss)
                     val_loss_history.setdefault(reg_list[j], []).append(loss.item())
                 val_loss = loss_fn(val_losses)
