@@ -87,11 +87,11 @@ def write_result(r2_results, mse_results, columns_list, csv_dir, method, ind):
     #result_data.to_csv(csv_dir, mode="a", header=not file_exists, index=True, encoding="utf-8")
     aligned_data.to_csv(csv_dir, mode="a", header=not os.path.exists(csv_dir), index=True, encoding="utf-8")
 
-def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predictions, tests, 
+def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predictions, trues, 
                   input_dim, method, index, reg_list, csv_dir, vis_dir, model_name, 
                   lr=config['learning_rate']
                   ):
-
+    
     output_dims = []
     #print(Y_train)
     for num in range(len(reg_list)):
@@ -105,15 +105,13 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
 
     if model_name == 'CNN':
         model = MTCNNModel(input_dim = input_dim,output_dims = output_dims)
-    else:
+    elif model_name == 'NN':
         model = MTNNModel(input_dim = input_dim,output_dims = output_dims, hidden_layers=[128, 64, 64])
-    # 回帰用の損失関数（MSE）
-    reg_loss = nn.MSELoss()
-    class_loss = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=0.0001)
+
+    optimizer = optim.Adam(model.parameters(), lr=lr)
 
     model_trained = training_MT(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val,model = model,
-                                regression_criterion=reg_loss, classification_criterion = class_loss, optimizer = optimizer, 
+                                optimizer = optimizer, 
                                 output_dim=output_dims,
                                 reg_list = reg_list, output_dir = vis_dir, 
                                 model_name = model_name)
@@ -128,9 +126,9 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
 
     for reg in reg_list:
         predictions.setdefault(method, {}).setdefault(reg, []).append(predicts[reg])
-        tests.setdefault(method, {}).setdefault(reg, []).append(true[reg])
+        trues.setdefault(method, {}).setdefault(reg, []).append(true[reg])
 
     write_result(r2_results, mse_results, columns_list = reg_list, csv_dir = csv_dir, method = method, ind = index)
   
-    return predictions, tests, r2_results, mse_results, model_trained
+    return predictions, trues, r2_results, mse_results, model_trained
 

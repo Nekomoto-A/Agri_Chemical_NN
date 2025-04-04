@@ -40,7 +40,7 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
     kf = KFold(n_splits=k, shuffle=True, random_state=42)
 
     predictions = {}
-    tests = {}
+    trues = {}
 
     reduced = {}
 
@@ -59,9 +59,10 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
         vis_dir = os.path.join(fold_dir, method)
         os.makedirs(vis_dir,exist_ok=True)
 
-        predictions, tests, r2_results, mse_results,model_trained = train_and_test(
+        print(X_train_tensor.shape)
+        predictions, trues, r2_results, mse_results,model_trained = train_and_test(
             X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor, 
-            scalers, predictions, tests, input_dim, method, index , reg_list, csv_dir,
+            scalers, predictions, trues, input_dim, method, index , reg_list, csv_dir,
             vis_dir = vis_dir, model_name = model_name
             )
         
@@ -71,21 +72,24 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
         for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
             scores.setdefault('R2', {}).setdefault(method, {}).setdefault(reg_list[i], []).append(r2)
             scores.setdefault('MSE', {}).setdefault(method, {}).setdefault(reg_list[i], []).append(mse)
+
         vis_dir = os.path.join(fold_dir, method_st)
         os.makedirs(vis_dir,exist_ok=True)
 
         for i,r in enumerate(reg_list):
             Y_train_single, Y_val_single, Y_test_single =[Y_train_tensor[i]], [Y_val_tensor[i]], [Y_test_tensor[i]]
             reg = [r]
+            print(X_train_tensor.shape)
 
-            predictions, tests, r2_result, mse_result, model_trained = train_and_test(
-            X_train_tensor, X_val_tensor, X_test_tensor, Y_train_single, Y_val_single, Y_test_single, 
-            scalers, predictions, tests, input_dim, method_st, index , reg, csv_dir, 
+            predictions, trues, r2_result, mse_result, model_trained = train_and_test(
+            X_train = X_train_tensor, X_val = X_val_tensor, X_test = X_test_tensor, Y_train = Y_train_single, Y_val = Y_val_single, Y_test = Y_test_single, 
+            scalers = scalers, predictions = predictions, trues = trues, input_dim = input_dim, method = method_st, index = index , reg_list = reg, csv_dir = csv_dir, 
             vis_dir = vis_dir, model_name = model_name
             )
 
             reduced_features = reduce_feature(model = model_trained, X = X_test_tensor, model_name = model_name)
             reduced.setdefault(method_st, {}).setdefault(r, []).append(reduced_features)
+
 
             scores.setdefault('R2', {}).setdefault(method_st, {}).setdefault(r, []).append(r2_result[0])
             scores.setdefault('MSE', {}).setdefault(method_st, {}).setdefault(r, []).append(mse_result[0])
@@ -95,18 +99,19 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
                                         result_dir = csv_dir, index = index)
             
             for metrics, dict in stats_scores.items():
-                for model_name, regs in dict.items():
+                for method_name, regs in dict.items():
                       for reg_name, value in regs.items():
-                        scores.setdefault(metrics, {}).setdefault(model_name, {}).setdefault(reg_name, []).append(value[0])
+                        scores.setdefault(metrics, {}).setdefault(method_name, {}).setdefault(reg_name, []).append(value[0])
+
 
     predictions = {
     model: {key: np.concatenate(value) for key, value in sub_dict.items()}
     for model, sub_dict in predictions.items()
     }
 
-    tests = {
+    trues = {
     model: {key: np.concatenate(value) for key, value in sub_dict.items()}
-    for model, sub_dict in tests.items()
+    for model, sub_dict in trues.items()
     }
 
     reduced = {
@@ -114,8 +119,8 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
     for model, sub_dict in reduced.items()
     }
 
-    print(tests)
-    print(predictions)
+    #print(tests)
+    #print(predictions)
     reduced_feature_dir = os.path.join(sub_dir, reduced_feature_path)
     os.makedirs(reduced_feature_dir,exist_ok=True)
     for key, features in reduced.items():
@@ -129,8 +134,9 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
                 x = features['all']
             else:
                 x = features[reg]
-            y = tests[key][reg]
+            y = trues[key][reg]
             plt.figure(figsize=(8, 6))
+
             if Y is not None:
                 if np.issubdtype(y.dtype, np.integer):  
                     # カテゴリ（離散ラベル）の場合（20クラス未満）
@@ -157,12 +163,12 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
     # 平均値を格納する辞書
     avg_std = {}
     for metrics,models in scores.items():
-        for model_name,regs in models.items():
+        for method_name,regs in models.items():
             for target,values in regs.items():
                 avg = f'{np.average(values):.3f}'
                 std = f'{np.std(values):.3f}'
                 result = f'{avg}±{std}'
-                avg_std.setdefault(metrics, {}).setdefault(model_name, {})[target] = result
+                avg_std.setdefault(metrics, {}).setdefault(method_name, {})[target] = result
     
     method_order = ["MT", "ST"]  # 先に固定するキー
     # "MT" -> "ST" -> その他 の順にソートする関数
