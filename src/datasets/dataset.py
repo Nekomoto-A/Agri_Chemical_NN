@@ -9,6 +9,7 @@ from torch.utils.data import TensorDataset, dataloader
 from sklearn.neighbors import LocalOutlierFactor
 from sklearn.preprocessing import LabelEncoder
 from sklearn.cluster import DBSCAN
+from torch.utils.data import Dataset
 
 import yaml
 import os
@@ -91,7 +92,7 @@ def clr_transform(data, geometric_mean=None,adjust = 1e-10):
     clr_data = np.log(data + 1).subtract(np.log(geometric_mean), axis=1)
     return clr_data, geometric_mean
 
-def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = config['val_size']):
+def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = config['val_size'], preprcess = config['preprocess']):
     x_train_split,x_val,y_train_split,y_val = train_test_split(x_train,y_train,test_size = val_size,random_state=0)
 
     print('学習データ数:',len(x_train_split))
@@ -115,16 +116,41 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
 
     for reg in reg_list:
         if np.issubdtype(y_train_split[reg].dtype, np.floating):
-            pp = StandardScaler()
-            #pp = MinMaxScaler()
-            #pp = PowerTransformer(method='yeo-johnson')
+            
+            if preprcess == 'SS':
+                pp = StandardScaler()
+                #pp = MinMaxScaler()
+                #pp = PowerTransformer(method='yeo-johnson')
 
-            pp = pp.fit(y_train_split[reg].values.reshape(-1, 1))
-            y_train_split_pp = pp.transform(y_train_split[reg].values.reshape(-1, 1))
-            y_val_pp = pp.transform(y_val[reg].values.reshape(-1, 1))
-            y_test_pp = pp.transform(y_test[reg].values.reshape(-1, 1))
+                pp = pp.fit(y_train_split[reg].values.reshape(-1, 1))
+                y_train_split_pp = pp.transform(y_train_split[reg].values.reshape(-1, 1))
+                y_val_pp = pp.transform(y_val[reg].values.reshape(-1, 1))
+                y_test_pp = pp.transform(y_test[reg].values.reshape(-1, 1))
+                scalers[reg] = pp  # スケーラーを保存
+            elif preprcess == 'MM':
+                #pp = StandardScaler()
+                pp = MinMaxScaler()
+                #pp = PowerTransformer(method='yeo-johnson')
 
-            scalers[reg] = pp  # スケーラーを保存
+                pp = pp.fit(y_train_split[reg].values.reshape(-1, 1))
+                y_train_split_pp = pp.transform(y_train_split[reg].values.reshape(-1, 1))
+                y_val_pp = pp.transform(y_val[reg].values.reshape(-1, 1))
+                y_test_pp = pp.transform(y_test[reg].values.reshape(-1, 1))
+                scalers[reg] = pp  # スケーラーを保存
+            elif preprcess == 'YJ':
+                pp = StandardScaler()
+                #pp = MinMaxScaler()
+                #pp = PowerTransformer(method='yeo-johnson')
+
+                pp = pp.fit(y_train_split[reg].values.reshape(-1, 1))
+                y_train_split_pp = pp.transform(y_train_split[reg].values.reshape(-1, 1))
+                y_val_pp = pp.transform(y_val[reg].values.reshape(-1, 1))
+                y_test_pp = pp.transform(y_test[reg].values.reshape(-1, 1))
+                scalers[reg] = pp  # スケーラーを保存
+            else:
+                y_train_split_pp = y_train_split[reg].values.reshape(-1, 1)
+                y_val_pp = y_val[reg].values.reshape(-1, 1)
+                y_test_pp = y_test[reg].values.reshape(-1, 1)
 
             Y_train_tensor.append(torch.tensor(y_train_split_pp, dtype=torch.float32))
             Y_val_tensor.append(torch.tensor(y_val_pp, dtype=torch.float32))
@@ -136,3 +162,18 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
             Y_val_tensor.append(torch.tensor(y_val[reg].values, dtype=torch.int64))
             Y_test_tensor.append(torch.tensor(y_test[reg].values, dtype=torch.int64))
     return X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers
+
+
+class MultiTaskDataset(Dataset):
+    def __init__(self, X, targets: list[torch.Tensor]):
+        self.X = X
+        self.targets = targets  # list of tensors [task1_labels, task2_labels, ...]
+
+    def __len__(self):
+        return len(self.X)
+
+    def __getitem__(self, idx):
+        x = self.X[idx]
+        ys = [y[idx] for y in self.targets]
+        return x, ys
+    

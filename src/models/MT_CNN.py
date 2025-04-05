@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 class MTCNNModel(nn.Module):
-    def __init__(self, input_dim, output_dims, conv_layers=[(64, 5, 1, 1),(64, 3, 1, 1)], hidden_dim=128):
+    def __init__(self, input_dim, output_dims, conv_layers=[(64, 5, 1, 1)], hidden_dim=128):
         super(MTCNNModel, self).__init__()
         self.input_sizes = input_dim
         self.hidden_dim = hidden_dim
@@ -29,9 +29,8 @@ class MTCNNModel(nn.Module):
             nn.Sequential(
                 nn.Linear(total_features, self.hidden_dim),
                 nn.ReLU(),
-                nn.Linear(self.hidden_dim, 64),
-                nn.ReLU(),
-                nn.Linear(64, out_dim),
+                nn.Dropout(0.2),
+                nn.Linear(self.hidden_dim, out_dim),
             ) for out_dim in output_dims
         ])
 

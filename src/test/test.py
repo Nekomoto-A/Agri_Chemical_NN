@@ -28,8 +28,12 @@ def test_MT(x_te,y_te,model,reg_list,scalers):
         # 各出力の予測結果と実際の値をリストに格納
         for i,reg in enumerate(reg_list):
             if torch.is_floating_point(y_te[i]) == True:
-                output = scalers[reg].inverse_transform(outputs[i].numpy())
-                true = scalers[reg].inverse_transform(y_te[i].numpy())
+                if not scalers:
+                    output = outputs[i].numpy()
+                    true = y_te[i].numpy()
+                else:
+                    output = scalers[reg].inverse_transform(outputs[i].numpy())
+                    true = scalers[reg].inverse_transform(y_te[i].numpy())
 
                 predicts[reg] = output
                 trues[reg] = true
@@ -91,7 +95,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                   input_dim, method, index, reg_list, csv_dir, vis_dir, model_name, 
                   lr=config['learning_rate']
                   ):
-    
+
     output_dims = []
     #print(Y_train)
     for num in range(len(reg_list)):
@@ -108,7 +112,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
     elif model_name == 'NN':
         model = MTNNModel(input_dim = input_dim,output_dims = output_dims, hidden_layers=[128, 64, 64])
 
-    optimizer = optim.Adam(model.parameters(), lr=lr)
+    optimizer = optim.Adam(model.parameters(), lr=lr,weight_decay=0.0001)
 
     model_trained = training_MT(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val,model = model,
                                 optimizer = optimizer, 

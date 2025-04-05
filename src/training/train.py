@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
+
+from src.datasets.dataset import MultiTaskDataset
 from src.experiments.visualize import visualize_tsne
 import matplotlib.pyplot as plt
 import os
@@ -11,6 +13,17 @@ yaml_path = 'config.yaml'
 script_name = os.path.basename(__file__)
 with open(yaml_path, "r") as file:
     config = yaml.safe_load(file)[script_name]
+
+import random
+import numpy as np
+def set_seed(seed: int = 42):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)  # if using GPU
+    torch.cuda.manual_seed_all(seed)  # multi-GPU 対応
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 
 class NormalizedLoss(nn.Module):
@@ -37,7 +50,8 @@ class NormalizedLoss(nn.Module):
         return sum(normalized_losses)
 
 def training_MT(x_tr,x_val,y_tr,y_val,model, optimizer, output_dim, reg_list, output_dir, model_name, 
-                epochs = config['epochs'], patience = config['patience'],early_stopping = config['early_stopping'],loss_sum = config['loss_sum'],visualize = config['visualize'],val = config['validation']):
+                epochs = config['epochs'], patience = config['patience'],early_stopping = config['early_stopping'],loss_sum = config['loss_sum'],
+                visualize = config['visualize'],val = config['validation'],batch_size = config['batch_size']):
     loss_fn = NormalizedLoss(len(output_dim))
     
     personal_losses = []
@@ -52,52 +66,67 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, optimizer, output_dim, reg_list, ou
     val_loss_history = {}
     last_epoch = 1
 
-    
 
+    set_seed(42)
+
+    trainset = MultiTaskDataset(x_tr, y_tr)
+    train_loader = DataLoader(trainset, batch_size=batch_size, shuffle=True)
+
+    valset = MultiTaskDataset(x_val, y_val)
+    val_loader = DataLoader(valset, batch_size=batch_size, shuffle=True)
 
     for epoch in range(epochs):
         model.train()
+        total_train_loss = 0.0
+        all_loss = {}
         torch.autograd.set_detect_anomaly(True)
-        outputs = model(x_tr)
-        train_losses = []
-        for j in range(len(output_dim)):
-
-            loss = personal_losses[j](outputs[j], y_tr[j])
-
-            #print(target)
-            #print(y_tr[j])
-            train_losses.append(loss)
-            train_loss_history.setdefault(reg_list[j], []).append(loss.item())
-        if loss_sum == 'Normalized':
-            train_loss = loss_fn(train_losses)
-        else:
-            train_loss = sum(train_losses)
         
-        train_loss_history.setdefault('SUM', []).append(train_loss.item())
+        for batch_x, batch_y in train_loader:
+            outputs = model(batch_x)
+            train_losses = []
+            for j in range(len(output_dim)):
 
-        optimizer.zero_grad()
-        train_loss.backward()
-        optimizer.step()
+                loss = personal_losses[j](outputs[j], batch_y[j])
+                train_losses.append(loss)
+                all_loss.setdefault(reg_list[j], []).append(loss.item())
+            if loss_sum == 'Normalized':
+                train_loss = loss_fn(train_losses)
+            else:
+                train_loss = sum(train_losses)
+            
+            total_train_loss += train_loss
+
+            optimizer.zero_grad()
+            train_loss.backward()
+            optimizer.step()
+        for key,item in all_loss.items():
+            train_loss_history.setdefault(key, []).append(sum(item))
+        train_loss_history.setdefault('SUM', []).append(total_train_loss.item())
 
         if val == True:
             # モデルを評価モードに設定（検証データ用）
+            all_val_loss = {}
             model.eval()
-            val_loss = 0
+            total_val_loss = 0
             with torch.no_grad():
-                outputs = model(x_val)
-                val_losses = []
-                for j in range(len(output_dim)):
-                    loss = personal_losses[j](outputs[j], y_val[j])
+                for batch_x,batch_y in val_loader:
+                    outputs = model(batch_x)
+                    val_losses = []
+                    for j in range(len(output_dim)):
+                        loss = personal_losses[j](outputs[j], batch_y[j])
+                        val_losses.append(loss)
+                        all_loss.setdefault(reg_list[j], []).append(loss.item())
+                    val_loss = loss_fn(val_losses)
+                    #val_loss = sum(val_losses)
+                    total_val_loss += val_loss.item()
 
-                    val_losses.append(loss)
-                    val_loss_history.setdefault(reg_list[j], []).append(loss.item())
-                val_loss = loss_fn(val_losses)
-                #val_loss = sum(val_losses)
+                for key,item in all_val_loss.items():
+                    val_loss_history.setdefault(key, []).append(sum(item))
                 val_loss_history.setdefault('SUM', []).append(val_loss.item())
-                
+            
             print(f"Epoch [{epoch+1}/{epochs}], "
-                f"Train Loss: {train_loss:.4f}, "
-                f"Validation Loss: {val_loss:.4f}"
+                f"Train Loss: {total_train_loss:.4f}, "
+                f"Validation Loss: {total_val_loss:.4f}"
                 )
             last_epoch += 1
 
@@ -121,9 +150,9 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, optimizer, output_dim, reg_list, ou
 
             if early_stopping == True:
                 # --- 早期終了の判定 ---
-                if val_loss.item() < best_loss:
+                if total_val_loss.item() < best_loss:
                 #if val_reg_loss.item() < best_loss:
-                    best_loss = val_loss.item()
+                    best_loss = total_val_loss.item()
                     #best_loss = val_reg_loss.item()
                     patience_counter = 0  # 改善したのでリセット
                     best_model_state = model.state_dict()  # ベストモデルを保存
@@ -142,6 +171,7 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, optimizer, output_dim, reg_list, ou
         reg_dir = os.path.join(train_dir, f'{reg}')
         os.makedirs(reg_dir,exist_ok=True)
         train_loss_history_dir = os.path.join(reg_dir, f'{last_epoch}epoch.png')
+        
         # 学習過程の可視化
         plt.figure(figsize=(8, 6))
         plt.plot(range(1, last_epoch), train_loss_history[reg], label="Train Loss", marker="o")
