@@ -37,7 +37,8 @@ class NormalizedLoss(nn.Module):
         return sum(normalized_losses)
 
 def training_MT(x_tr,x_val,y_tr,y_val,model, optimizer, output_dim, reg_list, output_dir, model_name, 
-                epochs = config['epochs'], patience = config['patience'],early_stopping = config['early_stopping'],loss_sum = config['loss_sum'],visualize = config['visualize'],val = config['validation']):
+                epochs = config['epochs'], patience = config['patience'],early_stopping = config['early_stopping'],loss_sum = config['loss_sum'],
+                visualize = config['visualize'], val = config['validation'], lambda_norm = config['lambda']):
     loss_fn = NormalizedLoss(len(output_dim))
     
     personal_losses = []
@@ -52,9 +53,6 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, optimizer, output_dim, reg_list, ou
     val_loss_history = {}
     last_epoch = 1
 
-    
-
-
     for epoch in range(epochs):
         model.train()
         torch.autograd.set_detect_anomaly(True)
@@ -68,11 +66,18 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, optimizer, output_dim, reg_list, ou
             #print(y_tr[j])
             train_losses.append(loss)
             train_loss_history.setdefault(reg_list[j], []).append(loss.item())
+        
         if loss_sum == 'Normalized':
             train_loss = loss_fn(train_losses)
         else:
             train_loss = sum(train_losses)
         
+        if model_name == 'CNN':
+            l2_norm = sum(p.pow(2).sum() for p in model.sharedconv.parameters())
+        elif model_name == 'NN':
+            l2_norm = sum(p.pow(2).sum() for p in model.sharedfc.parameters())
+        train_loss += lambda_norm * l2_norm
+
         train_loss_history.setdefault('SUM', []).append(train_loss.item())
 
         optimizer.zero_grad()
@@ -92,6 +97,7 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, optimizer, output_dim, reg_list, ou
                     val_losses.append(loss)
                     val_loss_history.setdefault(reg_list[j], []).append(loss.item())
                 val_loss = loss_fn(val_losses)
+                val_loss += lambda_norm * l2_norm
                 #val_loss = sum(val_losses)
                 val_loss_history.setdefault('SUM', []).append(val_loss.item())
                 
