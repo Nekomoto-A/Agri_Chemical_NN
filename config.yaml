@@ -8,7 +8,7 @@ train.py:
   visualize: False
   epochs: 100
   validation: True
-  lambda: 0.01
+  lambda: 0.001
 test.py:
   learning_rate: 0.001
 fold_eval.py:

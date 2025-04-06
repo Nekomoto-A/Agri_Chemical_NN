@@ -73,9 +73,9 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, optimizer, output_dim, reg_list, ou
             train_loss = sum(train_losses)
         
         if model_name == 'CNN':
-            l2_norm = sum(p.pow(2).sum() for p in model.sharedconv.parameters())
+            l2_norm = sum(p.abs().sum() for p in model.sharedconv.parameters())
         elif model_name == 'NN':
-            l2_norm = sum(p.pow(2).sum() for p in model.sharedfc.parameters())
+            l2_norm = sum(p.abs().sum() for p in model.sharedfc.parameters())
         train_loss += lambda_norm * l2_norm
 
         train_loss_history.setdefault('SUM', []).append(train_loss.item())
