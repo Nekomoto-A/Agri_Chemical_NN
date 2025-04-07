@@ -1,5 +1,5 @@
 dataset.py:
-  non_outlier: 'DBSCAN'
+  non_outlier: 'None'
   val_size: 0.2
 train.py:
   early_stopping: False
@@ -8,7 +8,7 @@ train.py:
   visualize: True
   epochs: 100
   validation: True
-  lambda: 0.0001
+  lambda: 0.001
 test.py:
   learning_rate: 0.001
 fold_eval.py:
