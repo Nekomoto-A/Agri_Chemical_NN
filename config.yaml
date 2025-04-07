@@ -5,7 +5,7 @@ train.py:
   early_stopping: False
   patience: 5
   loss_sum: 'Normalized'
-  visualize: False
+  visualize: True
   epochs: 100
   validation: True
   lambda: 0.001
@@ -27,15 +27,7 @@ fold_eval.py:
   feature_path: 'data/raw/taxon_data/taxon_lv7.csv'
   target_path: 'data/raw/chem_data.xlsx'
 main.py:
-  reg_list: [['CEC','pref'],
-            ['EC','pref'],
-            ['NH4.N','pref'],
-            ['NO3.N','pref'],
-            ['Inorganic.N','pref'],
-            ['Humus','pref'],
-            ['pH','pref'],
-            ['Available.P','pref'],
-
+  reg_list: [
             ['CEC','crop'],
             ['EC','crop'],
             ['NH4.N','crop'],
@@ -43,19 +35,6 @@ main.py:
             ['Inorganic.N','crop'],
             ['Humus','crop'],
             ['pH','crop'],
-            ['Available.P','crop'],
-            
-            ['CEC','pref','crop'],
-            ['EC','pref','crop'],
-            ['NH4.N','pref','crop'],
-            ['NO3.N','pref','crop'],
-            ['Inorganic.N','pref','crop'],
-            ['Humus','pref','crop'],
-            ['pH','pref','crop'],
-            ['Available.P','pref','crop'],
-
-            ['pH','Available.P'],
-            ['CEC','Humus'],
-            ['EC','NH4.N','NO3.N','Inorganic.N']
+            ['Available.P','crop']
             ]
 
