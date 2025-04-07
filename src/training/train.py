@@ -73,10 +73,10 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, optimizer, output_dim, reg_list, ou
             train_loss = sum(train_losses)
         
         if model_name == 'CNN':
-            l2_norm = sum(p.abs().sum() for p in model.sharedconv.parameters())
+            l1_norm = sum(p.abs().sum() for p in model.sharedconv.parameters())
         elif model_name == 'NN':
-            l2_norm = sum(p.abs().sum() for p in model.sharedfc.parameters())
-        train_loss += lambda_norm * l2_norm
+            l1_norm = sum(p.abs().sum() for p in model.sharedfc.parameters())
+        train_loss += lambda_norm * l1_norm
 
         train_loss_history.setdefault('SUM', []).append(train_loss.item())
 
@@ -97,7 +97,7 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, optimizer, output_dim, reg_list, ou
                     val_losses.append(loss)
                     val_loss_history.setdefault(reg_list[j], []).append(loss.item())
                 val_loss = loss_fn(val_losses)
-                val_loss += lambda_norm * l2_norm
+                val_loss += lambda_norm * l1_norm
                 #val_loss = sum(val_losses)
                 val_loss_history.setdefault('SUM', []).append(val_loss.item())
                 
@@ -109,7 +109,7 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, optimizer, output_dim, reg_list, ou
 
             #print(loss)[]
             if visualize == True:
-                if epoch % 10 == 0:
+                if (epoch + 1) % 10 == 0:
                     vis_name = f'{epoch+1}epoch.png'
                     visualize_tsne(model = model, model_name = model_name , X = x_tr, Y = y_tr, reg_list = reg_list, output_dir = output_dir, file_name = vis_name)
 

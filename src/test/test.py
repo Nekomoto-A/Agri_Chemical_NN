@@ -91,7 +91,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                   input_dim, method, index, reg_list, csv_dir, vis_dir, model_name, 
                   lr=config['learning_rate']
                   ):
-    
+
     output_dims = []
     #print(Y_train)
     for num in range(len(reg_list)):
@@ -129,6 +129,5 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         trues.setdefault(method, {}).setdefault(reg, []).append(true[reg])
 
     write_result(r2_results, mse_results, columns_list = reg_list, csv_dir = csv_dir, method = method, ind = index)
-  
-    return predictions, trues, r2_results, mse_results, model_trained
 
+    return predictions, trues, r2_results, mse_results, model_trained

@@ -32,7 +32,7 @@ def visualize_tsne(model, X, Y, reg_list, output_dir,file_name, model_name):
         os.makedirs(reg_dir,exist_ok=True)
         sub_dir = os.path.join(reg_dir, f'{file_name}')
 
-        Y_single = Y[i].numpy()
+        Y_single = Y[i].detach().numpy()
         # プロット
         plt.figure(figsize=(8, 6))
         if Y is not None:
