@@ -1,0 +1,4 @@
+,,accuracy,accuracy,Loss,Loss
+,,CEC,crop,CEC,crop
+method,fold,,,,
+M,fold1,0.4964396357536316,0.8,38.35650634765625,0.783531746031746

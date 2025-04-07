@@ -11,6 +11,7 @@ import pprint
 import pandas as pd
 import collections
 import csv
+from sklearn.manifold import TSNE
 
 import yaml
 yaml_path = 'config.yaml'
@@ -66,8 +67,9 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
             vis_dir = vis_dir, model_name = model_name
             )
         
-        reduced_features = reduce_feature(model = model_trained, X = X_test_tensor, model_name = model_name)
-        reduced.setdefault(method, {}).setdefault('all', []).append(reduced_features)
+        reduced_features = model.sharedconv(X_test_tensor.unsqueeze(1)).cpu().numpy()
+        reduced_features = reduced_features.reshape(reduced_features.shape[0], -1)
+        reduced.setdefault(method_st, {}).setdefault('all', []).append(reduced_features)
 
         for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
             scores.setdefault('R2', {}).setdefault(method, {}).setdefault(reg_list[i], []).append(r2)
@@ -87,7 +89,9 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
             vis_dir = vis_dir, model_name = model_name
             )
 
-            reduced_features = reduce_feature(model = model_trained, X = X_test_tensor, model_name = model_name)
+            #reduced_features = reduce_feature(model = model_trained, X = X_test_tensor, model_name = model_name)
+            reduced_features = model.sharedconv(X_test_tensor.unsqueeze(1)).cpu().numpy()
+            reduced_features = reduced_features.reshape(reduced_features.shape[0], -1)
             reduced.setdefault(method_st, {}).setdefault(r, []).append(reduced_features)
 
 
@@ -114,10 +118,15 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
     for model, sub_dict in trues.items()
     }
 
+
+    reducer = TSNE(n_components=2, perplexity=30, random_state=42)
+    #reducer = umap.UMAP(n_components=2, random_state=42)
+
     reduced = {
-    model: {key: np.concatenate(value) for key, value in sub_dict.items()}
+    model: {key: reducer.fit_transform(np.concatenate(value)) for key, value in sub_dict.items()}
     for model, sub_dict in reduced.items()
     }
+
 
     #print(tests)
     #print(predictions)
