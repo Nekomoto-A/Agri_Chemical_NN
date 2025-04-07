@@ -8,5 +8,5 @@ subprocess.run(["python", "main.py"])
 
 # さらにGitの操作を実行 (例: コミットを実行)
 subprocess.run(["git", "add", "."])
-subprocess.run(["git", "commit", "-m", "l1 visualize DBSCAN add"])
+subprocess.run(["git", "commit", "-m", "l1 visualize val 100epoch"])
 subprocess.run(["git", "push","origin","experiment"])
