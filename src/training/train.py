@@ -159,6 +159,7 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, optimizer, output_dim, reg_list, ou
         plt.legend()
         plt.grid()
         plt.tight_layout()
+        plt.ylim(0,10)
         #plt.show()
         plt.savefig(train_loss_history_dir)
         plt.close()

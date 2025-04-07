@@ -67,7 +67,10 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
             vis_dir = vis_dir, model_name = model_name
             )
         
-        reduced_features = model.sharedconv(X_test_tensor.unsqueeze(1)).cpu().numpy()
+        if model_name == 'CNN':
+            reduced_features = model_trained.sharedconv(X_test_tensor.unsqueeze(1)).detach().numpy()
+        elif model_name == 'NN':
+            reduced_features = model_trained.sharedfc(X_test_tensor).detach().numpy()
         reduced_features = reduced_features.reshape(reduced_features.shape[0], -1)
         reduced.setdefault(method_st, {}).setdefault('all', []).append(reduced_features)
 
@@ -90,7 +93,10 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
             )
 
             #reduced_features = reduce_feature(model = model_trained, X = X_test_tensor, model_name = model_name)
-            reduced_features = model.sharedconv(X_test_tensor.unsqueeze(1)).cpu().numpy()
+            if model_name == 'CNN':
+                reduced_features = model_trained.sharedconv(X_test_tensor.unsqueeze(1)).detach().numpy()
+            elif model_name == 'NN':
+                reduced_features = model_trained.sharedfc(X_test_tensor).detach().numpy()
             reduced_features = reduced_features.reshape(reduced_features.shape[0], -1)
             reduced.setdefault(method_st, {}).setdefault(r, []).append(reduced_features)
 
@@ -107,7 +113,6 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
                       for reg_name, value in regs.items():
                         scores.setdefault(metrics, {}).setdefault(method_name, {}).setdefault(reg_name, []).append(value[0])
 
-
     predictions = {
     model: {key: np.concatenate(value) for key, value in sub_dict.items()}
     for model, sub_dict in predictions.items()
@@ -117,7 +122,6 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
     model: {key: np.concatenate(value) for key, value in sub_dict.items()}
     for model, sub_dict in trues.items()
     }
-
 
     reducer = TSNE(n_components=2, perplexity=30, random_state=42)
     #reducer = umap.UMAP(n_components=2, random_state=42)
