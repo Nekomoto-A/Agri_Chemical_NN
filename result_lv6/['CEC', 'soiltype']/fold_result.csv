@@ -1,0 +1,4 @@
+,,accuracy,accuracy,Loss,Loss
+,,CEC,soiltype,CEC,soiltype
+method,fold,,,,
+M,fold1,0.5336042642593384,0.85,37.415283203125,0.2956241177656786
