@@ -19,20 +19,26 @@ with open(yaml_path, "r") as file:
 
 class data_create:
     def __init__(self,path_asv,path_chem,reg_list,exclude_ids):
-        self.asv_data = pd.read_csv(path_asv).drop('index',axis = 1)
+        self.asv_data = pd.read_csv(path_asv)#.drop('index',axis = 1)
         self.chem_data = pd.read_excel(path_chem)
         self.reg_list = reg_list
         self.exclude_ids = exclude_ids
     def __iter__(self):
-        asv_data = self.asv_data
+        asv_data = self.asv_data.loc[:, self.asv_data.columns.str.contains('d_')]
         chem_data = self.chem_data
+        #print(asv_data)
 
         mask = ~chem_data['crop-id'].isin(self.exclude_ids)
         asv_data,chem_data = asv_data[mask], chem_data[mask]
         label_encoders = {}
         
         for r in self.reg_list:
-            ind = chem_data[self.chem_data[r].isna()].index
+            if r == 'area':
+                chem_data[r] = np.where(chem_data['crop'] == 'Rice', 'paddy', 'field')
+            elif r == 'soiltype':
+                chem_data[r] = chem_data['SoilTypeID'].str[0]
+
+            ind = chem_data[chem_data[r].isna()].index
             asv_data = asv_data.drop(ind)
             chem_data = chem_data.drop(ind)
             
@@ -129,7 +135,6 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
             Y_train_tensor.append(torch.tensor(y_train_split_pp, dtype=torch.float32))
             Y_val_tensor.append(torch.tensor(y_val_pp, dtype=torch.float32))
             Y_test_tensor.append(torch.tensor(y_test_pp, dtype=torch.float32))
-
         else:
             #print(y_train_split[reg])
             Y_train_tensor.append(torch.tensor(y_train_split[reg].values, dtype=torch.int64))
