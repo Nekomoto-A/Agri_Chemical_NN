@@ -2,6 +2,7 @@ from src.datasets.dataset import data_create,transform_after_split
 
 from sklearn.model_selection import KFold
 import os
+import shutil
 from src.test.test import train_and_test,write_result
 from src.test.statsmodel_test import stats_models_result
 from src.experiments.visualize import reduce_feature
@@ -25,13 +26,16 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
                   ):
     os.makedirs(output_dir,exist_ok=True)
     sub_dir = os.path.join(output_dir, f'{reg_list}')
+    
+    if os.path.exists(sub_dir):
+        shutil.rmtree(sub_dir)
+    
     os.makedirs(sub_dir,exist_ok=True)
     csv_dir = os.path.join(sub_dir, csv_path)
     
     final_dir = os.path.join(sub_dir, final_output)
 
-    if os.path.exists(csv_dir):
-        os.remove(csv_dir)
+
 
     X,Y,_ = data_create(feature_path, target_path, reg_list,exclude_ids)
 

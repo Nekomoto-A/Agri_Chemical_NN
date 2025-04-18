@@ -1,16 +1,17 @@
 dataset.py:
   non_outlier: 'None'
-  val_size: 0.3
+  val_size: 0.2
 train.py:
   early_stopping: False
   patience: 7
+  least_epoch: 50
   loss_sum: 'Normalized'
   visualize: True
   epochs: 100
   validation: True
   lambda: 0
 test.py:
-  learning_rate: 0.0001
+  learning_rate: 0.001
 fold_eval.py:
   k_fold: 5
   model_name: 'CNN'
@@ -28,13 +29,6 @@ fold_eval.py:
   target_path: 'data/raw/chem_data.xlsx'
 main.py:
   reg_list: [
-            ['CEC','soiltype'],
-            ['EC','soiltype'],
-            ['NH4.N','soiltype'],
-            ['NO3.N','soiltype'],
-            ['Inorganic.N','soiltype'],
-            ['Humus','soiltype'],
-            ['pH','soiltype'],
-            ['Available.P','soiltype']
-            ]
+            ['pH','area'],
+      ]
 
