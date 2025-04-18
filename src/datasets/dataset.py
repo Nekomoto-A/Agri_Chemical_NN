@@ -25,11 +25,27 @@ class data_create:
         self.exclude_ids = exclude_ids
     def __iter__(self):
         asv_data = self.asv_data.loc[:, self.asv_data.columns.str.contains('d_')]
+        
+        taxa = asv_data.columns.to_list()
+        tax_levels = ["domain", "phylum", "class", "order", "family", "genus", "species"]
+        
+        # 分類階層の分割情報をDataFrame化
+        tax_split = pd.DataFrame(
+            [taxon.split(";") for taxon in taxa],
+            columns=tax_levels,
+            index=taxa
+        )
+
+        # 階層順にソート
+        tax_sorted = tax_split.sort_values(by=tax_levels)
+        # 並び替えた分類名で元のデータフレームの列順を並び替え
+        asv_data = asv_data[tax_sorted.index]
+
         chem_data = self.chem_data
         #print(asv_data)
-
-        mask = ~chem_data['crop-id'].isin(self.exclude_ids)
-        asv_data,chem_data = asv_data[mask], chem_data[mask]
+        if self.exclude_ids != None:
+            mask = ~chem_data['crop-id'].isin(self.exclude_ids)
+            asv_data,chem_data = asv_data[mask], chem_data[mask]
         label_encoders = {}
         
         for r in self.reg_list:
@@ -70,6 +86,8 @@ class data_create:
                 le = LabelEncoder()
                 chem_data[r] = le.fit_transform(chem_data[r])
                 label_encoders[r] = le  # 後でデコードするために保存
+                label_map = dict(zip(le.classes_, le.transform(le.classes_)))
+                print(f"{r} → 数値 のマッピング:", label_map)
                 #print(chem_data[r].unique())
                 
         yield asv_data
@@ -141,3 +159,4 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
             Y_val_tensor.append(torch.tensor(y_val[reg].values, dtype=torch.int64))
             Y_test_tensor.append(torch.tensor(y_test[reg].values, dtype=torch.int64))
     return X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers
+

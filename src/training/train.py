@@ -38,7 +38,7 @@ class NormalizedLoss(nn.Module):
 
 def training_MT(x_tr,x_val,y_tr,y_val,model, optimizer, output_dim, reg_list, output_dir, model_name, 
                 epochs = config['epochs'], patience = config['patience'],early_stopping = config['early_stopping'],loss_sum = config['loss_sum'],
-                visualize = config['visualize'], val = config['validation'], lambda_norm = config['lambda']):
+                visualize = config['visualize'], val = config['validation'], lambda_norm = config['lambda'],least_epoch = config['least_epoch']):
     loss_fn = NormalizedLoss(len(output_dim))
     
     personal_losses = []
@@ -54,6 +54,10 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, optimizer, output_dim, reg_list, ou
     last_epoch = 1
 
     for epoch in range(epochs):
+        if epoch == 0:
+            vis_name = f'{epoch}epoch.png'
+            visualize_tsne(model = model, model_name = model_name , X = x_tr, Y = y_tr, reg_list = reg_list, output_dir = output_dir, file_name = vis_name)
+
         model.train()
         torch.autograd.set_detect_anomaly(True)
         outputs = model(x_tr)
@@ -126,22 +130,23 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, optimizer, output_dim, reg_list, ou
                     visualize_tsne(model = model, model_name = model_name , X = x_tr, Y = vis_losses, reg_list = loss_list, output_dir = output_dir, file_name = vis_name_loss)
 
             if early_stopping == True:
-                # --- 早期終了の判定 ---
-                if val_loss.item() < best_loss:
-                #if val_reg_loss.item() < best_loss:
-                    best_loss = val_loss.item()
-                    #best_loss = val_reg_loss.item()
-                    patience_counter = 0  # 改善したのでリセット
-                    best_model_state = model.state_dict()  # ベストモデルを保存
-                else:
-                    patience_counter += 1  # 改善していないのでカウントアップ
-                
-                if patience_counter >= patience:
-                    print("Early stopping triggered!")
-                    model.load_state_dict(best_model_state)
-                    break
-                    # ベストモデルの復元
-                # 学習過程の可視化
+                if epoch >= least_epoch:
+                    # --- 早期終了の判定 ---
+                    if val_loss.item() < best_loss:
+                    #if val_reg_loss.item() < best_loss:
+                        best_loss = val_loss.item()
+                        #best_loss = val_reg_loss.item()
+                        patience_counter = 0  # 改善したのでリセット
+                        best_model_state = model.state_dict()  # ベストモデルを保存
+                    else:
+                        patience_counter += 1  # 改善していないのでカウントアップ
+                    
+                    if patience_counter >= patience:
+                        print("Early stopping triggered!")
+                        model.load_state_dict(best_model_state)
+                        break
+                        # ベストモデルの復元
+                    # 学習過程の可視化
     
     train_dir = os.path.join(output_dir, 'train')
     for reg in val_loss_history.keys():

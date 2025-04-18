@@ -18,7 +18,7 @@ def reduce_feature(model,X,model_name):
             shared_features = model.sharedfc(X).cpu().numpy()  # 共有層の出力を取得
         
         # t-SNE で2次元に圧縮
-        reducer = TSNE(n_components=2, perplexity=30, random_state=42)
+        reducer = TSNE(n_components=2, perplexity=30, random_state=42, init = 'pca')
         #reducer = umap.UMAP(n_components=2, random_state=42)
         reduced_features = reducer.fit_transform(shared_features)
     return reduced_features
@@ -36,15 +36,14 @@ def visualize_tsne(model, X, Y, reg_list, output_dir,file_name, model_name):
         # プロット
         plt.figure(figsize=(8, 6))
         if Y is not None:
-            unique_labels = np.unique(Y_single)
             if np.issubdtype(Y_single.dtype, np.integer):  
                 # カテゴリ（離散ラベル）の場合（20クラス未満）
                 scatter = plt.scatter(reduced_features[:, 0], reduced_features[:, 1], c=Y_single, cmap='tab10')
                 plt.legend(*scatter.legend_elements(), title="Classes")
             else:
                 # 連続値ラベルの場合
-                scaler = MinMaxScaler()
-                Y_single = scaler.fit_transform(Y_single)
+                #scaler = MinMaxScaler()
+                #Y_single = scaler.fit_transform(Y_single)
                 scatter = plt.scatter(reduced_features[:, 0], reduced_features[:, 1], c=Y_single, cmap='viridis')
                 plt.colorbar(label="Label Value")  # 連続値の場合はカラーバーを表示
         else:
