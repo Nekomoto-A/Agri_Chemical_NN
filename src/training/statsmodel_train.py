@@ -11,10 +11,15 @@ def statsmodel_train(X,Y,scalers,reg):
     # モデルの定義
 
     X = X.numpy()
-    Y = Y[0].numpy().reshape(-1, 1)
+
+    if reg in scalers:
+        Y = scalers[reg].inverse_transform(Y[0].numpy().reshape(-1, 1))
+    else:
+        Y = Y[0].numpy().reshape(-1, 1)
     #print(Y.dtype)
+    print(f'train:{reg}:{Y.dtype}')
     if np.issubdtype(Y.dtype, np.floating):
-        Y = scalers[reg].inverse_transform(Y)
+        #Y = scalers[reg].inverse_transform(Y)
         models = {
             "RF": RandomForestRegressor(),
             "XGB": XGBRegressor(),

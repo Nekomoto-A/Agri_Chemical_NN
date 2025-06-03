@@ -1,0 +1,2095 @@
+nohup: 入力を無視します
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/skbio/util/_warning.py:40: DeprecationWarning: `multiplicative_replacement` was renamed to `multi_replace` in 0.6.0. The old name is kept as an alias but is deprecated.
+  warn(message, warning)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+     6c5f4f9666d82b1bedf94e99acfe6741  ...  aaf967b7046023283cbfdb3bf2925277
+0                                  43  ...                                 0
+1                                   0  ...                                 0
+2                                  93  ...                                 0
+3                                 198  ...                                 0
+4                                  31  ...                                 0
+..                                ...  ...                               ...
+309                               195  ...                                 0
+310                                48  ...                                 0
+311                               241  ...                                 0
+312                               186  ...                                 0
+313                               147  ...                                 0
+
+[299 rows x 13719 columns]
+学習データ数: 191
+検証データ数: 48
+テストデータ数: 60
+torch.Size([191, 13719])
+Epoch [1/100], Train Loss: 2.2706, Validation Loss: 76.4680
+Epoch [2/100], Train Loss: 4117.9370, Validation Loss: 6497.7686
+Epoch [3/100], Train Loss: 20570.2109, Validation Loss: 650.7122
+Epoch [4/100], Train Loss: 808.6597, Validation Loss: 36.4878
+Epoch [5/100], Train Loss: 47.8228, Validation Loss: 35.8213
+Epoch [6/100], Train Loss: 46.6936, Validation Loss: 80.9549
+Epoch [7/100], Train Loss: 80.8060, Validation Loss: 114.9645
+Epoch [8/100], Train Loss: 100.2111, Validation Loss: 111.6549
+Epoch [9/100], Train Loss: 87.3749, Validation Loss: 93.2660
+Epoch [10/100], Train Loss: 60.9196, Validation Loss: 99.2408
+Epoch [11/100], Train Loss: 51.0715, Validation Loss: 88.0068
+Epoch [12/100], Train Loss: 37.8745, Validation Loss: 56.0243
+Epoch [13/100], Train Loss: 22.7960, Validation Loss: 32.5553
+Epoch [14/100], Train Loss: 16.7078, Validation Loss: 25.8958
+Epoch [15/100], Train Loss: 16.1601, Validation Loss: 28.1328
+Epoch [16/100], Train Loss: 17.1604, Validation Loss: 27.9643
+Epoch [17/100], Train Loss: 15.1985, Validation Loss: 24.5857
+Epoch [18/100], Train Loss: 11.4664, Validation Loss: 35.4554
+Epoch [19/100], Train Loss: 13.2736, Validation Loss: 32.7927
+Epoch [20/100], Train Loss: 12.2018, Validation Loss: 14.3614
+Epoch [21/100], Train Loss: 6.1645, Validation Loss: 3.4997
+Epoch [22/100], Train Loss: 2.7506, Validation Loss: 7.4246
+Epoch [23/100], Train Loss: 4.4145, Validation Loss: 16.1497
+Epoch [24/100], Train Loss: 8.2225, Validation Loss: 16.9176
+Epoch [25/100], Train Loss: 8.7154, Validation Loss: 9.5594
+Epoch [26/100], Train Loss: 5.2448, Validation Loss: 7.0981
+Epoch [27/100], Train Loss: 4.4296, Validation Loss: 10.6143
+Epoch [28/100], Train Loss: 6.5547, Validation Loss: 6.9699
+Epoch [29/100], Train Loss: 4.7704, Validation Loss: 3.2215
+Epoch [30/100], Train Loss: 2.7056, Validation Loss: 3.4630
+Epoch [31/100], Train Loss: 2.9185, Validation Loss: 4.3357
+Epoch [32/100], Train Loss: 3.6704, Validation Loss: 3.8046
+Epoch [33/100], Train Loss: 3.4883, Validation Loss: 2.8969
+Epoch [34/100], Train Loss: 2.9245, Validation Loss: 2.9744
+Epoch [35/100], Train Loss: 2.9509, Validation Loss: 3.8427
+Epoch [36/100], Train Loss: 3.5515, Validation Loss: 4.0945
+Epoch [37/100], Train Loss: 3.7598, Validation Loss: 3.3123
+Epoch [38/100], Train Loss: 3.2044, Validation Loss: 2.5457
+Epoch [39/100], Train Loss: 2.6224, Validation Loss: 2.5666
+Epoch [40/100], Train Loss: 2.6225, Validation Loss: 2.9476
+Epoch [41/100], Train Loss: 2.8952, Validation Loss: 2.9846
+Epoch [42/100], Train Loss: 2.8753, Validation Loss: 2.7108
+Epoch [43/100], Train Loss: 2.5898, Validation Loss: 2.6446
+Epoch [44/100], Train Loss: 2.4991, Validation Loss: 2.9044
+Epoch [45/100], Train Loss: 2.7331, Validation Loss: 3.0541
+Epoch [46/100], Train Loss: 2.8971, Validation Loss: 2.8522
+Epoch [47/100], Train Loss: 2.7315, Validation Loss: 2.5939
+Epoch [48/100], Train Loss: 2.4897, Validation Loss: 2.5620
+Epoch [49/100], Train Loss: 2.4621, Validation Loss: 2.6346
+Epoch [50/100], Train Loss: 2.5565, Validation Loss: 2.5843
+Epoch [51/100], Train Loss: 2.5385, Validation Loss: 2.4292
+Epoch [52/100], Train Loss: 2.4063, Validation Loss: 2.3411
+Epoch [53/100], Train Loss: 2.3524, Validation Loss: 2.3780
+Epoch [54/100], Train Loss: 2.4407, Validation Loss: 2.4288
+Epoch [55/100], Train Loss: 2.5200, Validation Loss: 2.3915
+Epoch [56/100], Train Loss: 2.4695, Validation Loss: 2.3270
+Epoch [57/100], Train Loss: 2.3776, Validation Loss: 2.3364
+Epoch [58/100], Train Loss: 2.3676, Validation Loss: 2.3890
+Epoch [59/100], Train Loss: 2.4059, Validation Loss: 2.3864
+Epoch [60/100], Train Loss: 2.3902, Validation Loss: 2.3282
+Epoch [61/100], Train Loss: 2.3235, Validation Loss: 2.3038
+Epoch [62/100], Train Loss: 2.2962, Validation Loss: 2.3424
+Epoch [63/100], Train Loss: 2.3321, Validation Loss: 2.3744
+Epoch [64/100], Train Loss: 2.3569, Validation Loss: 2.3573
+Epoch [65/100], Train Loss: 2.3293, Validation Loss: 2.3373
+Epoch [66/100], Train Loss: 2.2993, Validation Loss: 2.3512
+Epoch [67/100], Train Loss: 2.3075, Validation Loss: 2.3603
+Epoch [68/100], Train Loss: 2.3193, Validation Loss: 2.3256
+Epoch [69/100], Train Loss: 2.2967, Validation Loss: 2.2761
+Epoch [70/100], Train Loss: 2.2650, Validation Loss: 2.2562
+Epoch [71/100], Train Loss: 2.2630, Validation Loss: 2.2561
+Epoch [72/100], Train Loss: 2.2769, Validation Loss: 2.2439
+Epoch [73/100], Train Loss: 2.2723, Validation Loss: 2.2252
+Epoch [74/100], Train Loss: 2.2553, Validation Loss: 2.2243
+Epoch [75/100], Train Loss: 2.2528, Validation Loss: 2.2342
+Epoch [76/100], Train Loss: 2.2605, Validation Loss: 2.2305
+Epoch [77/100], Train Loss: 2.2548, Validation Loss: 2.2151
+Epoch [78/100], Train Loss: 2.2375, Validation Loss: 2.2094
+Epoch [79/100], Train Loss: 2.2294, Validation Loss: 2.2155
+Epoch [80/100], Train Loss: 2.2320, Validation Loss: 2.2180
+Epoch [81/100], Train Loss: 2.2291, Validation Loss: 2.2145
+Epoch [82/100], Train Loss: 2.2191, Validation Loss: 2.2155
+Epoch [83/100], Train Loss: 2.2148, Validation Loss: 2.2201
+Epoch [84/100], Train Loss: 2.2171, Validation Loss: 2.2172
+Epoch [85/100], Train Loss: 2.2145, Validation Loss: 2.2061
+Epoch [86/100], Train Loss: 2.2057, Validation Loss: 2.1967
+Epoch [87/100], Train Loss: 2.1998, Validation Loss: 2.1913
+Epoch [88/100], Train Loss: 2.1985, Validation Loss: 2.1838
+Epoch [89/100], Train Loss: 2.1947, Validation Loss: 2.1737
+Epoch [90/100], Train Loss: 2.1878, Validation Loss: 2.1668
+Epoch [91/100], Train Loss: 2.1838, Validation Loss: 2.1637
+Epoch [92/100], Train Loss: 2.1828, Validation Loss: 2.1595
+Epoch [93/100], Train Loss: 2.1796, Validation Loss: 3.1158
+Epoch [94/100], Train Loss: 3.1790, Validation Loss: 2.4601
+Epoch [95/100], Train Loss: 2.5133, Validation Loss: 2.6578
+Epoch [96/100], Train Loss: 2.7423, Validation Loss: 2.3635
+Epoch [97/100], Train Loss: 2.4099, Validation Loss: 2.1713
+Epoch [98/100], Train Loss: 2.1589, Validation Loss: 2.3883
+Epoch [99/100], Train Loss: 2.3765, Validation Loss: 2.5322
+Epoch [100/100], Train Loss: 2.5271, Validation Loss: 2.3298
+Output 1 (pH): R^2 Score = -0.060, MSE = 0.444
+Output 2 (Available.P): R^2 Score = 0.061, MSE = 11321.679
+torch.Size([191, 13719])
+Epoch [1/100], Train Loss: 1.2478, Validation Loss: 14.7110
+Epoch [2/100], Train Loss: 332.5533, Validation Loss: 2861.6326
+Epoch [3/100], Train Loss: 3069.4822, Validation Loss: 253.1148
+Epoch [4/100], Train Loss: 194.5799, Validation Loss: 5.6756
+Epoch [5/100], Train Loss: 14.8945, Validation Loss: 21.5197
+Epoch [6/100], Train Loss: 13.6219, Validation Loss: 66.8690
+Epoch [7/100], Train Loss: 25.8248, Validation Loss: 123.9961
+Epoch [8/100], Train Loss: 22.9427, Validation Loss: 169.6258
+Epoch [9/100], Train Loss: 15.6149, Validation Loss: 267.7769
+Epoch [10/100], Train Loss: 12.7741, Validation Loss: 249.7580
+Epoch [11/100], Train Loss: 6.4183, Validation Loss: 118.0626
+Epoch [12/100], Train Loss: 1.6109, Validation Loss: 36.5050
+Epoch [13/100], Train Loss: 4.9438, Validation Loss: 38.5406
+Epoch [14/100], Train Loss: 8.2227, Validation Loss: 42.7192
+Epoch [15/100], Train Loss: 5.3590, Validation Loss: 85.5965
+Epoch [16/100], Train Loss: 1.9764, Validation Loss: 138.0317/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/sklearn/base.py:1389: DataConversionWarning: A column-vector y was passed when a 1d array was expected. Please change the shape of y to (n_samples,), for example using ravel().
+  return fit_method(estimator, *args, **kwargs)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/sklearn/utils/validation.py:1408: DataConversionWarning: A column-vector y was passed when a 1d array was expected. Please change the shape of y to (n_samples, ), for example using ravel().
+  y = column_or_1d(y, warn=True)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+
+Epoch [17/100], Train Loss: 1.7459, Validation Loss: 155.0910
+Epoch [18/100], Train Loss: 2.5694, Validation Loss: 145.2390
+Epoch [19/100], Train Loss: 3.1364, Validation Loss: 119.0815
+Epoch [20/100], Train Loss: 3.1236, Validation Loss: 87.1030
+Epoch [21/100], Train Loss: 2.6645, Validation Loss: 58.0400
+Epoch [22/100], Train Loss: 2.0728, Validation Loss: 36.4972
+Epoch [23/100], Train Loss: 1.6242, Validation Loss: 21.8670
+Epoch [24/100], Train Loss: 1.4520, Validation Loss: 12.7059
+Epoch [25/100], Train Loss: 1.5362, Validation Loss: 7.6076
+Epoch [26/100], Train Loss: 1.7514, Validation Loss: 5.2654
+Epoch [27/100], Train Loss: 1.9414, Validation Loss: 4.2654
+Epoch [28/100], Train Loss: 2.0020, Validation Loss: 3.8538
+Epoch [29/100], Train Loss: 1.9190, Validation Loss: 3.7110
+Epoch [30/100], Train Loss: 1.7490, Validation Loss: 3.7094
+Epoch [31/100], Train Loss: 1.5726, Validation Loss: 3.7503
+Epoch [32/100], Train Loss: 1.4532, Validation Loss: 3.8500
+Epoch [33/100], Train Loss: 1.4150, Validation Loss: 3.9231
+Epoch [34/100], Train Loss: 1.4431, Validation Loss: 3.9021
+Epoch [35/100], Train Loss: 1.4957, Validation Loss: 3.7421
+Epoch [36/100], Train Loss: 1.5297, Validation Loss: 3.4608
+Epoch [37/100], Train Loss: 1.5215, Validation Loss: 3.1143
+Epoch [38/100], Train Loss: 1.4744, Validation Loss: 2.7635
+Epoch [39/100], Train Loss: 1.4106, Validation Loss: 2.4211
+Epoch [40/100], Train Loss: 1.3522, Validation Loss: 2.1301
+Epoch [41/100], Train Loss: 1.3106, Validation Loss: 1.9182
+Epoch [42/100], Train Loss: 1.2883, Validation Loss: 1.7782
+Epoch [43/100], Train Loss: 1.2814, Validation Loss: 1.6906
+Epoch [44/100], Train Loss: 1.2826, Validation Loss: 1.6404
+Epoch [45/100], Train Loss: 1.2848, Validation Loss: 1.6091
+Epoch [46/100], Train Loss: 1.2826, Validation Loss: 1.5868
+Epoch [47/100], Train Loss: 1.2737, Validation Loss: 1.5664
+Epoch [48/100], Train Loss: 1.2589, Validation Loss: 1.5497
+Epoch [49/100], Train Loss: 1.2406, Validation Loss: 1.5377
+Epoch [50/100], Train Loss: 1.2225, Validation Loss: 1.5308
+Epoch [51/100], Train Loss: 1.2076, Validation Loss: 1.5293
+Epoch [52/100], Train Loss: 1.1974, Validation Loss: 1.5308
+Epoch [53/100], Train Loss: 1.1918, Validation Loss: 1.5319
+Epoch [54/100], Train Loss: 1.1890, Validation Loss: 1.5302
+Epoch [55/100], Train Loss: 1.1866, Validation Loss: 1.5216
+Epoch [56/100], Train Loss: 1.1825, Validation Loss: 1.5078
+Epoch [57/100], Train Loss: 1.1755, Validation Loss: 1.4902
+Epoch [58/100], Train Loss: 1.1658, Validation Loss: 1.4713
+Epoch [59/100], Train Loss: 1.1547, Validation Loss: 1.4546
+Epoch [60/100], Train Loss: 1.1437, Validation Loss: 1.4405
+Epoch [61/100], Train Loss: 1.1341, Validation Loss: 1.4288
+Epoch [62/100], Train Loss: 1.1267, Validation Loss: 1.4202
+Epoch [63/100], Train Loss: 1.1212, Validation Loss: 1.4140
+Epoch [64/100], Train Loss: 1.1167, Validation Loss: 1.4088
+Epoch [65/100], Train Loss: 1.1120, Validation Loss: 1.4032
+Epoch [66/100], Train Loss: 1.1063, Validation Loss: 1.3967
+Epoch [67/100], Train Loss: 1.0993, Validation Loss: 1.3893
+Epoch [68/100], Train Loss: 1.0914, Validation Loss: 1.3817
+Epoch [69/100], Train Loss: 1.0832, Validation Loss: 1.3744
+Epoch [70/100], Train Loss: 1.0755, Validation Loss: 1.3679
+Epoch [71/100], Train Loss: 1.0687, Validation Loss: 1.3622
+Epoch [72/100], Train Loss: 1.0628, Validation Loss: 1.3567
+Epoch [73/100], Train Loss: 1.0574, Validation Loss: 1.3513
+Epoch [74/100], Train Loss: 1.0520, Validation Loss: 1.3457
+Epoch [75/100], Train Loss: 1.0460, Validation Loss: 1.3401
+Epoch [76/100], Train Loss: 1.0396, Validation Loss: 1.3346
+Epoch [77/100], Train Loss: 1.0329, Validation Loss: 1.3296
+Epoch [78/100], Train Loss: 1.0263, Validation Loss: 1.3152
+Epoch [79/100], Train Loss: 1.0157, Validation Loss: 1.5456
+Epoch [80/100], Train Loss: 1.2227, Validation Loss: 1.3049
+Epoch [81/100], Train Loss: 1.0027, Validation Loss: 1.3183
+Epoch [82/100], Train Loss: 1.0143, Validation Loss: 1.3198
+Epoch [83/100], Train Loss: 1.0174, Validation Loss: 1.3180
+Epoch [84/100], Train Loss: 1.0149, Validation Loss: 1.3119
+Epoch [85/100], Train Loss: 1.0060, Validation Loss: 1.3038
+Epoch [86/100], Train Loss: 0.9932, Validation Loss: 1.2975
+Epoch [87/100], Train Loss: 0.9808, Validation Loss: 1.2963
+Epoch [88/100], Train Loss: 0.9724, Validation Loss: 1.2996
+Epoch [89/100], Train Loss: 0.9687, Validation Loss: 1.3047
+Epoch [90/100], Train Loss: 0.9680, Validation Loss: 1.3080
+Epoch [91/100], Train Loss: 0.9670, Validation Loss: 1.3070
+Epoch [92/100], Train Loss: 0.9633, Validation Loss: 1.3013
+Epoch [93/100], Train Loss: 0.9564, Validation Loss: 1.2926
+Epoch [94/100], Train Loss: 0.9480, Validation Loss: 1.2836
+Epoch [95/100], Train Loss: 0.9403, Validation Loss: 1.2766
+Epoch [96/100], Train Loss: 0.9349, Validation Loss: 1.2723
+Epoch [97/100], Train Loss: 0.9317, Validation Loss: 1.2698
+Epoch [98/100], Train Loss: 0.9296, Validation Loss: 1.2681
+Epoch [99/100], Train Loss: 0.9267, Validation Loss: 1.2662
+Epoch [100/100], Train Loss: 0.9222, Validation Loss: 1.2644
+Output 1 (pH): R^2 Score = 0.445, MSE = 0.232
+torch.Size([191, 13719])
+Epoch [1/100], Train Loss: 1.2489, Validation Loss: 40.5933
+Epoch [2/100], Train Loss: 3430.5037, Validation Loss: 4517.0220
+Epoch [3/100], Train Loss: 5320.2964, Validation Loss: 1696.5066
+Epoch [4/100], Train Loss: 625.0089, Validation Loss: 61.9896
+Epoch [5/100], Train Loss: 91.9599, Validation Loss: 8.2053
+Epoch [6/100], Train Loss: 2.9282, Validation Loss: 59.6293
+Epoch [7/100], Train Loss: 40.4796, Validation Loss: 104.0059
+Epoch [8/100], Train Loss: 69.5377, Validation Loss: 135.4112
+Epoch [9/100], Train Loss: 47.2756, Validation Loss: 121.8433
+Epoch [10/100], Train Loss: 13.5621, Validation Loss: 94.3227
+Epoch [11/100], Train Loss: 3.6268, Validation Loss: 136.3887
+Epoch [12/100], Train Loss: 22.3880, Validation Loss: 148.0961
+Epoch [13/100], Train Loss: 28.4349, Validation Loss: 131.7842
+Epoch [14/100], Train Loss: 13.9644, Validation Loss: 198.4828
+Epoch [15/100], Train Loss: 2.8229, Validation Loss: 309.9295
+Epoch [16/100], Train Loss: 7.0420, Validation Loss: 327.2387
+Epoch [17/100], Train Loss: 15.6449, Validation Loss: 224.3619
+Epoch [18/100], Train Loss: 16.1031, Validation Loss: 96.6020
+Epoch [19/100], Train Loss: 8.6228, Validation Loss: 22.0826
+Epoch [20/100], Train Loss: 2.4548, Validation Loss: 5.9338
+Epoch [21/100], Train Loss: 3.8134, Validation Loss: 12.2024
+Epoch [22/100], Train Loss: 8.9598, Validation Loss: 13.3981
+Epoch [23/100], Train Loss: 10.0684, Validation Loss: 7.2500
+Epoch [24/100], Train Loss: 6.2584, Validation Loss: 2.2148
+Epoch [25/100], Train Loss: 3.0935, Validation Loss: 1.8793
+Epoch [26/100], Train Loss: 3.1229, Validation Loss: 5.6249
+Epoch [27/100], Train Loss: 4.9600, Validation Loss: 9.9074
+Epoch [28/100], Train Loss: 5.9445, Validation Loss: 10.3355
+Epoch [29/100], Train Loss: 4.6801, Validation Loss: 6.4957
+Epoch [30/100], Train Loss: 2.4553, Validation Loss: 2.7836
+Epoch [31/100], Train Loss: 1.5958, Validation Loss: 2.3922
+Epoch [32/100], Train Loss: 2.6632, Validation Loss: 3.4560
+Epoch [33/100], Train Loss: 3.8550, Validation Loss: 2.9352
+Epoch [34/100], Train Loss: 3.4747, Validation Loss: 1.6175
+Epoch [35/100], Train Loss: 2.1088, Validation Loss: 2.2388
+Epoch [36/100], Train Loss: 1.4713, Validation Loss: 4.7400
+Epoch [37/100], Train Loss: 2.0658, Validation Loss: 6.2778
+Epoch [38/100], Train Loss: 2.7945, Validation Loss: 5.1600
+Epoch [39/100], Train Loss: 2.6102, Validation Loss: 2.6668
+Epoch [40/100], Train Loss: 1.7980, Validation Loss: 1.0586
+Epoch [41/100], Train Loss: 1.3854, Validation Loss: 1.0387
+Epoch [42/100], Train Loss: 1.7382, Validation Loss: 1.4961
+Epoch [43/100], Train Loss: 2.1858, Validation Loss: 1.3602
+Epoch [44/100], Train Loss: 2.0490, Validation Loss: 0.9044
+Epoch [45/100], Train Loss: 1.5421, Validation Loss: 0.9663
+Epoch [46/100], Train Loss: 1.3361, Validation Loss: 1.5690
+Epoch [47/100], Train Loss: 1.5876, Validation Loss: 1.9106
+Epoch [48/100], Train Loss: 1.8223, Validation Loss: 1.5804
+Epoch [49/100], Train Loss: 1.6813, Validation Loss: 1.0479
+Epoch [50/100], Train Loss: 1.3772, Validation Loss: 0.8615
+Epoch [51/100], Train Loss: 1.3027, Validation Loss: 0.9953/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/sklearn/base.py:1389: DataConversionWarning: A column-vector y was passed when a 1d array was expected. Please change the shape of y to (n_samples,), for example using ravel().
+  return fit_method(estimator, *args, **kwargs)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/sklearn/utils/validation.py:1408: DataConversionWarning: A column-vector y was passed when a 1d array was expected. Please change the shape of y to (n_samples, ), for example using ravel().
+  y = column_or_1d(y, warn=True)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+
+Epoch [52/100], Train Loss: 1.4757, Validation Loss: 1.1004
+Epoch [53/100], Train Loss: 1.5914, Validation Loss: 1.0180
+Epoch [54/100], Train Loss: 1.4838, Validation Loss: 0.8919
+Epoch [55/100], Train Loss: 1.3121, Validation Loss: 0.9124
+Epoch [56/100], Train Loss: 1.2902, Validation Loss: 1.0608
+Epoch [57/100], Train Loss: 1.4003, Validation Loss: 1.1377
+Epoch [58/100], Train Loss: 1.4532, Validation Loss: 1.0421
+Epoch [59/100], Train Loss: 1.3684, Validation Loss: 0.9011
+Epoch [60/100], Train Loss: 1.2658, Validation Loss: 0.8585
+Epoch [61/100], Train Loss: 1.2702, Validation Loss: 0.8910
+Epoch [62/100], Train Loss: 1.3399, Validation Loss: 0.8897
+Epoch [63/100], Train Loss: 1.3504, Validation Loss: 0.8422
+Epoch [64/100], Train Loss: 1.2813, Validation Loss: 0.8471
+Epoch [65/100], Train Loss: 1.2300, Validation Loss: 0.9455
+Epoch [66/100], Train Loss: 1.2541, Validation Loss: 1.0331
+Epoch [67/100], Train Loss: 1.2932, Validation Loss: 1.0026
+Epoch [68/100], Train Loss: 1.2750, Validation Loss: 0.8935
+Epoch [69/100], Train Loss: 1.2254, Validation Loss: 0.8167
+Epoch [70/100], Train Loss: 1.2140, Validation Loss: 0.8025
+Epoch [71/100], Train Loss: 1.2415, Validation Loss: 0.8029
+Epoch [72/100], Train Loss: 1.2491, Validation Loss: 0.7981
+Epoch [73/100], Train Loss: 1.2191, Validation Loss: 0.8202
+Epoch [74/100], Train Loss: 1.1956, Validation Loss: 0.8738
+Epoch [75/100], Train Loss: 1.2056, Validation Loss: 0.9064
+Epoch [76/100], Train Loss: 1.2189, Validation Loss: 0.8811
+Epoch [77/100], Train Loss: 1.2055, Validation Loss: 0.8286
+Epoch [78/100], Train Loss: 1.1836, Validation Loss: 0.7969
+Epoch [79/100], Train Loss: 1.1822, Validation Loss: 0.7913
+Epoch [80/100], Train Loss: 1.1923, Validation Loss: 0.7907
+Epoch [81/100], Train Loss: 1.1880, Validation Loss: 0.7939
+Epoch [82/100], Train Loss: 1.1716, Validation Loss: 0.8124
+Epoch [83/100], Train Loss: 1.1653, Validation Loss: 0.8357
+Epoch [84/100], Train Loss: 1.1709, Validation Loss: 0.8385
+Epoch [85/100], Train Loss: 1.1701, Validation Loss: 0.8183
+Epoch [86/100], Train Loss: 1.1587, Validation Loss: 0.7971
+Epoch [87/100], Train Loss: 1.1514, Validation Loss: 0.7888
+Epoch [88/100], Train Loss: 1.1533, Validation Loss: 0.7876
+Epoch [89/100], Train Loss: 1.1533, Validation Loss: 0.7881
+Epoch [90/100], Train Loss: 1.1455, Validation Loss: 0.7944
+Epoch [91/100], Train Loss: 1.1387, Validation Loss: 0.8055
+Epoch [92/100], Train Loss: 1.1385, Validation Loss: 0.8102
+Epoch [93/100], Train Loss: 1.1381, Validation Loss: 0.8028
+Epoch [94/100], Train Loss: 1.1324, Validation Loss: 0.7912
+Epoch [95/100], Train Loss: 1.1266, Validation Loss: 0.7844
+Epoch [96/100], Train Loss: 1.1253, Validation Loss: 0.7820
+Epoch [97/100], Train Loss: 1.1243, Validation Loss: 0.7815
+Epoch [98/100], Train Loss: 1.1198, Validation Loss: 0.7840
+Epoch [99/100], Train Loss: 1.1149, Validation Loss: 0.7892
+Epoch [100/100], Train Loss: 1.1131, Validation Loss: 0.7915
+Output 1 (Available.P): R^2 Score = 0.297, MSE = 8480.366
+学習データ数: 191
+検証データ数: 48
+テストデータ数: 60
+torch.Size([191, 13719])
+Epoch [1/100], Train Loss: 2.2857, Validation Loss: 80.5885
+Epoch [2/100], Train Loss: 5230.0132, Validation Loss: 5173.2148
+Epoch [3/100], Train Loss: 9547.3320, Validation Loss: 2450.7676
+Epoch [4/100], Train Loss: 1346.9222, Validation Loss: 168.1090
+Epoch [5/100], Train Loss: 74.7848, Validation Loss: 336.4944
+Epoch [6/100], Train Loss: 116.2476, Validation Loss: 682.7145
+Epoch [7/100], Train Loss: 154.9042, Validation Loss: 847.2429
+Epoch [8/100], Train Loss: 162.6105, Validation Loss: 533.8197
+Epoch [9/100], Train Loss: 100.9411, Validation Loss: 172.2773
+Epoch [10/100], Train Loss: 39.0412, Validation Loss: 136.4758
+Epoch [11/100], Train Loss: 27.5109, Validation Loss: 292.0970
+Epoch [12/100], Train Loss: 51.1657, Validation Loss: 376.6207
+Epoch [13/100], Train Loss: 71.8661, Validation Loss: 264.6284
+Epoch [14/100], Train Loss: 58.8568, Validation Loss: 120.4355
+Epoch [15/100], Train Loss: 32.0674, Validation Loss: 36.6755
+Epoch [16/100], Train Loss: 11.7781, Validation Loss: 10.2873
+Epoch [17/100], Train Loss: 4.3562, Validation Loss: 16.5994
+Epoch [18/100], Train Loss: 7.4268, Validation Loss: 26.5981
+Epoch [19/100], Train Loss: 13.0009, Validation Loss: 32.9847
+Epoch [20/100], Train Loss: 17.5758, Validation Loss: 33.1727
+Epoch [21/100], Train Loss: 19.3757, Validation Loss: 28.2635
+Epoch [22/100], Train Loss: 18.2272, Validation Loss: 20.8152
+Epoch [23/100], Train Loss: 14.9022, Validation Loss: 13.3123
+Epoch [24/100], Train Loss: 10.6499, Validation Loss: 7.3306
+Epoch [25/100], Train Loss: 6.4115, Validation Loss: 3.2852
+Epoch [26/100], Train Loss: 3.3468, Validation Loss: 2.4859
+Epoch [27/100], Train Loss: 2.9789, Validation Loss: 3.8906
+Epoch [28/100], Train Loss: 4.1742, Validation Loss: 4.7726
+Epoch [29/100], Train Loss: 4.6420, Validation Loss: 5.0772
+Epoch [30/100], Train Loss: 4.5388, Validation Loss: 5.2722
+Epoch [31/100], Train Loss: 4.3689, Validation Loss: 5.5147
+Epoch [32/100], Train Loss: 4.3897, Validation Loss: 5.4300
+Epoch [33/100], Train Loss: 4.3593, Validation Loss: 5.0348
+Epoch [34/100], Train Loss: 4.1099, Validation Loss: 4.4633
+Epoch [35/100], Train Loss: 3.7316, Validation Loss: 3.8575
+Epoch [36/100], Train Loss: 3.3288, Validation Loss: 3.3263
+Epoch [37/100], Train Loss: 2.9838, Validation Loss: 2.9310
+Epoch [38/100], Train Loss: 2.7421, Validation Loss: 2.6877
+Epoch [39/100], Train Loss: 2.6115, Validation Loss: 2.5782
+Epoch [40/100], Train Loss: 2.5736, Validation Loss: 2.5656
+Epoch [41/100], Train Loss: 2.5963, Validation Loss: 2.6113
+Epoch [42/100], Train Loss: 2.6464, Validation Loss: 2.6798
+Epoch [43/100], Train Loss: 2.6964, Validation Loss: 2.7433
+Epoch [44/100], Train Loss: 2.7293, Validation Loss: 2.7835
+Epoch [45/100], Train Loss: 2.7373, Validation Loss: 2.7915
+Epoch [46/100], Train Loss: 2.7203, Validation Loss: 2.7674
+Epoch [47/100], Train Loss: 2.6838, Validation Loss: 2.7196
+Epoch [48/100], Train Loss: 2.6367, Validation Loss: 2.6598
+Epoch [49/100], Train Loss: 2.5884, Validation Loss: 2.6004
+Epoch [50/100], Train Loss: 2.5459, Validation Loss: 2.5485
+Epoch [51/100], Train Loss: 2.5124, Validation Loss: 2.5066
+Epoch [52/100], Train Loss: 2.4877, Validation Loss: 2.4745
+Epoch [53/100], Train Loss: 2.4694, Validation Loss: 2.4496
+Epoch [54/100], Train Loss: 2.4546, Validation Loss: 2.4289
+Epoch [55/100], Train Loss: 2.4403, Validation Loss: 2.4105
+Epoch [56/100], Train Loss: 2.4252, Validation Loss: 2.3931
+Epoch [57/100], Train Loss: 2.4089, Validation Loss: 2.3759
+Epoch [58/100], Train Loss: 2.3919, Validation Loss: 2.3596
+Epoch [59/100], Train Loss: 2.3754, Validation Loss: 2.3456
+Epoch [60/100], Train Loss: 2.3607, Validation Loss: 2.3361
+Epoch [61/100], Train Loss: 2.3491, Validation Loss: 2.3318
+Epoch [62/100], Train Loss: 2.3412, Validation Loss: 2.3331
+Epoch [63/100], Train Loss: 2.3368, Validation Loss: 2.3391
+Epoch [64/100], Train Loss: 2.3348, Validation Loss: 2.3488
+Epoch [65/100], Train Loss: 2.3339, Validation Loss: 2.3622
+Epoch [66/100], Train Loss: 2.3326, Validation Loss: 2.3766
+Epoch [67/100], Train Loss: 2.3300, Validation Loss: 2.3893
+Epoch [68/100], Train Loss: 2.3257, Validation Loss: 2.3995
+Epoch [69/100], Train Loss: 2.3203, Validation Loss: 2.4053
+Epoch [70/100], Train Loss: 2.3140, Validation Loss: 2.4061
+Epoch [71/100], Train Loss: 2.3078, Validation Loss: 2.4009
+Epoch [72/100], Train Loss: 2.3013, Validation Loss: 2.3898
+Epoch [73/100], Train Loss: 2.2947, Validation Loss: 2.3753
+Epoch [74/100], Train Loss: 2.2886, Validation Loss: 2.3597
+Epoch [75/100], Train Loss: 2.2835, Validation Loss: 2.3445
+Epoch [76/100], Train Loss: 2.2799, Validation Loss: 2.3316
+Epoch [77/100], Train Loss: 2.2781, Validation Loss: 2.3213
+Epoch [78/100], Train Loss: 2.2773, Validation Loss: 2.3135
+Epoch [79/100], Train Loss: 2.2771, Validation Loss: 2.3079
+Epoch [80/100], Train Loss: 2.2762, Validation Loss: 2.3032
+Epoch [81/100], Train Loss: 2.2742, Validation Loss: 2.2990
+Epoch [82/100], Train Loss: 2.2707, Validation Loss: 2.2952
+Epoch [83/100], Train Loss: 2.2660, Validation Loss: 2.2921
+Epoch [84/100], Train Loss: 2.2607, Validation Loss: 2.2903/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/sklearn/base.py:1389: DataConversionWarning: A column-vector y was passed when a 1d array was expected. Please change the shape of y to (n_samples,), for example using ravel().
+  return fit_method(estimator, *args, **kwargs)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/sklearn/utils/validation.py:1408: DataConversionWarning: A column-vector y was passed when a 1d array was expected. Please change the shape of y to (n_samples, ), for example using ravel().
+  y = column_or_1d(y, warn=True)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+
+Epoch [85/100], Train Loss: 2.2554, Validation Loss: 2.2899
+Epoch [86/100], Train Loss: 2.2508, Validation Loss: 2.2912
+Epoch [87/100], Train Loss: 2.2470, Validation Loss: 2.2940
+Epoch [88/100], Train Loss: 2.2443, Validation Loss: 2.2973
+Epoch [89/100], Train Loss: 2.2424, Validation Loss: 2.3002
+Epoch [90/100], Train Loss: 2.2409, Validation Loss: 2.3011
+Epoch [91/100], Train Loss: 2.2391, Validation Loss: 2.2992
+Epoch [92/100], Train Loss: 2.2366, Validation Loss: 2.2947
+Epoch [93/100], Train Loss: 2.2332, Validation Loss: 2.2878
+Epoch [94/100], Train Loss: 2.2293, Validation Loss: 2.2799
+Epoch [95/100], Train Loss: 2.2252, Validation Loss: 2.2725
+Epoch [96/100], Train Loss: 2.2215, Validation Loss: 2.2664
+Epoch [97/100], Train Loss: 2.2181, Validation Loss: 2.2617
+Epoch [98/100], Train Loss: 2.2150, Validation Loss: 2.2584
+Epoch [99/100], Train Loss: 2.2120, Validation Loss: 2.2563
+Epoch [100/100], Train Loss: 2.2091, Validation Loss: 2.2554
+Output 1 (pH): R^2 Score = -0.057, MSE = 0.406
+Output 2 (Available.P): R^2 Score = 0.023, MSE = 10211.690
+torch.Size([191, 13719])
+Epoch [1/100], Train Loss: 1.2517, Validation Loss: 24.7399
+Epoch [2/100], Train Loss: 764.4857, Validation Loss: 3980.2202
+Epoch [3/100], Train Loss: 18406.1719, Validation Loss: 634.2782
+Epoch [4/100], Train Loss: 574.7023, Validation Loss: 16.6540
+Epoch [5/100], Train Loss: 9.9811, Validation Loss: 215.1203
+Epoch [6/100], Train Loss: 77.7371, Validation Loss: 374.8849
+Epoch [7/100], Train Loss: 107.9398, Validation Loss: 393.7540
+Epoch [8/100], Train Loss: 99.2709, Validation Loss: 308.3498
+Epoch [9/100], Train Loss: 72.8996, Validation Loss: 133.8602
+Epoch [10/100], Train Loss: 33.2463, Validation Loss: 9.8385
+Epoch [11/100], Train Loss: 3.7481, Validation Loss: 48.2161
+Epoch [12/100], Train Loss: 11.4687, Validation Loss: 135.3853
+Epoch [13/100], Train Loss: 34.5833, Validation Loss: 124.1881
+Epoch [14/100], Train Loss: 34.9264, Validation Loss: 69.0919
+Epoch [15/100], Train Loss: 22.2746, Validation Loss: 22.5836
+Epoch [16/100], Train Loss: 8.9939, Validation Loss: 2.8149
+Epoch [17/100], Train Loss: 2.1050, Validation Loss: 3.7970
+Epoch [18/100], Train Loss: 2.0085, Validation Loss: 13.8694
+Epoch [19/100], Train Loss: 6.2695, Validation Loss: 22.6562
+Epoch [20/100], Train Loss: 10.8640, Validation Loss: 24.7321
+Epoch [21/100], Train Loss: 12.7213, Validation Loss: 20.1359
+Epoch [22/100], Train Loss: 11.1346, Validation Loss: 12.2635
+Epoch [23/100], Train Loss: 7.3616, Validation Loss: 5.1391
+Epoch [24/100], Train Loss: 3.5320, Validation Loss: 1.4695
+Epoch [25/100], Train Loss: 1.4667, Validation Loss: 1.7284
+Epoch [26/100], Train Loss: 1.8021, Validation Loss: 4.3216
+Epoch [27/100], Train Loss: 3.7424, Validation Loss: 6.7523
+Epoch [28/100], Train Loss: 5.6407, Validation Loss: 7.2550
+Epoch [29/100], Train Loss: 6.1464, Validation Loss: 5.7211
+Epoch [30/100], Train Loss: 5.0450, Validation Loss: 3.3998
+Epoch [31/100], Train Loss: 3.2080, Validation Loss: 1.6540
+Epoch [32/100], Train Loss: 1.7611, Validation Loss: 1.1525
+Epoch [33/100], Train Loss: 1.3346, Validation Loss: 1.7197
+Epoch [34/100], Train Loss: 1.8461, Validation Loss: 2.6825
+Epoch [35/100], Train Loss: 2.7330, Validation Loss: 3.3574
+Epoch [36/100], Train Loss: 3.3692, Validation Loss: 3.3812
+Epoch [37/100], Train Loss: 3.4023, Validation Loss: 2.8060
+Epoch [38/100], Train Loss: 2.8710, Validation Loss: 1.9856
+Epoch [39/100], Train Loss: 2.1062, Validation Loss: 1.3480
+Epoch [40/100], Train Loss: 1.5086, Validation Loss: 1.1601
+Epoch [41/100], Train Loss: 1.3286, Validation Loss: 1.4048
+Epoch [42/100], Train Loss: 1.5536, Validation Loss: 1.8265
+Epoch [43/100], Train Loss: 1.9507, Validation Loss: 2.1127
+Epoch [44/100], Train Loss: 2.2276, Validation Loss: 2.0867
+Epoch [45/100], Train Loss: 2.2129, Validation Loss: 1.7921
+Epoch [46/100], Train Loss: 1.9396, Validation Loss: 1.4252
+Epoch [47/100], Train Loss: 1.5887, Validation Loss: 1.1903
+Epoch [48/100], Train Loss: 1.3544, Validation Loss: 1.1837
+Epoch [49/100], Train Loss: 1.3294, Validation Loss: 1.3540
+Epoch [50/100], Train Loss: 1.4714, Validation Loss: 1.5335
+Epoch [51/100], Train Loss: 1.6423, Validation Loss: 1.6075
+Epoch [52/100], Train Loss: 1.7226, Validation Loss: 1.5453
+Epoch [53/100], Train Loss: 1.6724, Validation Loss: 1.3921
+Epoch [54/100], Train Loss: 1.5323, Validation Loss: 1.2337
+Epoch [55/100], Train Loss: 1.3860, Validation Loss: 1.1438
+Epoch [56/100], Train Loss: 1.3067, Validation Loss: 1.1468
+Epoch [57/100], Train Loss: 1.3190, Validation Loss: 1.2114
+Epoch [58/100], Train Loss: 1.3906, Validation Loss: 1.2765
+Epoch [59/100], Train Loss: 1.4601, Validation Loss: 1.2929
+Epoch [60/100], Train Loss: 1.4782, Validation Loss: 1.2519
+Epoch [61/100], Train Loss: 1.4357, Validation Loss: 1.1836
+Epoch [62/100], Train Loss: 1.3629, Validation Loss: 1.1314
+Epoch [63/100], Train Loss: 1.3036, Validation Loss: 1.1219
+Epoch [64/100], Train Loss: 1.2857, Validation Loss: 1.1513
+Epoch [65/100], Train Loss: 1.3073, Validation Loss: 1.1925
+Epoch [66/100], Train Loss: 1.3430, Validation Loss: 1.2156
+Epoch [67/100], Train Loss: 1.3635, Validation Loss: 1.2060
+Epoch [68/100], Train Loss: 1.3547, Validation Loss: 1.1708
+Epoch [69/100], Train Loss: 1.3229, Validation Loss: 1.1306
+Epoch [70/100], Train Loss: 1.2882, Validation Loss: 1.1055
+Epoch [71/100], Train Loss: 1.2693, Validation Loss: 1.1023
+Epoch [72/100], Train Loss: 1.2719, Validation Loss: 1.1133
+Epoch [73/100], Train Loss: 1.2872, Validation Loss: 1.1234
+Epoch [74/100], Train Loss: 1.2997, Validation Loss: 1.1220
+Epoch [75/100], Train Loss: 1.2985, Validation Loss: 1.1091
+Epoch [76/100], Train Loss: 1.2838, Validation Loss: 1.0934
+Epoch [77/100], Train Loss: 1.2648, Validation Loss: 1.0847
+Epoch [78/100], Train Loss: 1.2521, Validation Loss: 1.0866
+Epoch [79/100], Train Loss: 1.2503, Validation Loss: 1.0951
+Epoch [80/100], Train Loss: 1.2561, Validation Loss: 1.1021
+Epoch [81/100], Train Loss: 1.2615, Validation Loss: 1.1011
+Epoch [82/100], Train Loss: 1.2605, Validation Loss: 1.0919
+Epoch [83/100], Train Loss: 1.2523, Validation Loss: 1.0790
+Epoch [84/100], Train Loss: 1.2415, Validation Loss: 1.0686
+Epoch [85/100], Train Loss: 1.2336, Validation Loss: 1.0636
+Epoch [86/100], Train Loss: 1.2313, Validation Loss: 1.0631
+Epoch [87/100], Train Loss: 1.2329, Validation Loss: 1.0633
+Epoch [88/100], Train Loss: 1.2342, Validation Loss: 1.0614
+Epoch [89/100], Train Loss: 1.2321, Validation Loss: 1.0568
+Epoch [90/100], Train Loss: 1.2264, Validation Loss: 1.0518
+Epoch [91/100], Train Loss: 1.2197, Validation Loss: 1.0488
+Epoch [92/100], Train Loss: 1.2148, Validation Loss: 1.0485
+Epoch [93/100], Train Loss: 1.2128, Validation Loss: 1.0495
+Epoch [94/100], Train Loss: 1.2125, Validation Loss: 1.0494
+Epoch [95/100], Train Loss: 1.2116, Validation Loss: 1.0467
+Epoch [96/100], Train Loss: 1.2088, Validation Loss: 1.0417
+Epoch [97/100], Train Loss: 1.2043, Validation Loss: 1.0361
+Epoch [98/100], Train Loss: 1.1997, Validation Loss: 1.0317
+Epoch [99/100], Train Loss: 1.1964, Validation Loss: 1.0288
+Epoch [100/100], Train Loss: 1.1946, Validation Loss: 1.0267
+Output 1 (pH): R^2 Score = 0.064, MSE = 0.360
+torch.Size([191, 13719])
+Epoch [1/100], Train Loss: 1.2630, Validation Loss: 95.5582
+Epoch [2/100], Train Loss: 5700.6650, Validation Loss: 211.5963
+Epoch [3/100], Train Loss: 469.3961, Validation Loss: 818.3240
+Epoch [4/100], Train Loss: 364.1172, Validation Loss: 317.5338
+Epoch [5/100], Train Loss: 78.2304, Validation Loss: 2.0550
+Epoch [6/100], Train Loss: 1.7053, Validation Loss: 202.1739
+Epoch [7/100], Train Loss: 68.1735, Validation Loss: 290.4276
+Epoch [8/100], Train Loss: 96.9352, Validation Loss: 171.0633
+Epoch [9/100], Train Loss: 53.3527, Validation Loss: 30.8498
+Epoch [10/100], Train Loss: 8.9050, Validation Loss: 30.3002
+Epoch [11/100], Train Loss: 9.1724, Validation Loss: 110.6426
+Epoch [12/100], Train Loss: 27.3803, Validation Loss: 129.8366
+Epoch [13/100], Train Loss: 32.0120, Validation Loss: 99.8886
+Epoch [14/100], Train Loss: 25.1697, Validation Loss: 46.5535
+Epoch [15/100], Train Loss: 13.2543, Validation Loss: 11.3225
+Epoch [16/100], Train Loss: 4.4767, Validation Loss: 1.6123/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/sklearn/base.py:1389: DataConversionWarning: A column-vector y was passed when a 1d array was expected. Please change the shape of y to (n_samples,), for example using ravel().
+  return fit_method(estimator, *args, **kwargs)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/sklearn/utils/validation.py:1408: DataConversionWarning: A column-vector y was passed when a 1d array was expected. Please change the shape of y to (n_samples, ), for example using ravel().
+  y = column_or_1d(y, warn=True)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+
+Epoch [17/100], Train Loss: 1.3910, Validation Loss: 9.2232
+Epoch [18/100], Train Loss: 3.4603, Validation Loss: 21.4228
+Epoch [19/100], Train Loss: 7.4824, Validation Loss: 27.4509
+Epoch [20/100], Train Loss: 10.1255, Validation Loss: 24.0552
+Epoch [21/100], Train Loss: 9.6994, Validation Loss: 15.1898
+Epoch [22/100], Train Loss: 6.8768, Validation Loss: 6.9852
+Epoch [23/100], Train Loss: 3.6764, Validation Loss: 2.5145
+Epoch [24/100], Train Loss: 1.7322, Validation Loss: 1.5818
+Epoch [25/100], Train Loss: 1.5061, Validation Loss: 2.6152
+Epoch [26/100], Train Loss: 2.4795, Validation Loss: 4.0586
+Epoch [27/100], Train Loss: 3.7386, Validation Loss: 4.9341
+Epoch [28/100], Train Loss: 4.5127, Validation Loss: 4.9617
+Epoch [29/100], Train Loss: 4.4838, Validation Loss: 4.3546
+Epoch [30/100], Train Loss: 3.8062, Validation Loss: 3.4625
+Epoch [31/100], Train Loss: 2.8770, Validation Loss: 2.5766
+Epoch [32/100], Train Loss: 2.0532, Validation Loss: 1.9057
+Epoch [33/100], Train Loss: 1.5270, Validation Loss: 1.5884
+Epoch [34/100], Train Loss: 1.3701, Validation Loss: 1.6259
+Epoch [35/100], Train Loss: 1.5622, Validation Loss: 1.8809
+Epoch [36/100], Train Loss: 1.9792, Validation Loss: 2.1449
+Epoch [37/100], Train Loss: 2.3789, Validation Loss: 2.2383
+Epoch [38/100], Train Loss: 2.4723, Validation Loss: 2.1095
+Epoch [39/100], Train Loss: 2.2160, Validation Loss: 1.8588
+Epoch [40/100], Train Loss: 1.8301, Validation Loss: 1.6307
+Epoch [41/100], Train Loss: 1.5160, Validation Loss: 1.5312
+Epoch [42/100], Train Loss: 1.3566, Validation Loss: 1.5577
+Epoch [43/100], Train Loss: 1.3316, Validation Loss: 1.5561
+Epoch [44/100], Train Loss: 1.2991, Validation Loss: 1.5226
+Epoch [45/100], Train Loss: 1.3043, Validation Loss: 1.5415
+Epoch [46/100], Train Loss: 1.2566, Validation Loss: 1.5228
+Epoch [47/100], Train Loss: 1.2257, Validation Loss: 1.4100
+Epoch [48/100], Train Loss: 1.1455, Validation Loss: 1.4203
+Epoch [49/100], Train Loss: 1.1427, Validation Loss: 1.3779
+Epoch [50/100], Train Loss: 1.0507, Validation Loss: 1.4398
+Epoch [51/100], Train Loss: 1.0531, Validation Loss: 1.3895
+Epoch [52/100], Train Loss: 0.9969, Validation Loss: 1.3916
+Epoch [53/100], Train Loss: 0.9950, Validation Loss: 1.3790
+Epoch [54/100], Train Loss: 0.9593, Validation Loss: 1.3826
+Epoch [55/100], Train Loss: 0.9329, Validation Loss: 1.3759
+Epoch [56/100], Train Loss: 0.9111, Validation Loss: 1.3309
+Epoch [57/100], Train Loss: 0.8671, Validation Loss: 1.3228
+Epoch [58/100], Train Loss: 0.8559, Validation Loss: 1.2932
+Epoch [59/100], Train Loss: 0.8096, Validation Loss: 1.3037
+Epoch [60/100], Train Loss: 0.8014, Validation Loss: 1.2588
+Epoch [61/100], Train Loss: 0.7592, Validation Loss: 1.2455
+Epoch [62/100], Train Loss: 0.7517, Validation Loss: 1.2310
+Epoch [63/100], Train Loss: 0.7132, Validation Loss: 1.2442
+Epoch [64/100], Train Loss: 0.7063, Validation Loss: 1.2042
+Epoch [65/100], Train Loss: 0.6703, Validation Loss: 1.1959
+Epoch [66/100], Train Loss: 0.6585, Validation Loss: 1.1990
+Epoch [67/100], Train Loss: 0.6366, Validation Loss: 1.1845
+Epoch [68/100], Train Loss: 0.6151, Validation Loss: 1.1791
+Epoch [69/100], Train Loss: 0.6098, Validation Loss: 1.1745
+Epoch [70/100], Train Loss: 0.5894, Validation Loss: 1.1662
+Epoch [71/100], Train Loss: 0.5743, Validation Loss: 1.1680
+Epoch [72/100], Train Loss: 0.5721, Validation Loss: 1.1655
+Epoch [73/100], Train Loss: 0.5628, Validation Loss: 1.1567
+Epoch [74/100], Train Loss: 0.5434, Validation Loss: 1.1551
+Epoch [75/100], Train Loss: 0.5304, Validation Loss: 1.1684
+Epoch [76/100], Train Loss: 0.5271, Validation Loss: 1.1753
+Epoch [77/100], Train Loss: 0.5232, Validation Loss: 1.2042
+Epoch [78/100], Train Loss: 0.5117, Validation Loss: 1.2088
+Epoch [79/100], Train Loss: 0.4967, Validation Loss: 1.2343
+Epoch [80/100], Train Loss: 0.4879, Validation Loss: 1.2781
+Epoch [81/100], Train Loss: 0.4856, Validation Loss: 1.2804
+Epoch [82/100], Train Loss: 0.4819, Validation Loss: 1.3231
+Epoch [83/100], Train Loss: 0.4740, Validation Loss: 1.3269
+Epoch [84/100], Train Loss: 0.4674, Validation Loss: 1.3300
+Epoch [85/100], Train Loss: 0.4659, Validation Loss: 1.3621
+Epoch [86/100], Train Loss: 0.4651, Validation Loss: 1.3306
+Epoch [87/100], Train Loss: 0.4606, Validation Loss: 1.3419
+Epoch [88/100], Train Loss: 0.4552, Validation Loss: 1.3355
+Epoch [89/100], Train Loss: 0.4527, Validation Loss: 1.3128
+Epoch [90/100], Train Loss: 0.4524, Validation Loss: 1.3352
+Epoch [91/100], Train Loss: 0.4513, Validation Loss: 1.3035
+Epoch [92/100], Train Loss: 0.4480, Validation Loss: 1.3220
+Epoch [93/100], Train Loss: 0.4439, Validation Loss: 1.3120
+Epoch [94/100], Train Loss: 0.4407, Validation Loss: 1.3125
+Epoch [95/100], Train Loss: 0.4390, Validation Loss: 1.3281
+Epoch [96/100], Train Loss: 0.4385, Validation Loss: 1.3110
+Epoch [97/100], Train Loss: 0.4385, Validation Loss: 1.3428
+Epoch [98/100], Train Loss: 0.4385, Validation Loss: 1.3105
+Epoch [99/100], Train Loss: 0.4382, Validation Loss: 1.3515
+Epoch [100/100], Train Loss: 0.4375, Validation Loss: 1.3127
+Output 1 (Available.P): R^2 Score = 0.342, MSE = 6869.994
+学習データ数: 191
+検証データ数: 48
+テストデータ数: 60
+torch.Size([191, 13719])
+Epoch [1/100], Train Loss: 2.2495, Validation Loss: 89.3874
+Epoch [2/100], Train Loss: 9245.0176, Validation Loss: 1247.4570
+Epoch [3/100], Train Loss: 10671.1133, Validation Loss: 1478.4762
+Epoch [4/100], Train Loss: 1457.7122, Validation Loss: 203.4872
+Epoch [5/100], Train Loss: 79.9985, Validation Loss: 545.4913
+Epoch [6/100], Train Loss: 171.5741, Validation Loss: 1932.6665
+Epoch [7/100], Train Loss: 419.1592, Validation Loss: 2351.0100
+Epoch [8/100], Train Loss: 429.1255, Validation Loss: 1575.8441
+Epoch [9/100], Train Loss: 266.4324, Validation Loss: 686.9153
+Epoch [10/100], Train Loss: 115.9711, Validation Loss: 160.2113
+Epoch [11/100], Train Loss: 33.0888, Validation Loss: 58.2139
+Epoch [12/100], Train Loss: 10.5803, Validation Loss: 104.6617
+Epoch [13/100], Train Loss: 13.4209, Validation Loss: 159.6492
+Epoch [14/100], Train Loss: 23.6558, Validation Loss: 191.1003
+Epoch [15/100], Train Loss: 34.8119, Validation Loss: 199.5348
+Epoch [16/100], Train Loss: 43.5959, Validation Loss: 196.0266
+Epoch [17/100], Train Loss: 49.7843, Validation Loss: 179.7365
+Epoch [18/100], Train Loss: 52.4719, Validation Loss: 153.4254
+Epoch [19/100], Train Loss: 51.2360, Validation Loss: 122.2201
+Epoch [20/100], Train Loss: 46.5948, Validation Loss: 91.7475
+Epoch [21/100], Train Loss: 39.6657, Validation Loss: 65.7693
+Epoch [22/100], Train Loss: 31.8421, Validation Loss: 45.6631
+Epoch [23/100], Train Loss: 24.3604, Validation Loss: 31.1189
+Epoch [24/100], Train Loss: 18.0060, Validation Loss: 21.0778
+Epoch [25/100], Train Loss: 13.0890, Validation Loss: 14.3060
+Epoch [26/100], Train Loss: 9.5398, Validation Loss: 9.7434
+Epoch [27/100], Train Loss: 7.0897, Validation Loss: 6.6548
+Epoch [28/100], Train Loss: 5.4191, Validation Loss: 4.5636
+Epoch [29/100], Train Loss: 4.2690, Validation Loss: 3.1862
+Epoch [30/100], Train Loss: 3.4786, Validation Loss: 2.3587
+Epoch [31/100], Train Loss: 2.9660, Validation Loss: 1.9676
+Epoch [32/100], Train Loss: 2.6977, Validation Loss: 1.9239
+Epoch [33/100], Train Loss: 2.6569, Validation Loss: 2.1250
+Epoch [34/100], Train Loss: 2.8140, Validation Loss: 2.4658
+Epoch [35/100], Train Loss: 3.1218, Validation Loss: 2.8459
+Epoch [36/100], Train Loss: 3.5076, Validation Loss: 3.1801
+Epoch [37/100], Train Loss: 3.8799, Validation Loss: 3.4098
+Epoch [38/100], Train Loss: 4.1544, Validation Loss: 3.5209
+Epoch [39/100], Train Loss: 4.2916, Validation Loss: 3.5400
+Epoch [40/100], Train Loss: 4.3104, Validation Loss: 3.5124
+Epoch [41/100], Train Loss: 4.2627, Validation Loss: 3.4838
+Epoch [42/100], Train Loss: 4.1957, Validation Loss: 3.4707
+Epoch [43/100], Train Loss: 4.1384, Validation Loss: 3.4608
+Epoch [44/100], Train Loss: 4.0832, Validation Loss: 3.4174
+Epoch [45/100], Train Loss: 4.0156, Validation Loss: 3.1631
+Epoch [46/100], Train Loss: 3.8295, Validation Loss: 4.1424
+Epoch [47/100], Train Loss: 3.9360, Validation Loss: 2.9162
+Epoch [48/100], Train Loss: 3.5544, Validation Loss: 2.9219
+Epoch [49/100], Train Loss: 3.6008, Validation Loss: 2.7820/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+
+Epoch [50/100], Train Loss: 3.4365, Validation Loss: 2.5310
+Epoch [51/100], Train Loss: 3.1184, Validation Loss: 2.5597
+Epoch [52/100], Train Loss: 2.9778, Validation Loss: 2.6373
+Epoch [53/100], Train Loss: 2.9711, Validation Loss: 2.3163
+Epoch [54/100], Train Loss: 2.7190, Validation Loss: 2.0761
+Epoch [55/100], Train Loss: 2.5573, Validation Loss: 2.0252
+Epoch [56/100], Train Loss: 2.5217, Validation Loss: 1.9679
+Epoch [57/100], Train Loss: 2.4436, Validation Loss: 1.8646
+Epoch [58/100], Train Loss: 2.3014, Validation Loss: 1.8017
+Epoch [59/100], Train Loss: 2.1800, Validation Loss: 1.8367
+Epoch [60/100], Train Loss: 2.1555, Validation Loss: 1.8431
+Epoch [61/100], Train Loss: 2.1321, Validation Loss: 1.7426
+Epoch [62/100], Train Loss: 2.0358, Validation Loss: 1.6825
+Epoch [63/100], Train Loss: 1.9803, Validation Loss: 1.6905
+Epoch [64/100], Train Loss: 1.9848, Validation Loss: 1.6939
+Epoch [65/100], Train Loss: 1.9695, Validation Loss: 1.6727
+Epoch [66/100], Train Loss: 1.9182, Validation Loss: 1.6845
+Epoch [67/100], Train Loss: 1.8933, Validation Loss: 1.7328
+Epoch [68/100], Train Loss: 1.9127, Validation Loss: 1.7325
+Epoch [69/100], Train Loss: 1.8973, Validation Loss: 1.7037
+Epoch [70/100], Train Loss: 1.8678, Validation Loss: 1.7119
+Epoch [71/100], Train Loss: 1.8761, Validation Loss: 1.7279
+Epoch [72/100], Train Loss: 1.8839, Validation Loss: 1.7221
+Epoch [73/100], Train Loss: 1.8626, Validation Loss: 1.7292
+Epoch [74/100], Train Loss: 1.8544, Validation Loss: 1.7441
+Epoch [75/100], Train Loss: 1.8628, Validation Loss: 1.7195
+Epoch [76/100], Train Loss: 1.8443, Validation Loss: 1.6927
+Epoch [77/100], Train Loss: 1.8308, Validation Loss: 1.6840
+Epoch [78/100], Train Loss: 1.8322, Validation Loss: 1.6669
+Epoch [79/100], Train Loss: 1.8169, Validation Loss: 1.6565
+Epoch [80/100], Train Loss: 1.8036, Validation Loss: 1.6568
+Epoch [81/100], Train Loss: 1.8015, Validation Loss: 1.6393
+Epoch [82/100], Train Loss: 1.7880, Validation Loss: 1.6180
+Epoch [83/100], Train Loss: 1.7747, Validation Loss: 1.6076
+Epoch [84/100], Train Loss: 1.7692, Validation Loss: 1.5981
+Epoch [85/100], Train Loss: 1.7560, Validation Loss: 1.5957
+Epoch [86/100], Train Loss: 1.7438, Validation Loss: 1.5980
+Epoch [87/100], Train Loss: 1.7371, Validation Loss: 1.5875
+Epoch [88/100], Train Loss: 1.7234, Validation Loss: 1.5763
+Epoch [89/100], Train Loss: 1.7133, Validation Loss: 1.5735
+Epoch [90/100], Train Loss: 1.7051, Validation Loss: 1.5778
+Epoch [91/100], Train Loss: 1.6923, Validation Loss: 1.5893
+Epoch [92/100], Train Loss: 1.6852, Validation Loss: 1.5896
+Epoch [93/100], Train Loss: 1.6750, Validation Loss: 1.5831
+Epoch [94/100], Train Loss: 1.6668, Validation Loss: 1.5861
+Epoch [95/100], Train Loss: 1.6592, Validation Loss: 1.6001
+Epoch [96/100], Train Loss: 1.6502, Validation Loss: 1.6132
+Epoch [97/100], Train Loss: 1.6451, Validation Loss: 1.6050
+Epoch [98/100], Train Loss: 1.6366, Validation Loss: 1.6024
+Epoch [99/100], Train Loss: 1.6322, Validation Loss: 1.6128
+Epoch [100/100], Train Loss: 1.6250, Validation Loss: 1.6283
+Output 1 (pH): R^2 Score = 0.284, MSE = 0.267
+Output 2 (Available.P): R^2 Score = -0.047, MSE = 7354.415
+torch.Size([191, 13719])
+Epoch [1/100], Train Loss: 1.2583, Validation Loss: 110.9570
+Epoch [2/100], Train Loss: 2406.7659, Validation Loss: 600.4756
+Epoch [3/100], Train Loss: 1632.2845, Validation Loss: 1486.6938
+Epoch [4/100], Train Loss: 415.6097, Validation Loss: 311.7752
+Epoch [5/100], Train Loss: 13.5998, Validation Loss: 754.2582
+Epoch [6/100], Train Loss: 142.9621, Validation Loss: 1740.1218
+Epoch [7/100], Train Loss: 239.8742, Validation Loss: 934.8853
+Epoch [8/100], Train Loss: 164.5160, Validation Loss: 238.9584
+Epoch [9/100], Train Loss: 68.9433, Validation Loss: 46.9266
+Epoch [10/100], Train Loss: 23.3058, Validation Loss: 19.6115
+Epoch [11/100], Train Loss: 3.3363, Validation Loss: 71.5599
+Epoch [12/100], Train Loss: 15.8634, Validation Loss: 56.5154
+Epoch [13/100], Train Loss: 17.8654, Validation Loss: 37.1099
+Epoch [14/100], Train Loss: 13.9859, Validation Loss: 23.5030
+Epoch [15/100], Train Loss: 10.2695, Validation Loss: 7.3186
+Epoch [16/100], Train Loss: 6.4196, Validation Loss: 6.2830
+Epoch [17/100], Train Loss: 3.7622, Validation Loss: 23.0296
+Epoch [18/100], Train Loss: 2.2344, Validation Loss: 45.4952
+Epoch [19/100], Train Loss: 1.5289, Validation Loss: 61.4329
+Epoch [20/100], Train Loss: 1.3580, Validation Loss: 68.1610
+Epoch [21/100], Train Loss: 1.4822, Validation Loss: 56.8505
+Epoch [22/100], Train Loss: 1.6200, Validation Loss: 33.4056
+Epoch [23/100], Train Loss: 1.5193, Validation Loss: 12.3259
+Epoch [24/100], Train Loss: 1.3431, Validation Loss: 2.0919
+Epoch [25/100], Train Loss: 1.4415, Validation Loss: 1.7061
+Epoch [26/100], Train Loss: 1.4333, Validation Loss: 2.5493
+Epoch [27/100], Train Loss: 1.3173, Validation Loss: 3.7298
+Epoch [28/100], Train Loss: 1.4291, Validation Loss: 3.2357
+Epoch [29/100], Train Loss: 1.3747, Validation Loss: 2.2328
+Epoch [30/100], Train Loss: 1.3395, Validation Loss: 1.6414
+Epoch [31/100], Train Loss: 1.3310, Validation Loss: 1.5212
+Epoch [32/100], Train Loss: 1.3611, Validation Loss: 1.4848
+Epoch [33/100], Train Loss: 1.3484, Validation Loss: 1.4007
+Epoch [34/100], Train Loss: 1.3540, Validation Loss: 1.4564
+Epoch [35/100], Train Loss: 1.3250, Validation Loss: 1.4404
+Epoch [36/100], Train Loss: 1.3332, Validation Loss: 1.3988
+Epoch [37/100], Train Loss: 1.3337, Validation Loss: 1.3628
+Epoch [38/100], Train Loss: 1.3302, Validation Loss: 1.3463
+Epoch [39/100], Train Loss: 1.3297, Validation Loss: 1.3346
+Epoch [40/100], Train Loss: 1.3320, Validation Loss: 1.3081
+Epoch [41/100], Train Loss: 1.3306, Validation Loss: 1.2706
+Epoch [42/100], Train Loss: 1.3281, Validation Loss: 1.2386
+Epoch [43/100], Train Loss: 1.3287, Validation Loss: 1.2194
+Epoch [44/100], Train Loss: 1.3286, Validation Loss: 1.2120
+Epoch [45/100], Train Loss: 1.3259, Validation Loss: 1.2121
+Epoch [46/100], Train Loss: 1.3248, Validation Loss: 1.2078
+Epoch [47/100], Train Loss: 1.3248, Validation Loss: 1.1907
+Epoch [48/100], Train Loss: 1.3225, Validation Loss: 1.1683
+Epoch [49/100], Train Loss: 1.3204, Validation Loss: 1.1525
+Epoch [50/100], Train Loss: 1.3198, Validation Loss: 1.1461
+Epoch [51/100], Train Loss: 1.3179, Validation Loss: 1.1471
+Epoch [52/100], Train Loss: 1.3154, Validation Loss: 1.1497
+Epoch [53/100], Train Loss: 1.3141, Validation Loss: 1.1458
+Epoch [54/100], Train Loss: 1.3123, Validation Loss: 1.1351
+Epoch [55/100], Train Loss: 1.3097, Validation Loss: 1.1250
+Epoch [56/100], Train Loss: 1.3079, Validation Loss: 1.1204
+Epoch [57/100], Train Loss: 1.3061, Validation Loss: 1.1206
+Epoch [58/100], Train Loss: 1.3033, Validation Loss: 1.1229
+Epoch [59/100], Train Loss: 1.3011, Validation Loss: 1.1222
+Epoch [60/100], Train Loss: 1.2990, Validation Loss: 1.1164
+Epoch [61/100], Train Loss: 1.2962, Validation Loss: 1.1097
+Epoch [62/100], Train Loss: 1.2937, Validation Loss: 1.1060
+Epoch [63/100], Train Loss: 1.2912, Validation Loss: 1.1055
+Epoch [64/100], Train Loss: 1.2881, Validation Loss: 1.1064
+Epoch [65/100], Train Loss: 1.2853, Validation Loss: 1.1049
+Epoch [66/100], Train Loss: 1.2824, Validation Loss: 1.0997
+Epoch [67/100], Train Loss: 1.2789, Validation Loss: 1.0940
+Epoch [68/100], Train Loss: 1.2757, Validation Loss: 1.0904
+Epoch [69/100], Train Loss: 1.2723, Validation Loss: 1.0891
+Epoch [70/100], Train Loss: 1.2685, Validation Loss: 1.0879
+Epoch [71/100], Train Loss: 1.2648, Validation Loss: 1.0841
+Epoch [72/100], Train Loss: 1.2608, Validation Loss: 1.0784
+Epoch [73/100], Train Loss: 1.2565, Validation Loss: 1.0734
+Epoch [74/100], Train Loss: 1.2523, Validation Loss: 1.0704
+Epoch [75/100], Train Loss: 1.2476, Validation Loss: 1.0683
+Epoch [76/100], Train Loss: 1.2428, Validation Loss: 1.0644
+Epoch [77/100], Train Loss: 1.2378, Validation Loss: 1.0582
+Epoch [78/100], Train Loss: 1.2325, Validation Loss: 1.0524
+Epoch [79/100], Train Loss: 1.2271, Validation Loss: 1.0483
+Epoch [80/100], Train Loss: 1.2212, Validation Loss: 1.0448
+Epoch [81/100], Train Loss: 1.2151, Validation Loss: 1.0390
+Epoch [82/100], Train Loss: 1.2087, Validation Loss: 1.0318
+Epoch [83/100], Train Loss: 1.2020, Validation Loss: 1.0259/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/sklearn/base.py:1389: DataConversionWarning: A column-vector y was passed when a 1d array was expected. Please change the shape of y to (n_samples,), for example using ravel().
+  return fit_method(estimator, *args, **kwargs)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/sklearn/utils/validation.py:1408: DataConversionWarning: A column-vector y was passed when a 1d array was expected. Please change the shape of y to (n_samples, ), for example using ravel().
+  y = column_or_1d(y, warn=True)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/sklearn/base.py:1389: DataConversionWarning: A column-vector y was passed when a 1d array was expected. Please change the shape of y to (n_samples,), for example using ravel().
+  return fit_method(estimator, *args, **kwargs)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/sklearn/utils/validation.py:1408: DataConversionWarning: A column-vector y was passed when a 1d array was expected. Please change the shape of y to (n_samples, ), for example using ravel().
+  y = column_or_1d(y, warn=True)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+
+Epoch [84/100], Train Loss: 1.1951, Validation Loss: 1.0214
+Epoch [85/100], Train Loss: 1.1877, Validation Loss: 1.0156
+Epoch [86/100], Train Loss: 1.1801, Validation Loss: 1.0074
+Epoch [87/100], Train Loss: 1.1720, Validation Loss: 1.0002
+Epoch [88/100], Train Loss: 1.1637, Validation Loss: 1.4156
+Epoch [89/100], Train Loss: 1.6372, Validation Loss: 1.9242
+Epoch [90/100], Train Loss: 1.9778, Validation Loss: 1.2962
+Epoch [91/100], Train Loss: 1.4026, Validation Loss: 1.0177
+Epoch [92/100], Train Loss: 1.2155, Validation Loss: 1.3870
+Epoch [93/100], Train Loss: 1.6328, Validation Loss: 1.2784
+Epoch [94/100], Train Loss: 1.4994, Validation Loss: 0.9875
+Epoch [95/100], Train Loss: 1.1666, Validation Loss: 1.1363
+Epoch [96/100], Train Loss: 1.2883, Validation Loss: 1.3294
+Epoch [97/100], Train Loss: 1.4677, Validation Loss: 1.1137
+Epoch [98/100], Train Loss: 1.2631, Validation Loss: 0.9661
+Epoch [99/100], Train Loss: 1.1356, Validation Loss: 1.0737
+Epoch [100/100], Train Loss: 1.2572, Validation Loss: 1.1364
+Output 1 (pH): R^2 Score = -0.563, MSE = 0.582
+torch.Size([191, 13719])
+Epoch [1/100], Train Loss: 1.2516, Validation Loss: 3.2065
+Epoch [2/100], Train Loss: 118.3899, Validation Loss: 7266.3999
+Epoch [3/100], Train Loss: 10312.4717, Validation Loss: 218.5059
+Epoch [4/100], Train Loss: 86.1380, Validation Loss: 50.8601
+Epoch [5/100], Train Loss: 49.7218, Validation Loss: 131.8865
+Epoch [6/100], Train Loss: 108.3001, Validation Loss: 70.3955
+Epoch [7/100], Train Loss: 65.0014, Validation Loss: 9.6885
+Epoch [8/100], Train Loss: 8.1288, Validation Loss: 16.2700
+Epoch [9/100], Train Loss: 27.9541, Validation Loss: 53.5753
+Epoch [10/100], Train Loss: 39.2290, Validation Loss: 43.0569
+Epoch [11/100], Train Loss: 20.5122, Validation Loss: 11.4313
+Epoch [12/100], Train Loss: 4.9325, Validation Loss: 6.0366
+Epoch [13/100], Train Loss: 8.4187, Validation Loss: 20.8161
+Epoch [14/100], Train Loss: 13.3216, Validation Loss: 25.8983
+Epoch [15/100], Train Loss: 10.7811, Validation Loss: 19.4175
+Epoch [16/100], Train Loss: 6.7176, Validation Loss: 5.6066
+Epoch [17/100], Train Loss: 2.1595, Validation Loss: 9.0755
+Epoch [18/100], Train Loss: 2.1473, Validation Loss: 29.4762
+Epoch [19/100], Train Loss: 5.8596, Validation Loss: 33.0767
+Epoch [20/100], Train Loss: 6.8460, Validation Loss: 14.1678
+Epoch [21/100], Train Loss: 3.6048, Validation Loss: 2.7581
+Epoch [22/100], Train Loss: 1.4366, Validation Loss: 9.4209
+Epoch [23/100], Train Loss: 3.0544, Validation Loss: 16.4301
+Epoch [24/100], Train Loss: 5.0681, Validation Loss: 11.4980
+Epoch [25/100], Train Loss: 4.1564, Validation Loss: 3.1880
+Epoch [26/100], Train Loss: 1.8931, Validation Loss: 2.8987
+Epoch [27/100], Train Loss: 1.6476, Validation Loss: 7.9149
+Epoch [28/100], Train Loss: 3.2535, Validation Loss: 8.3993
+Epoch [29/100], Train Loss: 3.6138, Validation Loss: 4.1477
+Epoch [30/100], Train Loss: 2.2147, Validation Loss: 1.4063
+Epoch [31/100], Train Loss: 1.3564, Validation Loss: 2.3841
+Epoch [32/100], Train Loss: 2.1002, Validation Loss: 3.5127
+Epoch [33/100], Train Loss: 2.8246, Validation Loss: 2.4886
+Epoch [34/100], Train Loss: 2.2628, Validation Loss: 1.2348
+Epoch [35/100], Train Loss: 1.3978, Validation Loss: 1.5499
+Epoch [36/100], Train Loss: 1.4187, Validation Loss: 2.5670
+Epoch [37/100], Train Loss: 1.9496, Validation Loss: 2.6031
+Epoch [38/100], Train Loss: 2.0094, Validation Loss: 1.6641
+Epoch [39/100], Train Loss: 1.5122, Validation Loss: 1.0972
+Epoch [40/100], Train Loss: 1.2497, Validation Loss: 1.3539
+Epoch [41/100], Train Loss: 1.5125, Validation Loss: 1.6309
+Epoch [42/100], Train Loss: 1.7427, Validation Loss: 1.3874
+Epoch [43/100], Train Loss: 1.5385, Validation Loss: 1.0697
+Epoch [44/100], Train Loss: 1.2376, Validation Loss: 1.1947
+Epoch [45/100], Train Loss: 1.2768, Validation Loss: 1.4941
+Epoch [46/100], Train Loss: 1.4902, Validation Loss: 1.4442
+Epoch [47/100], Train Loss: 1.4623, Validation Loss: 1.1382
+Epoch [48/100], Train Loss: 1.2407, Validation Loss: 1.0284
+Epoch [49/100], Train Loss: 1.1799, Validation Loss: 1.1602
+Epoch [50/100], Train Loss: 1.3135, Validation Loss: 1.2080
+Epoch [51/100], Train Loss: 1.3577, Validation Loss: 1.0758
+Epoch [52/100], Train Loss: 1.2261, Validation Loss: 0.9985
+Epoch [53/100], Train Loss: 1.1359, Validation Loss: 1.0875
+Epoch [54/100], Train Loss: 1.2018, Validation Loss: 1.1546
+Epoch [55/100], Train Loss: 1.2604, Validation Loss: 1.0726
+Epoch [56/100], Train Loss: 1.1894, Validation Loss: 0.9776
+Epoch [57/100], Train Loss: 1.1092, Validation Loss: 0.9968
+Epoch [58/100], Train Loss: 1.1362, Validation Loss: 1.0433
+Epoch [59/100], Train Loss: 1.1844, Validation Loss: 1.0089
+Epoch [60/100], Train Loss: 1.1480, Validation Loss: 0.9531
+Epoch [61/100], Train Loss: 1.0858, Validation Loss: 0.9668
+Epoch [62/100], Train Loss: 1.0928, Validation Loss: 1.0046
+Epoch [63/100], Train Loss: 1.1273, Validation Loss: 0.9832
+Epoch [64/100], Train Loss: 1.1065, Validation Loss: 0.9351
+Epoch [65/100], Train Loss: 1.0619, Validation Loss: 0.9315
+Epoch [66/100], Train Loss: 1.0631, Validation Loss: 0.9507
+Epoch [67/100], Train Loss: 1.0859, Validation Loss: 0.9381
+Epoch [68/100], Train Loss: 1.0718, Validation Loss: 0.9121
+Epoch [69/100], Train Loss: 1.0403, Validation Loss: 0.9171
+Epoch [70/100], Train Loss: 1.0402, Validation Loss: 0.9341
+Epoch [71/100], Train Loss: 1.0544, Validation Loss: 0.9227
+Epoch [72/100], Train Loss: 1.0424, Validation Loss: 0.8992
+Epoch [73/100], Train Loss: 1.0206, Validation Loss: 0.8962
+Epoch [74/100], Train Loss: 1.0217, Validation Loss: 0.9013
+Epoch [75/100], Train Loss: 1.0295, Validation Loss: 0.8929
+Epoch [76/100], Train Loss: 1.0181, Validation Loss: 0.8850
+Epoch [77/100], Train Loss: 1.0035, Validation Loss: 0.8927
+Epoch [78/100], Train Loss: 1.0053, Validation Loss: 0.8988
+Epoch [79/100], Train Loss: 1.0080, Validation Loss: 0.8891
+Epoch [80/100], Train Loss: 0.9975, Validation Loss: 0.8778
+Epoch [81/100], Train Loss: 0.9889, Validation Loss: 0.8759
+Epoch [82/100], Train Loss: 0.9916, Validation Loss: 0.8743
+Epoch [83/100], Train Loss: 0.9909, Validation Loss: 0.8702
+Epoch [84/100], Train Loss: 0.9819, Validation Loss: 0.8722
+Epoch [85/100], Train Loss: 0.9776, Validation Loss: 0.8773
+Epoch [86/100], Train Loss: 0.9792, Validation Loss: 0.8735
+Epoch [87/100], Train Loss: 0.9756, Validation Loss: 0.8626
+Epoch [88/100], Train Loss: 0.9684, Validation Loss: 0.8551
+Epoch [89/100], Train Loss: 0.9665, Validation Loss: 0.8517
+Epoch [90/100], Train Loss: 0.9663, Validation Loss: 0.8484
+Epoch [91/100], Train Loss: 0.9614, Validation Loss: 0.8478
+Epoch [92/100], Train Loss: 0.9566, Validation Loss: 0.8504
+Epoch [93/100], Train Loss: 0.9559, Validation Loss: 0.8488
+Epoch [94/100], Train Loss: 0.9539, Validation Loss: 0.8420
+Epoch [95/100], Train Loss: 0.9492, Validation Loss: 0.8361
+Epoch [96/100], Train Loss: 0.9466, Validation Loss: 0.8335
+Epoch [97/100], Train Loss: 0.9456, Validation Loss: 0.8323
+Epoch [98/100], Train Loss: 0.9422, Validation Loss: 0.8335
+Epoch [99/100], Train Loss: 0.9385, Validation Loss: 0.8367
+Epoch [100/100], Train Loss: 0.9369, Validation Loss: 0.8371
+Output 1 (Available.P): R^2 Score = 0.405, MSE = 4176.371
+学習データ数: 191
+検証データ数: 48
+テストデータ数: 60
+torch.Size([191, 13719])
+Epoch [1/100], Train Loss: 2.2663, Validation Loss: 409.5242
+Epoch [2/100], Train Loss: 23404.6582, Validation Loss: 2172.1006
+Epoch [3/100], Train Loss: 14530.2334, Validation Loss: 1571.7009
+Epoch [4/100], Train Loss: 2474.9939, Validation Loss: 320.0318
+Epoch [5/100], Train Loss: 225.3771, Validation Loss: 589.1447
+Epoch [6/100], Train Loss: 146.4159, Validation Loss: 2643.6990
+Epoch [7/100], Train Loss: 417.0146, Validation Loss: 4173.0112
+Epoch [8/100], Train Loss: 512.6425, Validation Loss: 3279.6221
+Epoch [9/100], Train Loss: 385.8779, Validation Loss: 1795.9373
+Epoch [10/100], Train Loss: 223.4019, Validation Loss: 802.6863
+Epoch [11/100], Train Loss: 113.4042, Validation Loss: 293.6133
+Epoch [12/100], Train Loss: 52.5675, Validation Loss: 127.3379
+Epoch [13/100], Train Loss: 28.8502, Validation Loss: 97.2431
+Epoch [14/100], Train Loss: 21.2471, Validation Loss: 110.6932
+Epoch [15/100], Train Loss: 19.6410, Validation Loss: 136.5244/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+
+Epoch [16/100], Train Loss: 21.9968, Validation Loss: 132.2552
+Epoch [17/100], Train Loss: 23.6318, Validation Loss: 106.5936
+Epoch [18/100], Train Loss: 22.0540, Validation Loss: 77.0663
+Epoch [19/100], Train Loss: 19.0287, Validation Loss: 52.1478
+Epoch [20/100], Train Loss: 15.2076, Validation Loss: 32.8067
+Epoch [21/100], Train Loss: 11.6598, Validation Loss: 19.7982
+Epoch [22/100], Train Loss: 9.0421, Validation Loss: 12.2251
+Epoch [23/100], Train Loss: 7.4990, Validation Loss: 8.5111
+Epoch [24/100], Train Loss: 6.8334, Validation Loss: 7.1829
+Epoch [25/100], Train Loss: 6.7372, Validation Loss: 7.0999
+Epoch [26/100], Train Loss: 6.9886, Validation Loss: 7.2456
+Epoch [27/100], Train Loss: 7.3954, Validation Loss: 7.2808
+Epoch [28/100], Train Loss: 7.6203, Validation Loss: 7.0386
+Epoch [29/100], Train Loss: 7.5622, Validation Loss: 6.5715
+Epoch [30/100], Train Loss: 7.2354, Validation Loss: 5.8931
+Epoch [31/100], Train Loss: 6.7068, Validation Loss: 5.2171
+Epoch [32/100], Train Loss: 6.0742, Validation Loss: 4.5921
+Epoch [33/100], Train Loss: 5.4274, Validation Loss: 4.0454
+Epoch [34/100], Train Loss: 4.8308, Validation Loss: 3.5902
+Epoch [35/100], Train Loss: 4.3087, Validation Loss: 3.2211
+Epoch [36/100], Train Loss: 3.8641, Validation Loss: 2.9346
+Epoch [37/100], Train Loss: 3.4989, Validation Loss: 2.7296
+Epoch [38/100], Train Loss: 3.2191, Validation Loss: 2.6004
+Epoch [39/100], Train Loss: 3.0244, Validation Loss: 2.5365
+Epoch [40/100], Train Loss: 2.9068, Validation Loss: 2.5228
+Epoch [41/100], Train Loss: 2.8506, Validation Loss: 2.5450
+Epoch [42/100], Train Loss: 2.8381, Validation Loss: 2.5891
+Epoch [43/100], Train Loss: 2.8524, Validation Loss: 2.6392
+Epoch [44/100], Train Loss: 2.8799, Validation Loss: 2.6842
+Epoch [45/100], Train Loss: 2.9094, Validation Loss: 2.7159
+Epoch [46/100], Train Loss: 2.9324, Validation Loss: 2.7279
+Epoch [47/100], Train Loss: 2.9440, Validation Loss: 2.7146
+Epoch [48/100], Train Loss: 2.9366, Validation Loss: 2.6898
+Epoch [49/100], Train Loss: 2.9111, Validation Loss: 2.6592
+Epoch [50/100], Train Loss: 2.8813, Validation Loss: 2.6105
+Epoch [51/100], Train Loss: 2.8504, Validation Loss: 2.5399
+Epoch [52/100], Train Loss: 2.7962, Validation Loss: 2.4644
+Epoch [53/100], Train Loss: 2.7421, Validation Loss: 2.3865
+Epoch [54/100], Train Loss: 2.6899, Validation Loss: 2.3099
+Epoch [55/100], Train Loss: 2.6334, Validation Loss: 2.2235
+Epoch [56/100], Train Loss: 2.5667, Validation Loss: 2.1259
+Epoch [57/100], Train Loss: 2.4931, Validation Loss: 2.0359
+Epoch [58/100], Train Loss: 2.4282, Validation Loss: 1.9810
+Epoch [59/100], Train Loss: 2.4089, Validation Loss: 1.9615
+Epoch [60/100], Train Loss: 2.4137, Validation Loss: 1.9328
+Epoch [61/100], Train Loss: 2.3905, Validation Loss: 1.9078
+Epoch [62/100], Train Loss: 2.3600, Validation Loss: 1.8969
+Epoch [63/100], Train Loss: 2.3431, Validation Loss: 1.8806
+Epoch [64/100], Train Loss: 2.3349, Validation Loss: 1.8524
+Epoch [65/100], Train Loss: 2.3323, Validation Loss: 1.8464
+Epoch [66/100], Train Loss: 2.3343, Validation Loss: 1.8602
+Epoch [67/100], Train Loss: 2.3347, Validation Loss: 1.8649
+Epoch [68/100], Train Loss: 2.3353, Validation Loss: 1.8516
+Epoch [69/100], Train Loss: 2.3316, Validation Loss: 1.8340
+Epoch [70/100], Train Loss: 2.3276, Validation Loss: 1.8310
+Epoch [71/100], Train Loss: 2.3209, Validation Loss: 1.8375
+Epoch [72/100], Train Loss: 2.3130, Validation Loss: 1.8330
+Epoch [73/100], Train Loss: 2.3037, Validation Loss: 1.8177
+Epoch [74/100], Train Loss: 2.2908, Validation Loss: 1.7966
+Epoch [75/100], Train Loss: 2.2767, Validation Loss: 1.7835
+Epoch [76/100], Train Loss: 2.2610, Validation Loss: 1.7773
+Epoch [77/100], Train Loss: 2.2434, Validation Loss: 1.7782
+Epoch [78/100], Train Loss: 2.2262, Validation Loss: 1.7718
+Epoch [79/100], Train Loss: 2.2085, Validation Loss: 1.7547
+Epoch [80/100], Train Loss: 2.1899, Validation Loss: 1.7449
+Epoch [81/100], Train Loss: 2.1718, Validation Loss: 1.7299
+Epoch [82/100], Train Loss: 2.1533, Validation Loss: 1.7318
+Epoch [83/100], Train Loss: 2.1344, Validation Loss: 1.6887
+Epoch [84/100], Train Loss: 2.1334, Validation Loss: 1.7668
+Epoch [85/100], Train Loss: 2.1319, Validation Loss: 1.7300
+Epoch [86/100], Train Loss: 2.1043, Validation Loss: 1.6728
+Epoch [87/100], Train Loss: 2.1124, Validation Loss: 1.7130
+Epoch [88/100], Train Loss: 2.0823, Validation Loss: 1.7224
+Epoch [89/100], Train Loss: 2.0802, Validation Loss: 1.6681
+Epoch [90/100], Train Loss: 2.0554, Validation Loss: 1.6587
+Epoch [91/100], Train Loss: 2.0624, Validation Loss: 1.6790
+Epoch [92/100], Train Loss: 2.0447, Validation Loss: 1.6958
+Epoch [93/100], Train Loss: 2.0510, Validation Loss: 1.6631
+Epoch [94/100], Train Loss: 2.0299, Validation Loss: 1.6591
+Epoch [95/100], Train Loss: 2.0335, Validation Loss: 1.6814
+Epoch [96/100], Train Loss: 2.0100, Validation Loss: 1.7157
+Epoch [97/100], Train Loss: 2.0153, Validation Loss: 1.6643
+Epoch [98/100], Train Loss: 1.9936, Validation Loss: 1.6544
+Epoch [99/100], Train Loss: 1.9941, Validation Loss: 1.7361
+Epoch [100/100], Train Loss: 1.9795, Validation Loss: 1.7398
+Output 1 (pH): R^2 Score = 0.069, MSE = 0.326
+Output 2 (Available.P): R^2 Score = 0.078, MSE = 7955.678
+torch.Size([191, 13719])
+Epoch [1/100], Train Loss: 1.2560, Validation Loss: 4.3372
+Epoch [2/100], Train Loss: 316.6139, Validation Loss: 5590.7817
+Epoch [3/100], Train Loss: 14162.9990, Validation Loss: 849.3002
+Epoch [4/100], Train Loss: 578.0364, Validation Loss: 19.9361
+Epoch [5/100], Train Loss: 8.4935, Validation Loss: 16.0014
+Epoch [6/100], Train Loss: 22.2040, Validation Loss: 16.8520
+Epoch [7/100], Train Loss: 31.2919, Validation Loss: 11.9163
+Epoch [8/100], Train Loss: 25.1421, Validation Loss: 5.6496
+Epoch [9/100], Train Loss: 10.7311, Validation Loss: 1.5012
+Epoch [10/100], Train Loss: 1.8126, Validation Loss: 1.5693
+Epoch [11/100], Train Loss: 5.4013, Validation Loss: 2.8167
+Epoch [12/100], Train Loss: 8.4772, Validation Loss: 1.8460
+Epoch [13/100], Train Loss: 4.9231, Validation Loss: 1.4788
+Epoch [14/100], Train Loss: 3.2815, Validation Loss: 3.1937
+Epoch [15/100], Train Loss: 4.2866, Validation Loss: 3.7501
+Epoch [16/100], Train Loss: 3.8380, Validation Loss: 2.8727
+Epoch [17/100], Train Loss: 2.6587, Validation Loss: 1.8005
+Epoch [18/100], Train Loss: 1.8229, Validation Loss: 1.7868
+Epoch [19/100], Train Loss: 1.5912, Validation Loss: 1.6927
+Epoch [20/100], Train Loss: 1.7474, Validation Loss: 1.3578
+Epoch [21/100], Train Loss: 1.6947, Validation Loss: 1.4471
+Epoch [22/100], Train Loss: 1.6686, Validation Loss: 2.9305
+Epoch [23/100], Train Loss: 1.9158, Validation Loss: 2.2793
+Epoch [24/100], Train Loss: 1.6703, Validation Loss: 1.2526
+Epoch [25/100], Train Loss: 1.4185, Validation Loss: 1.2399
+Epoch [26/100], Train Loss: 1.4015, Validation Loss: 1.4586
+Epoch [27/100], Train Loss: 1.4653, Validation Loss: 1.6169
+Epoch [28/100], Train Loss: 1.5515, Validation Loss: 1.8440
+Epoch [29/100], Train Loss: 1.6344, Validation Loss: 1.5772
+Epoch [30/100], Train Loss: 1.5430, Validation Loss: 1.2697
+Epoch [31/100], Train Loss: 1.4109, Validation Loss: 1.1032
+Epoch [32/100], Train Loss: 1.3534, Validation Loss: 1.0445
+Epoch [33/100], Train Loss: 1.3795, Validation Loss: 1.0751
+Epoch [34/100], Train Loss: 1.4162, Validation Loss: 1.2083
+Epoch [35/100], Train Loss: 1.4251, Validation Loss: 1.3689
+Epoch [36/100], Train Loss: 1.4115, Validation Loss: 1.3748
+Epoch [37/100], Train Loss: 1.3842, Validation Loss: 1.2110
+Epoch [38/100], Train Loss: 1.3474, Validation Loss: 1.0371
+Epoch [39/100], Train Loss: 1.3271, Validation Loss: 0.9654
+Epoch [40/100], Train Loss: 1.3180, Validation Loss: 0.9762
+Epoch [41/100], Train Loss: 1.3201, Validation Loss: 0.9970
+Epoch [42/100], Train Loss: 1.3274, Validation Loss: 0.9920
+Epoch [43/100], Train Loss: 1.3245, Validation Loss: 0.9588
+Epoch [44/100], Train Loss: 1.3047, Validation Loss: 0.9302
+Epoch [45/100], Train Loss: 1.2737, Validation Loss: 0.9384
+Epoch [46/100], Train Loss: 1.2522, Validation Loss: 0.9867
+Epoch [47/100], Train Loss: 1.2574, Validation Loss: 1.0058
+Epoch [48/100], Train Loss: 1.2578, Validation Loss: 0.9706
+Epoch [49/100], Train Loss: 1.2396, Validation Loss: 0.9296/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/sklearn/base.py:1389: DataConversionWarning: A column-vector y was passed when a 1d array was expected. Please change the shape of y to (n_samples,), for example using ravel().
+  return fit_method(estimator, *args, **kwargs)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/sklearn/utils/validation.py:1408: DataConversionWarning: A column-vector y was passed when a 1d array was expected. Please change the shape of y to (n_samples, ), for example using ravel().
+  y = column_or_1d(y, warn=True)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+
+Epoch [50/100], Train Loss: 1.2249, Validation Loss: 0.9107
+Epoch [51/100], Train Loss: 1.2184, Validation Loss: 0.8932
+Epoch [52/100], Train Loss: 1.2110, Validation Loss: 0.8866
+Epoch [53/100], Train Loss: 1.2012, Validation Loss: 0.8917
+Epoch [54/100], Train Loss: 1.1943, Validation Loss: 0.9017
+Epoch [55/100], Train Loss: 1.1879, Validation Loss: 0.9058
+Epoch [56/100], Train Loss: 1.1757, Validation Loss: 0.8987
+Epoch [57/100], Train Loss: 1.1628, Validation Loss: 0.8893
+Epoch [58/100], Train Loss: 1.1532, Validation Loss: 0.8828
+Epoch [59/100], Train Loss: 1.1488, Validation Loss: 0.8774
+Epoch [60/100], Train Loss: 1.1420, Validation Loss: 0.8704
+Epoch [61/100], Train Loss: 1.1287, Validation Loss: 0.8678
+Epoch [62/100], Train Loss: 1.1161, Validation Loss: 0.8700
+Epoch [63/100], Train Loss: 1.1089, Validation Loss: 0.8697
+Epoch [64/100], Train Loss: 1.1014, Validation Loss: 0.8595
+Epoch [65/100], Train Loss: 1.0887, Validation Loss: 0.8478
+Epoch [66/100], Train Loss: 1.0744, Validation Loss: 0.8396
+Epoch [67/100], Train Loss: 1.0627, Validation Loss: 0.8336
+Epoch [68/100], Train Loss: 1.0490, Validation Loss: 0.8328
+Epoch [69/100], Train Loss: 1.0234, Validation Loss: 0.8499
+Epoch [70/100], Train Loss: 1.0040, Validation Loss: 0.8237
+Epoch [71/100], Train Loss: 0.9780, Validation Loss: 0.8023
+Epoch [72/100], Train Loss: 0.9701, Validation Loss: 0.7955
+Epoch [73/100], Train Loss: 0.9412, Validation Loss: 0.8037
+Epoch [74/100], Train Loss: 0.9321, Validation Loss: 0.7742
+Epoch [75/100], Train Loss: 0.9168, Validation Loss: 0.7663
+Epoch [76/100], Train Loss: 0.8988, Validation Loss: 0.7797
+Epoch [77/100], Train Loss: 0.8945, Validation Loss: 0.7514
+Epoch [78/100], Train Loss: 0.8794, Validation Loss: 0.7440
+Epoch [79/100], Train Loss: 0.8663, Validation Loss: 0.7643
+Epoch [80/100], Train Loss: 0.8660, Validation Loss: 0.7331
+Epoch [81/100], Train Loss: 0.8512, Validation Loss: 0.7345
+Epoch [82/100], Train Loss: 0.8472, Validation Loss: 0.7401
+Epoch [83/100], Train Loss: 0.8386, Validation Loss: 0.7518
+Epoch [84/100], Train Loss: 0.8376, Validation Loss: 0.7458
+Epoch [85/100], Train Loss: 0.8305, Validation Loss: 0.7410
+Epoch [86/100], Train Loss: 0.8265, Validation Loss: 0.7314
+Epoch [87/100], Train Loss: 0.8183, Validation Loss: 0.7216
+Epoch [88/100], Train Loss: 0.8125, Validation Loss: 0.7115
+Epoch [89/100], Train Loss: 0.8048, Validation Loss: 0.7060
+Epoch [90/100], Train Loss: 0.7956, Validation Loss: 0.7056
+Epoch [91/100], Train Loss: 0.7915, Validation Loss: 0.7043
+Epoch [92/100], Train Loss: 0.7797, Validation Loss: 0.7105
+Epoch [93/100], Train Loss: 0.7766, Validation Loss: 0.7077
+Epoch [94/100], Train Loss: 0.7654, Validation Loss: 0.6980
+Epoch [95/100], Train Loss: 0.7582, Validation Loss: 0.7002
+Epoch [96/100], Train Loss: 0.7512, Validation Loss: 0.7124
+Epoch [97/100], Train Loss: 0.7426, Validation Loss: 0.7273
+Epoch [98/100], Train Loss: 0.7390, Validation Loss: 0.7269
+Epoch [99/100], Train Loss: 0.7309, Validation Loss: 0.7172
+Epoch [100/100], Train Loss: 0.7246, Validation Loss: 0.7305
+Output 1 (pH): R^2 Score = 0.564, MSE = 0.152
+torch.Size([191, 13719])
+Epoch [1/100], Train Loss: 1.2474, Validation Loss: 0.9601
+Epoch [2/100], Train Loss: 72.2852, Validation Loss: 2949.6692
+Epoch [3/100], Train Loss: 26902.5566, Validation Loss: 867.3683
+Epoch [4/100], Train Loss: 1166.7904, Validation Loss: 2.7932
+Epoch [5/100], Train Loss: 4.0348, Validation Loss: 250.1669
+Epoch [6/100], Train Loss: 137.0181, Validation Loss: 199.4987
+Epoch [7/100], Train Loss: 92.4933, Validation Loss: 109.6241
+Epoch [8/100], Train Loss: 48.2487, Validation Loss: 40.7931
+Epoch [9/100], Train Loss: 16.3983, Validation Loss: 4.9096
+Epoch [10/100], Train Loss: 2.4725, Validation Loss: 5.1241
+Epoch [11/100], Train Loss: 2.9465, Validation Loss: 27.1068
+Epoch [12/100], Train Loss: 10.1274, Validation Loss: 41.0158
+Epoch [13/100], Train Loss: 13.4520, Validation Loss: 38.3554
+Epoch [14/100], Train Loss: 11.8973, Validation Loss: 26.3077
+Epoch [15/100], Train Loss: 8.0954, Validation Loss: 12.5161
+Epoch [16/100], Train Loss: 4.2602, Validation Loss: 3.4663
+Epoch [17/100], Train Loss: 1.9368, Validation Loss: 1.1792
+Epoch [18/100], Train Loss: 1.3610, Validation Loss: 4.3513
+Epoch [19/100], Train Loss: 2.0499, Validation Loss: 9.8198
+Epoch [20/100], Train Loss: 3.3014, Validation Loss: 14.5713
+Epoch [21/100], Train Loss: 4.4587, Validation Loss: 16.8238
+Epoch [22/100], Train Loss: 5.0962, Validation Loss: 16.2171
+Epoch [23/100], Train Loss: 5.0778, Validation Loss: 13.4380
+Epoch [24/100], Train Loss: 4.5070, Validation Loss: 9.6389
+Epoch [25/100], Train Loss: 3.6226, Validation Loss: 5.9566
+Epoch [26/100], Train Loss: 2.6942, Validation Loss: 3.1752
+Epoch [27/100], Train Loss: 1.9430, Validation Loss: 1.6369
+Epoch [28/100], Train Loss: 1.5090, Validation Loss: 1.1724
+Epoch [29/100], Train Loss: 1.3897, Validation Loss: 1.2418
+Epoch [30/100], Train Loss: 1.4524, Validation Loss: 1.5725
+Epoch [31/100], Train Loss: 1.6195, Validation Loss: 1.9517
+Epoch [32/100], Train Loss: 1.8170, Validation Loss: 2.2269
+Epoch [33/100], Train Loss: 1.9781, Validation Loss: 2.3258
+Epoch [34/100], Train Loss: 2.0590, Validation Loss: 2.2442
+Epoch [35/100], Train Loss: 2.0442, Validation Loss: 2.0289
+Epoch [36/100], Train Loss: 1.9471, Validation Loss: 1.7534
+Epoch [37/100], Train Loss: 1.8009, Validation Loss: 1.4906
+Epoch [38/100], Train Loss: 1.6454, Validation Loss: 1.2936
+Epoch [39/100], Train Loss: 1.5152, Validation Loss: 1.1868
+Epoch [40/100], Train Loss: 1.4313, Validation Loss: 1.1678
+Epoch [41/100], Train Loss: 1.3996, Validation Loss: 1.2156
+Epoch [42/100], Train Loss: 1.4128, Validation Loss: 1.3000
+Epoch [43/100], Train Loss: 1.4550, Validation Loss: 1.3902
+Epoch [44/100], Train Loss: 1.5075, Validation Loss: 1.4611
+Epoch [45/100], Train Loss: 1.5531, Validation Loss: 1.4974
+Epoch [46/100], Train Loss: 1.5799, Validation Loss: 1.4949
+Epoch [47/100], Train Loss: 1.5828, Validation Loss: 1.4586
+Epoch [48/100], Train Loss: 1.5632, Validation Loss: 1.3997
+Epoch [49/100], Train Loss: 1.5278, Validation Loss: 1.3319
+Epoch [50/100], Train Loss: 1.4858, Validation Loss: 1.2680
+Epoch [51/100], Train Loss: 1.4468, Validation Loss: 1.2178
+Epoch [52/100], Train Loss: 1.4179, Validation Loss: 1.1858
+Epoch [53/100], Train Loss: 1.4030, Validation Loss: 1.1715
+Epoch [54/100], Train Loss: 1.4018, Validation Loss: 1.1711
+Epoch [55/100], Train Loss: 1.4112, Validation Loss: 1.1788
+Epoch [56/100], Train Loss: 1.4258, Validation Loss: 1.1884
+Epoch [57/100], Train Loss: 1.4402, Validation Loss: 1.1951
+Epoch [58/100], Train Loss: 1.4498, Validation Loss: 1.1962
+Epoch [59/100], Train Loss: 1.4521, Validation Loss: 1.1916
+Epoch [60/100], Train Loss: 1.4471, Validation Loss: 1.1838
+Epoch [61/100], Train Loss: 1.4369, Validation Loss: 1.1760
+Epoch [62/100], Train Loss: 1.4247, Validation Loss: 1.1710
+Epoch [63/100], Train Loss: 1.4135, Validation Loss: 1.1700
+Epoch [64/100], Train Loss: 1.4054, Validation Loss: 1.1728
+Epoch [65/100], Train Loss: 1.4014, Validation Loss: 1.1785
+Epoch [66/100], Train Loss: 1.4011, Validation Loss: 1.1859
+Epoch [67/100], Train Loss: 1.4034, Validation Loss: 1.1936
+Epoch [68/100], Train Loss: 1.4070, Validation Loss: 1.2006
+Epoch [69/100], Train Loss: 1.4105, Validation Loss: 1.2055
+Epoch [70/100], Train Loss: 1.4128, Validation Loss: 1.2077
+Epoch [71/100], Train Loss: 1.4132, Validation Loss: 1.2066
+Epoch [72/100], Train Loss: 1.4117, Validation Loss: 1.2027
+Epoch [73/100], Train Loss: 1.4088, Validation Loss: 1.1966
+Epoch [74/100], Train Loss: 1.4051, Validation Loss: 1.1896
+Epoch [75/100], Train Loss: 1.4014, Validation Loss: 1.1827
+Epoch [76/100], Train Loss: 1.3985, Validation Loss: 1.1771
+Epoch [77/100], Train Loss: 1.3968, Validation Loss: 1.1731
+Epoch [78/100], Train Loss: 1.3964, Validation Loss: 1.1707
+Epoch [79/100], Train Loss: 1.3969, Validation Loss: 1.1695
+Epoch [80/100], Train Loss: 1.3979, Validation Loss: 1.1691
+Epoch [81/100], Train Loss: 1.3989, Validation Loss: 1.1689
+Epoch [82/100], Train Loss: 1.3993, Validation Loss: 1.1687
+Epoch [83/100], Train Loss: 1.3990, Validation Loss: 1.1685
+Epoch [84/100], Train Loss: 1.3980, Validation Loss: 1.1685/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/sklearn/base.py:1389: DataConversionWarning: A column-vector y was passed when a 1d array was expected. Please change the shape of y to (n_samples,), for example using ravel().
+  return fit_method(estimator, *args, **kwargs)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/sklearn/utils/validation.py:1408: DataConversionWarning: A column-vector y was passed when a 1d array was expected. Please change the shape of y to (n_samples, ), for example using ravel().
+  y = column_or_1d(y, warn=True)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+
+Epoch [85/100], Train Loss: 1.3966, Validation Loss: 1.1689
+Epoch [86/100], Train Loss: 1.3950, Validation Loss: 1.1699
+Epoch [87/100], Train Loss: 1.3937, Validation Loss: 1.1715
+Epoch [88/100], Train Loss: 1.3928, Validation Loss: 1.1735
+Epoch [89/100], Train Loss: 1.3924, Validation Loss: 1.1756
+Epoch [90/100], Train Loss: 1.3923, Validation Loss: 1.1775
+Epoch [91/100], Train Loss: 1.3923, Validation Loss: 1.1789
+Epoch [92/100], Train Loss: 1.3924, Validation Loss: 1.1795
+Epoch [93/100], Train Loss: 1.3922, Validation Loss: 1.1793
+Epoch [94/100], Train Loss: 1.3918, Validation Loss: 1.1784
+Epoch [95/100], Train Loss: 1.3911, Validation Loss: 1.1768
+Epoch [96/100], Train Loss: 1.3903, Validation Loss: 1.1750
+Epoch [97/100], Train Loss: 1.3895, Validation Loss: 1.1731
+Epoch [98/100], Train Loss: 1.3888, Validation Loss: 1.1713
+Epoch [99/100], Train Loss: 1.3881, Validation Loss: 1.1698
+Epoch [100/100], Train Loss: 1.3877, Validation Loss: 1.1685
+Output 1 (Available.P): R^2 Score = 0.016, MSE = 8493.728
+学習データ数: 192
+検証データ数: 48
+テストデータ数: 59
+torch.Size([192, 13719])
+Epoch [1/100], Train Loss: 2.2766, Validation Loss: 17.0089
+Epoch [2/100], Train Loss: 415.7223, Validation Loss: 20006.2422
+Epoch [3/100], Train Loss: 8613.3184, Validation Loss: 4285.0327
+Epoch [4/100], Train Loss: 352.3527, Validation Loss: 73.6171
+Epoch [5/100], Train Loss: 31.7377, Validation Loss: 770.7838
+Epoch [6/100], Train Loss: 184.3463, Validation Loss: 486.5341
+Epoch [7/100], Train Loss: 225.0640, Validation Loss: 357.7961
+Epoch [8/100], Train Loss: 97.3875, Validation Loss: 328.9621
+Epoch [9/100], Train Loss: 35.4350, Validation Loss: 818.1543
+Epoch [10/100], Train Loss: 50.4876, Validation Loss: 875.7415
+Epoch [11/100], Train Loss: 46.0022, Validation Loss: 273.4950
+Epoch [12/100], Train Loss: 18.3434, Validation Loss: 171.2035
+Epoch [13/100], Train Loss: 9.5625, Validation Loss: 774.6674
+Epoch [14/100], Train Loss: 27.2026, Validation Loss: 1173.1294
+Epoch [15/100], Train Loss: 41.8634, Validation Loss: 894.2198
+Epoch [16/100], Train Loss: 34.0950, Validation Loss: 373.2207
+Epoch [17/100], Train Loss: 14.5395, Validation Loss: 82.2668
+Epoch [18/100], Train Loss: 3.3148, Validation Loss: 75.1378
+Epoch [19/100], Train Loss: 7.7030, Validation Loss: 151.2034
+Epoch [20/100], Train Loss: 17.2204, Validation Loss: 154.9299
+Epoch [21/100], Train Loss: 18.9966, Validation Loss: 105.3783
+Epoch [22/100], Train Loss: 13.3083, Validation Loss: 68.4505
+Epoch [23/100], Train Loss: 8.1971, Validation Loss: 61.3082
+Epoch [24/100], Train Loss: 7.8919, Validation Loss: 61.9036
+Epoch [25/100], Train Loss: 10.1261, Validation Loss: 51.5134
+Epoch [26/100], Train Loss: 10.7854, Validation Loss: 31.6283
+Epoch [27/100], Train Loss: 8.5021, Validation Loss: 13.8001
+Epoch [28/100], Train Loss: 5.1113, Validation Loss: 5.9807
+Epoch [29/100], Train Loss: 3.2036, Validation Loss: 7.6353
+Epoch [30/100], Train Loss: 3.8161, Validation Loss: 13.0824
+Epoch [31/100], Train Loss: 5.8897, Validation Loss: 16.5316
+Epoch [32/100], Train Loss: 7.4295, Validation Loss: 15.5085
+Epoch [33/100], Train Loss: 7.1931, Validation Loss: 11.1948
+Epoch [34/100], Train Loss: 5.4708, Validation Loss: 6.4701
+Epoch [35/100], Train Loss: 3.5265, Validation Loss: 3.6448
+Epoch [36/100], Train Loss: 2.4892, Validation Loss: 3.3284
+Epoch [37/100], Train Loss: 2.6545, Validation Loss: 4.5016
+Epoch [38/100], Train Loss: 3.5022, Validation Loss: 5.3225
+Epoch [39/100], Train Loss: 4.1848, Validation Loss: 5.0328
+Epoch [40/100], Train Loss: 4.2271, Validation Loss: 4.0866
+Epoch [41/100], Train Loss: 3.7198, Validation Loss: 3.2600
+Epoch [42/100], Train Loss: 3.0742, Validation Loss: 3.0003
+Epoch [43/100], Train Loss: 2.6606, Validation Loss: 3.2828
+Epoch [44/100], Train Loss: 2.5926, Validation Loss: 3.7944
+Epoch [45/100], Train Loss: 2.7402, Validation Loss: 4.1921
+Epoch [46/100], Train Loss: 2.8862, Validation Loss: 4.2831
+Epoch [47/100], Train Loss: 2.8865, Validation Loss: 4.0878
+Epoch [48/100], Train Loss: 2.7420, Validation Loss: 3.7581
+Epoch [49/100], Train Loss: 2.5520, Validation Loss: 3.4491
+Epoch [50/100], Train Loss: 2.4195, Validation Loss: 3.2387
+Epoch [51/100], Train Loss: 2.3874, Validation Loss: 3.1214
+Epoch [52/100], Train Loss: 2.4288, Validation Loss: 3.0423
+Epoch [53/100], Train Loss: 2.4789, Validation Loss: 2.9476
+Epoch [54/100], Train Loss: 2.4791, Validation Loss: 2.8226
+Epoch [55/100], Train Loss: 2.4110, Validation Loss: 2.6977
+Epoch [56/100], Train Loss: 2.3021, Validation Loss: 2.6240
+Epoch [57/100], Train Loss: 2.2030, Validation Loss: 2.6362
+Epoch [58/100], Train Loss: 2.1549, Validation Loss: 2.7288
+Epoch [59/100], Train Loss: 2.1663, Validation Loss: 2.8574
+Epoch [60/100], Train Loss: 2.2119, Validation Loss: 2.9617
+Epoch [61/100], Train Loss: 2.2500, Validation Loss: 2.9965
+Epoch [62/100], Train Loss: 2.2486, Validation Loss: 2.9545
+Epoch [63/100], Train Loss: 2.2024, Validation Loss: 2.8634
+Epoch [64/100], Train Loss: 2.1327, Validation Loss: 2.7656
+Epoch [65/100], Train Loss: 2.0708, Validation Loss: 2.6948
+Epoch [66/100], Train Loss: 2.0396, Validation Loss: 2.6621
+Epoch [67/100], Train Loss: 2.0420, Validation Loss: 2.6580
+Epoch [68/100], Train Loss: 2.0634, Validation Loss: 2.6615
+Epoch [69/100], Train Loss: 2.0817, Validation Loss: 2.6518
+Epoch [70/100], Train Loss: 2.0796, Validation Loss: 2.6165
+Epoch [71/100], Train Loss: 2.0517, Validation Loss: 2.5561
+Epoch [72/100], Train Loss: 2.0063, Validation Loss: 2.4853
+Epoch [73/100], Train Loss: 1.9583, Validation Loss: 2.4490
+Epoch [74/100], Train Loss: 1.9214, Validation Loss: 2.5901
+Epoch [75/100], Train Loss: 1.9035, Validation Loss: 3.3348
+Epoch [76/100], Train Loss: 1.9053, Validation Loss: 4.7161
+Epoch [77/100], Train Loss: 1.9130, Validation Loss: 4.5300
+Epoch [78/100], Train Loss: 1.8940, Validation Loss: 3.4923
+Epoch [79/100], Train Loss: 1.8544, Validation Loss: 2.8267
+Epoch [80/100], Train Loss: 1.8195, Validation Loss: 2.6077
+Epoch [81/100], Train Loss: 1.8002, Validation Loss: 2.6403
+Epoch [82/100], Train Loss: 1.7926, Validation Loss: 2.9369
+Epoch [83/100], Train Loss: 1.7904, Validation Loss: 3.6857
+Epoch [84/100], Train Loss: 1.7858, Validation Loss: 4.8599
+Epoch [85/100], Train Loss: 1.7729, Validation Loss: 5.7664
+Epoch [86/100], Train Loss: 1.7531, Validation Loss: 5.7297
+Epoch [87/100], Train Loss: 1.7358, Validation Loss: 5.1243
+Epoch [88/100], Train Loss: 1.7307, Validation Loss: 4.5203
+Epoch [89/100], Train Loss: 1.7340, Validation Loss: 4.1487
+Epoch [90/100], Train Loss: 1.7324, Validation Loss: 3.9607
+Epoch [91/100], Train Loss: 1.7200, Validation Loss: 3.8007
+Epoch [92/100], Train Loss: 1.7042, Validation Loss: 3.5234
+Epoch [93/100], Train Loss: 1.6948, Validation Loss: 3.1110
+Epoch [94/100], Train Loss: 1.6915, Validation Loss: 2.7256
+Epoch [95/100], Train Loss: 1.6877, Validation Loss: 2.5102
+Epoch [96/100], Train Loss: 1.6796, Validation Loss: 2.4348
+Epoch [97/100], Train Loss: 1.6685, Validation Loss: 2.4194
+Epoch [98/100], Train Loss: 1.6576, Validation Loss: 2.4161
+Epoch [99/100], Train Loss: 1.6488, Validation Loss: 2.4098
+Epoch [100/100], Train Loss: 1.6424, Validation Loss: 2.3985
+Output 1 (pH): R^2 Score = 0.202, MSE = 0.457
+Output 2 (Available.P): R^2 Score = -0.539, MSE = 4764.325
+torch.Size([192, 13719])
+Epoch [1/100], Train Loss: 1.2534, Validation Loss: 67.7769
+Epoch [2/100], Train Loss: 7170.9438, Validation Loss: 489.8155
+Epoch [3/100], Train Loss: 2600.3818, Validation Loss: 856.2101
+Epoch [4/100], Train Loss: 597.0630, Validation Loss: 182.3744
+Epoch [5/100], Train Loss: 58.1299, Validation Loss: 5.6344
+Epoch [6/100], Train Loss: 1.8703, Validation Loss: 174.7066
+Epoch [7/100], Train Loss: 40.5773, Validation Loss: 387.0159
+Epoch [8/100], Train Loss: 80.0831, Validation Loss: 315.8898
+Epoch [9/100], Train Loss: 70.5508, Validation Loss: 96.2084
+Epoch [10/100], Train Loss: 23.7830, Validation Loss: 1.6454
+Epoch [11/100], Train Loss: 1.6594, Validation Loss: 78.4645
+Epoch [12/100], Train Loss: 28.1103, Validation Loss: 84.7638
+Epoch [13/100], Train Loss: 32.4220, Validation Loss: 29.2908
+Epoch [14/100], Train Loss: 13.3275, Validation Loss: 1.4939
+Epoch [15/100], Train Loss: 1.5743, Validation Loss: 18.0209/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/sklearn/base.py:1389: DataConversionWarning: A column-vector y was passed when a 1d array was expected. Please change the shape of y to (n_samples,), for example using ravel().
+  return fit_method(estimator, *args, **kwargs)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/sklearn/utils/validation.py:1408: DataConversionWarning: A column-vector y was passed when a 1d array was expected. Please change the shape of y to (n_samples, ), for example using ravel().
+  y = column_or_1d(y, warn=True)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+
+Epoch [16/100], Train Loss: 4.9348, Validation Loss: 35.2923
+Epoch [17/100], Train Loss: 10.8142, Validation Loss: 38.0032
+Epoch [18/100], Train Loss: 12.8760, Validation Loss: 27.0247
+Epoch [19/100], Train Loss: 10.0079, Validation Loss: 10.4913
+Epoch [20/100], Train Loss: 4.9353, Validation Loss: 1.7566
+Epoch [21/100], Train Loss: 1.4452, Validation Loss: 6.4270
+Epoch [22/100], Train Loss: 3.7471, Validation Loss: 9.2315
+Epoch [23/100], Train Loss: 5.6019, Validation Loss: 7.0028
+Epoch [24/100], Train Loss: 4.8253, Validation Loss: 3.6597
+Epoch [25/100], Train Loss: 3.3937, Validation Loss: 1.9454
+Epoch [26/100], Train Loss: 2.1822, Validation Loss: 1.4998
+Epoch [27/100], Train Loss: 1.4285, Validation Loss: 2.2836
+Epoch [28/100], Train Loss: 1.4774, Validation Loss: 3.6221
+Epoch [29/100], Train Loss: 2.0349, Validation Loss: 4.5673
+Epoch [30/100], Train Loss: 2.5386, Validation Loss: 4.5822
+Epoch [31/100], Train Loss: 2.6052, Validation Loss: 3.7749
+Epoch [32/100], Train Loss: 2.2347, Validation Loss: 2.6721
+Epoch [33/100], Train Loss: 1.7203, Validation Loss: 1.8186
+Epoch [34/100], Train Loss: 1.3963, Validation Loss: 1.4639
+Epoch [35/100], Train Loss: 1.4123, Validation Loss: 1.4930
+Epoch [36/100], Train Loss: 1.6611, Validation Loss: 1.6014
+Epoch [37/100], Train Loss: 1.8889, Validation Loss: 1.6055
+Epoch [38/100], Train Loss: 1.9197, Validation Loss: 1.5132
+Epoch [39/100], Train Loss: 1.7559, Validation Loss: 1.4517
+Epoch [40/100], Train Loss: 1.5300, Validation Loss: 1.5404
+Epoch [41/100], Train Loss: 1.3820, Validation Loss: 1.7952
+Epoch [42/100], Train Loss: 1.3741, Validation Loss: 2.1164
+Epoch [43/100], Train Loss: 1.4689, Validation Loss: 2.3551
+Epoch [44/100], Train Loss: 1.5746, Validation Loss: 2.4066
+Epoch [45/100], Train Loss: 1.6106, Validation Loss: 2.2626
+Epoch [46/100], Train Loss: 1.5565, Validation Loss: 2.0037
+Epoch [47/100], Train Loss: 1.4534, Validation Loss: 1.7413
+Epoch [48/100], Train Loss: 1.3678, Validation Loss: 1.5523
+Epoch [49/100], Train Loss: 1.3440, Validation Loss: 1.4566
+Epoch [50/100], Train Loss: 1.3795, Validation Loss: 1.4267
+Epoch [51/100], Train Loss: 1.4324, Validation Loss: 1.4225
+Epoch [52/100], Train Loss: 1.4568, Validation Loss: 1.4220
+Epoch [53/100], Train Loss: 1.4349, Validation Loss: 1.4301
+Epoch [54/100], Train Loss: 1.3845, Validation Loss: 1.4645
+Epoch [55/100], Train Loss: 1.3394, Validation Loss: 1.5321
+Epoch [56/100], Train Loss: 1.3241, Validation Loss: 1.6178
+Epoch [57/100], Train Loss: 1.3390, Validation Loss: 1.6889
+Epoch [58/100], Train Loss: 1.3639, Validation Loss: 1.7149
+Epoch [59/100], Train Loss: 1.3754, Validation Loss: 1.6861
+Epoch [60/100], Train Loss: 1.3637, Validation Loss: 1.6176
+Epoch [61/100], Train Loss: 1.3373, Validation Loss: 1.5382
+Epoch [62/100], Train Loss: 1.3138, Validation Loss: 1.4730
+Epoch [63/100], Train Loss: 1.3060, Validation Loss: 1.4326
+Epoch [64/100], Train Loss: 1.3134, Validation Loss: 1.4136
+Epoch [65/100], Train Loss: 1.3245, Validation Loss: 1.4074
+Epoch [66/100], Train Loss: 1.3270, Validation Loss: 1.4096
+Epoch [67/100], Train Loss: 1.3174, Validation Loss: 1.4219
+Epoch [68/100], Train Loss: 1.3017, Validation Loss: 1.4469
+Epoch [69/100], Train Loss: 1.2898, Validation Loss: 1.4816
+Epoch [70/100], Train Loss: 1.2870, Validation Loss: 1.5156
+Epoch [71/100], Train Loss: 1.2908, Validation Loss: 1.5358
+Epoch [72/100], Train Loss: 1.2942, Validation Loss: 1.5341
+Epoch [73/100], Train Loss: 1.2918, Validation Loss: 1.5119
+Epoch [74/100], Train Loss: 1.2837, Validation Loss: 1.4786
+Epoch [75/100], Train Loss: 1.2744, Validation Loss: 1.4454
+Epoch [76/100], Train Loss: 1.2687, Validation Loss: 1.4199
+Epoch [77/100], Train Loss: 1.2678, Validation Loss: 1.4043
+Epoch [78/100], Train Loss: 1.2688, Validation Loss: 1.3977
+Epoch [79/100], Train Loss: 1.2678, Validation Loss: 1.3987
+Epoch [80/100], Train Loss: 1.2631, Validation Loss: 1.4072
+Epoch [81/100], Train Loss: 1.2566, Validation Loss: 1.4225
+Epoch [82/100], Train Loss: 1.2513, Validation Loss: 1.4410
+Epoch [83/100], Train Loss: 1.2488, Validation Loss: 1.4565
+Epoch [84/100], Train Loss: 1.2480, Validation Loss: 1.4624
+Epoch [85/100], Train Loss: 1.2465, Validation Loss: 1.4563
+Epoch [86/100], Train Loss: 1.2430, Validation Loss: 1.4409
+Epoch [87/100], Train Loss: 1.2380, Validation Loss: 1.4219
+Epoch [88/100], Train Loss: 1.2335, Validation Loss: 1.4047
+Epoch [89/100], Train Loss: 1.2306, Validation Loss: 1.3923
+Epoch [90/100], Train Loss: 1.2287, Validation Loss: 1.3855
+Epoch [91/100], Train Loss: 1.2265, Validation Loss: 1.3841
+Epoch [92/100], Train Loss: 1.2233, Validation Loss: 1.3875
+Epoch [93/100], Train Loss: 1.2191, Validation Loss: 1.3947
+Epoch [94/100], Train Loss: 1.2152, Validation Loss: 1.4034
+Epoch [95/100], Train Loss: 1.2120, Validation Loss: 1.4105
+Epoch [96/100], Train Loss: 1.2093, Validation Loss: 1.4130
+Epoch [97/100], Train Loss: 1.2064, Validation Loss: 1.4089
+Epoch [98/100], Train Loss: 1.2027, Validation Loss: 1.3993
+Epoch [99/100], Train Loss: 1.1983, Validation Loss: 1.3871
+Epoch [100/100], Train Loss: 1.1938, Validation Loss: 1.3756
+Output 1 (pH): R^2 Score = 0.095, MSE = 0.519
+torch.Size([192, 13719])
+Epoch [1/100], Train Loss: 1.2587, Validation Loss: 33.0826
+Epoch [2/100], Train Loss: 3570.8711, Validation Loss: 898.7034
+Epoch [3/100], Train Loss: 3800.8452, Validation Loss: 1175.7188
+Epoch [4/100], Train Loss: 623.4100, Validation Loss: 39.1987
+Epoch [5/100], Train Loss: 11.5145, Validation Loss: 269.8237
+Epoch [6/100], Train Loss: 59.5840, Validation Loss: 805.1595
+Epoch [7/100], Train Loss: 153.7619, Validation Loss: 887.7477
+Epoch [8/100], Train Loss: 148.5071, Validation Loss: 419.2529
+Epoch [9/100], Train Loss: 67.0843, Validation Loss: 36.6774
+Epoch [10/100], Train Loss: 8.2378, Validation Loss: 110.3596
+Epoch [11/100], Train Loss: 10.3992, Validation Loss: 377.6754
+Epoch [12/100], Train Loss: 43.2751, Validation Loss: 401.8146
+Epoch [13/100], Train Loss: 50.8799, Validation Loss: 259.6826
+Epoch [14/100], Train Loss: 38.9593, Validation Loss: 108.7260
+Epoch [15/100], Train Loss: 20.0630, Validation Loss: 25.0612
+Epoch [16/100], Train Loss: 6.7327, Validation Loss: 1.9083
+Epoch [17/100], Train Loss: 1.5250, Validation Loss: 9.2638
+Epoch [18/100], Train Loss: 2.7859, Validation Loss: 23.8981
+Epoch [19/100], Train Loss: 7.0820, Validation Loss: 32.9746
+Epoch [20/100], Train Loss: 11.2797, Validation Loss: 34.1075
+Epoch [21/100], Train Loss: 13.4387, Validation Loss: 29.3722
+Epoch [22/100], Train Loss: 13.2611, Validation Loss: 22.1957
+Epoch [23/100], Train Loss: 11.3449, Validation Loss: 15.2438
+Epoch [24/100], Train Loss: 8.6240, Validation Loss: 9.8089
+Epoch [25/100], Train Loss: 5.9463, Validation Loss: 6.1254
+Epoch [26/100], Train Loss: 3.8204, Validation Loss: 3.8434
+Epoch [27/100], Train Loss: 2.4096, Validation Loss: 2.5949
+Epoch [28/100], Train Loss: 1.6645, Validation Loss: 2.0631
+Epoch [29/100], Train Loss: 1.4540, Validation Loss: 2.0257
+Epoch [30/100], Train Loss: 1.6565, Validation Loss: 2.2882
+Epoch [31/100], Train Loss: 2.1477, Validation Loss: 2.6701
+Epoch [32/100], Train Loss: 2.7729, Validation Loss: 3.0078
+Epoch [33/100], Train Loss: 3.3641, Validation Loss: 3.1725
+Epoch [34/100], Train Loss: 3.7008, Validation Loss: 3.1054
+Epoch [35/100], Train Loss: 3.6313, Validation Loss: 2.8298
+Epoch [36/100], Train Loss: 3.1947, Validation Loss: 2.4565
+Epoch [37/100], Train Loss: 2.5991, Validation Loss: 2.1554
+Epoch [38/100], Train Loss: 2.1174, Validation Loss: 2.0928
+Epoch [39/100], Train Loss: 1.9678, Validation Loss: 2.2472
+Epoch [40/100], Train Loss: 2.0453, Validation Loss: 2.4010
+Epoch [41/100], Train Loss: 1.9673, Validation Loss: 2.4143
+Epoch [42/100], Train Loss: 1.7347, Validation Loss: 2.3140
+Epoch [43/100], Train Loss: 1.5648, Validation Loss: 2.1831
+Epoch [44/100], Train Loss: 1.5041, Validation Loss: 2.0559
+Epoch [45/100], Train Loss: 1.4869, Validation Loss: 1.9864
+Epoch [46/100], Train Loss: 1.4686, Validation Loss: 1.9444
+Epoch [47/100], Train Loss: 1.4550, Validation Loss: 1.9358
+Epoch [48/100], Train Loss: 1.4441, Validation Loss: 1.9424
+Epoch [49/100], Train Loss: 1.4377, Validation Loss: 1.9533
+Epoch [50/100], Train Loss: 1.4356, Validation Loss: 1.9667/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/matplotlib/cbook.py:1719: DeprecationWarning: Conversion of an array with ndim > 0 to a scalar is deprecated, and will error in future. Ensure you extract a single element from your array before performing this operation. (Deprecated NumPy 1.25.)
+  return math.isfinite(val)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/sklearn/base.py:1389: DataConversionWarning: A column-vector y was passed when a 1d array was expected. Please change the shape of y to (n_samples,), for example using ravel().
+  return fit_method(estimator, *args, **kwargs)
+/home/nomura/anaconda3/envs/agri_chem/lib/python3.12/site-packages/sklearn/utils/validation.py:1408: DataConversionWarning: A column-vector y was passed when a 1d array was expected. Please change the shape of y to (n_samples, ), for example using ravel().
+  y = column_or_1d(y, warn=True)
+
+Epoch [51/100], Train Loss: 1.4354, Validation Loss: 1.9746
+Epoch [52/100], Train Loss: 1.4366, Validation Loss: 1.9763
+Epoch [53/100], Train Loss: 1.4377, Validation Loss: 1.9757
+Epoch [54/100], Train Loss: 1.4378, Validation Loss: 1.9722
+Epoch [55/100], Train Loss: 1.4361, Validation Loss: 1.9638
+Epoch [56/100], Train Loss: 1.4324, Validation Loss: 1.9517
+Epoch [57/100], Train Loss: 1.4269, Validation Loss: 1.9363
+Epoch [58/100], Train Loss: 1.4200, Validation Loss: 1.9195
+Epoch [59/100], Train Loss: 1.4127, Validation Loss: 1.9022
+Epoch [60/100], Train Loss: 1.4057, Validation Loss: 1.8857
+Epoch [61/100], Train Loss: 1.3996, Validation Loss: 1.8709
+Epoch [62/100], Train Loss: 1.3947, Validation Loss: 1.8583
+Epoch [63/100], Train Loss: 1.3912, Validation Loss: 1.8482
+Epoch [64/100], Train Loss: 1.3890, Validation Loss: 1.8403
+Epoch [65/100], Train Loss: 1.3877, Validation Loss: 1.8339
+Epoch [66/100], Train Loss: 1.3871, Validation Loss: 1.8293
+Epoch [67/100], Train Loss: 1.3867, Validation Loss: 1.8262
+Epoch [68/100], Train Loss: 1.3861, Validation Loss: 1.8240
+Epoch [69/100], Train Loss: 1.3850, Validation Loss: 1.8228
+Epoch [70/100], Train Loss: 1.3833, Validation Loss: 1.8224
+Epoch [71/100], Train Loss: 1.3810, Validation Loss: 1.8228
+Epoch [72/100], Train Loss: 1.3782, Validation Loss: 1.8240
+Epoch [73/100], Train Loss: 1.3752, Validation Loss: 1.8260
+Epoch [74/100], Train Loss: 1.3721, Validation Loss: 1.8290
+Epoch [75/100], Train Loss: 1.3691, Validation Loss: 1.8328
+Epoch [76/100], Train Loss: 1.3665, Validation Loss: 1.8372
+Epoch [77/100], Train Loss: 1.3642, Validation Loss: 1.8415
+Epoch [78/100], Train Loss: 1.3623, Validation Loss: 1.8457
+Epoch [79/100], Train Loss: 1.3607, Validation Loss: 1.8493
+Epoch [80/100], Train Loss: 1.3594, Validation Loss: 1.8521
+Epoch [81/100], Train Loss: 1.3580, Validation Loss: 1.8539
+Epoch [82/100], Train Loss: 1.3567, Validation Loss: 1.8546
+Epoch [83/100], Train Loss: 1.3552, Validation Loss: 1.8540
+Epoch [84/100], Train Loss: 1.3535, Validation Loss: 1.8522
+Epoch [85/100], Train Loss: 1.3516, Validation Loss: 1.8496
+Epoch [86/100], Train Loss: 1.3497, Validation Loss: 1.8461
+Epoch [87/100], Train Loss: 1.3477, Validation Loss: 1.8421
+Epoch [88/100], Train Loss: 1.3457, Validation Loss: 1.8379
+Epoch [89/100], Train Loss: 1.3438, Validation Loss: 1.8337
+Epoch [90/100], Train Loss: 1.3419, Validation Loss: 1.8296
+Epoch [91/100], Train Loss: 1.3402, Validation Loss: 1.8259
+Epoch [92/100], Train Loss: 1.3386, Validation Loss: 1.8227
+Epoch [93/100], Train Loss: 1.3370, Validation Loss: 1.8200
+Epoch [94/100], Train Loss: 1.3354, Validation Loss: 1.8178
+Epoch [95/100], Train Loss: 1.3339, Validation Loss: 1.8160
+Epoch [96/100], Train Loss: 1.3323, Validation Loss: 1.8147
+Epoch [97/100], Train Loss: 1.3306, Validation Loss: 1.8138
+Epoch [98/100], Train Loss: 1.3289, Validation Loss: 1.8133
+Epoch [99/100], Train Loss: 1.3272, Validation Loss: 1.8132
+Epoch [100/100], Train Loss: 1.3254, Validation Loss: 1.8133
+Output 1 (Available.P): R^2 Score = -0.062, MSE = 3286.750
+{'MSE': {'MT': {'Available.P': [11321.6787109375,
+                                10211.6904296875,
+                                7354.41455078125,
+                                7955.67822265625,
+                                4764.32470703125],
+                'pH': [0.443722128868103,
+                       0.40615764260292053,
+                       0.2667585611343384,
+                       0.32554611563682556,
+                       0.4573618769645691]},
+         'RF': {'Available.P': [75836648.09342733,
+                                93739324.58231254,
+                                65545810.70765628,
+                                53809192.7074273,
+                                69852307.80172373],
+                'pH': [15.504057118963049,
+                       16.22005356722084,
+                       17.548241358792925,
+                       19.32718540563872,
+                       15.38876704128856]},
+         'ST': {'Available.P': [8480.3662109375,
+                                6869.994140625,
+                                4176.37060546875,
+                                8493.7275390625,
+                                3286.750244140625],
+                'pH': [0.23204980790615082,
+                       0.3596048951148987,
+                       0.582372784614563,
+                       0.15238170325756073,
+                       0.518754243850708]},
+         'SVR': {'Available.P': [13605983.529905152,
+                                 12332886.465843087,
+                                 14763538.737484403,
+                                 14098514.844014289,
+                                 13846003.269242592],
+                 'pH': [15.476946103388821,
+                        16.31548607117986,
+                        17.503673245474236,
+                        19.30042429498524,
+                        15.373265061509512]},
+         'XGB': {'Available.P': [76091288.0,
+                                 104223064.0,
+                                 74252880.0,
+                                 69845400.0,
+                                 93074728.0],
+                 'pH': [15.575834274291992,
+                        16.140077590942383,
+                        17.176124572753906,
+                        19.336774826049805,
+                        15.33470630645752]}},
+ 'R2': {'MT': {'Available.P': [0.06142216920852661,
+                               0.022651374340057373,
+                               -0.047029972076416016,
+                               0.07833719253540039,
+                               -0.5394625663757324],
+               'pH': [-0.06040215492248535,
+                      -0.05699610710144043,
+                      0.2838893532752991,
+                      0.06946319341659546,
+                      0.20194607973098755]},
+        'RF': {'Available.P': [-6285.929154891875,
+                               -8970.678208545663,
+                               -9330.597421242368,
+                               -6232.777732101883,
+                               -22569.8833317953],
+               'pH': [-36.05142499494803,
+                      -41.211526068009306,
+                      -46.10806785865606,
+                      -54.24458159993893,
+                      -25.851969800901855]},
+        'ST': {'Available.P': [0.2969697117805481,
+                               0.3424811363220215,
+                               0.40542036294937134,
+                               0.01600438356399536,
+                               -0.06202435493469238],
+               'pH': [0.44544994831085205,
+                      0.06415408849716187,
+                      -0.5633738040924072,
+                      0.5644340515136719,
+                      0.09482210874557495]},
+        'SVR': {'Available.P': [-1126.9487778752846,
+                                -1179.365756283141,
+                                -2100.8490506675344,
+                                -1632.3084268367597,
+                                -4472.96133695126],
+                'pH': [-35.9866353884355,
+                       -41.45988231491729,
+                       -45.98842523102049,
+                       -54.16808798070922,
+                       -25.824920285384184]},
+        'XGB': {'Available.P': [-6307.03955078125,
+                                -9974.0634765625,
+                                -10570.2001953125,
+                                -8090.56787109375,
+                                -30073.578125],
+                'pH': [-36.22295379638672,
+                       -41.00339126586914,
+                       -45.109130859375,
+                       -54.27199172973633,
+                       -25.75763702392578]}}}
+{'MSE': OrderedDict([('MT',
+                      {'Available.P': '8321.557±2293.315',
+                       'pH': '0.380±0.073'}),
+                     ('ST',
+                      {'Available.P': '6261.442±2166.720',
+                       'pH': '0.369±0.164'}),
+                     ('RF',
+                      {'Available.P': '71756656.779±13146837.136',
+                       'pH': '16.798±1.480'}),
+                     ('SVR',
+                      {'Available.P': '13729385.369±798093.565',
+                       'pH': '16.794±1.468'}),
+                     ('XGB',
+                      {'Available.P': '83497472.000±13022803.913',
+                       'pH': '16.713±1.457'})]),
+ 'R2': OrderedDict([('MT',
+                     {'Available.P': '-0.085±0.231', 'pH': '0.088±0.138'}),
+                    ('ST', {'Available.P': '0.200±0.187', 'pH': '0.121±0.393'}),
+                    ('RF',
+                     {'Available.P': '-10677.973±6086.010',
+                      'pH': '-40.694±9.540'}),
+                    ('SVR',
+                     {'Available.P': '-2102.487±1236.450',
+                      'pH': '-40.686±9.523'}),
+                    ('XGB',
+                     {'Available.P': '-13003.090±8665.627',
+                      'pH': '-40.473±9.453'})])}
+CSVファイル 'result.csv' を作成しました。

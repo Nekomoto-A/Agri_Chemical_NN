@@ -8,6 +8,11 @@ with open(yaml_path, "r") as file:
 
 reg_list = config['reg_list']
 
+import torch
+import numpy as np
+torch.manual_seed(42)
+np.random.seed(42)
+
 def main():
     if any(isinstance(i, list) for i in reg_list) == False:
         fold_evaluate(reg_list = reg_list)

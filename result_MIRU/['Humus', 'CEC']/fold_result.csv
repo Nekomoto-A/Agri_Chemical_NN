@@ -1,0 +1,4 @@
+,,accuracy,accuracy,Loss,Loss
+,,Humus,CEC,Humus,CEC
+method,fold,,,,
+M,fold1,-0.41003119945526123,-1.0004503726959229,3.0527682304382324,10.197758674621582

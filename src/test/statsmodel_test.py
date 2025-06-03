@@ -1,19 +1,30 @@
-from sklearn.metrics import r2_score,mean_squared_error,accuracy_score, f1_score
+from sklearn.metrics import r2_score,mean_squared_error,accuracy_score, f1_score, mean_absolute_error
 from src.training.statsmodel_train import statsmodel_train
 from src.test.test import write_result
 import numpy as np
+import pprint
 
 def statsmodel_test(X, Y, models, scalers, reg, result_dir,index):
     X = X.numpy()
     Y = Y[0].numpy().reshape(-1, 1)
+    print(Y.shape)
+    print(X.shape)
     scores = {}
     for name, model in models.items():
-        if np.issubdtype(Y.dtype, np.floating): 
-            Y_pp = scalers[reg].inverse_transform(Y)
-            pred = scalers[reg].inverse_transform(model.predict(X).reshape(-1, 1))
+        if np.issubdtype(Y.dtype, np.floating):
+            print(f'test:{reg}:{Y.dtype}')
 
-            r2 = r2_score(Y_pp,pred)
-            mse = mean_squared_error(Y_pp,pred)
+            if reg in scalers:
+                Y_pp = scalers[reg].inverse_transform(Y)
+                pred = scalers[reg].inverse_transform(model.predict(X).reshape(-1, 1))
+            else:
+                Y_pp = Y
+                pred = model.predict(X).reshape(-1, 1)
+
+            r2 = r2_score(pred,Y_pp)
+            #mse = mean_squared_error(pred,Y_pp)
+            mse = mean_absolute_error(pred,Y_pp)
+            print(f'決定係数：{r2}')
         else:
             Y_pp = Y
             pred = models[name].predict(X)

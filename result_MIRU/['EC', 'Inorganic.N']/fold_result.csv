@@ -1,0 +1,4 @@
+,,accuracy,accuracy,Loss,Loss
+,,EC,Inorganic.N,EC,Inorganic.N
+method,fold,,,,
+M,fold1,-7.876020431518555,-2.9710090160369873,0.10517080873250961,2.9498424530029297

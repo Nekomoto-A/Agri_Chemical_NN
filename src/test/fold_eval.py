@@ -2,7 +2,6 @@ from src.datasets.dataset import data_create,transform_after_split
 
 from sklearn.model_selection import KFold
 import os
-import shutil
 from src.test.test import train_and_test,write_result
 from src.test.statsmodel_test import stats_models_result
 from src.experiments.visualize import reduce_feature
@@ -26,16 +25,13 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
                   ):
     os.makedirs(output_dir,exist_ok=True)
     sub_dir = os.path.join(output_dir, f'{reg_list}')
-    
-    if os.path.exists(sub_dir):
-        shutil.rmtree(sub_dir)
-    
     os.makedirs(sub_dir,exist_ok=True)
     csv_dir = os.path.join(sub_dir, csv_path)
     
     final_dir = os.path.join(sub_dir, final_output)
 
-
+    if os.path.exists(csv_dir):
+        os.remove(csv_dir)
 
     X,Y,_ = data_create(feature_path, target_path, reg_list,exclude_ids)
 
@@ -55,8 +51,6 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
         index = [f'fold{fold+1}']
         X_train, X_test = X.iloc[train_index], X.iloc[test_index]
         Y_train, Y_test = Y.iloc[train_index], Y.iloc[test_index]
-
-        X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers = transform_after_split(X_train,X_test,Y_train,Y_test, reg_list = reg_list)
         
         fold_dir = os.path.join(sub_dir, index[0])
         os.makedirs(fold_dir,exist_ok=True)
@@ -64,23 +58,28 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
         vis_dir = os.path.join(fold_dir, method)
         os.makedirs(vis_dir,exist_ok=True)
 
+        X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers,_,_,test_ids = transform_after_split(X_train,X_test,Y_train,Y_test, reg_list = reg_list,fold = fold_dir)
         print(X_train_tensor.shape)
         predictions, trues, r2_results, mse_results,model_trained = train_and_test(
             X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor, 
             scalers, predictions, trues, input_dim, method, index , reg_list, csv_dir,
-            vis_dir = vis_dir, model_name = model_name
+            vis_dir = vis_dir, model_name = model_name, test_ids = test_ids
             )
         
-        if model_name == 'CNN':
+        if model_name == 'CNN' or model_name == 'CNN_catph':
             reduced_features = model_trained.sharedconv(X_test_tensor.unsqueeze(1)).detach().numpy()
         elif model_name == 'NN':
             reduced_features = model_trained.sharedfc(X_test_tensor).detach().numpy()
+
+        '''
         reduced_features = reduced_features.reshape(reduced_features.shape[0], -1)
         reduced.setdefault(method_st, {}).setdefault('all', []).append(reduced_features)
+        '''
 
         for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
-            scores.setdefault('R2', {}).setdefault(method, {}).setdefault(reg_list[i], []).append(r2)
-            scores.setdefault('MSE', {}).setdefault(method, {}).setdefault(reg_list[i], []).append(mse)
+            t = reg_list[i]
+            scores.setdefault('R2', {}).setdefault(method, {}).setdefault(t, []).append(r2)
+            scores.setdefault('MSE', {}).setdefault(method, {}).setdefault(t, []).append(mse)
 
         vis_dir = os.path.join(fold_dir, method_st)
         os.makedirs(vis_dir,exist_ok=True)
@@ -93,17 +92,18 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
             predictions, trues, r2_result, mse_result, model_trained = train_and_test(
             X_train = X_train_tensor, X_val = X_val_tensor, X_test = X_test_tensor, Y_train = Y_train_single, Y_val = Y_val_single, Y_test = Y_test_single, 
             scalers = scalers, predictions = predictions, trues = trues, input_dim = input_dim, method = method_st, index = index , reg_list = reg, csv_dir = csv_dir, 
-            vis_dir = vis_dir, model_name = model_name
+            vis_dir = vis_dir, model_name = model_name,test_ids = test_ids
             )
 
             #reduced_features = reduce_feature(model = model_trained, X = X_test_tensor, model_name = model_name)
+            """
             if model_name == 'CNN':
                 reduced_features = model_trained.sharedconv(X_test_tensor.unsqueeze(1)).detach().numpy()
             elif model_name == 'NN':
                 reduced_features = model_trained.sharedfc(X_test_tensor).detach().numpy()
             reduced_features = reduced_features.reshape(reduced_features.shape[0], -1)
             reduced.setdefault(method_st, {}).setdefault(r, []).append(reduced_features)
-
+            """
 
             scores.setdefault('R2', {}).setdefault(method_st, {}).setdefault(r, []).append(r2_result[0])
             scores.setdefault('MSE', {}).setdefault(method_st, {}).setdefault(r, []).append(mse_result[0])
@@ -134,7 +134,6 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
     model: {key: reducer.fit_transform(np.concatenate(value)) for key, value in sub_dict.items()}
     for model, sub_dict in reduced.items()
     }
-
 
     #print(tests)
     #print(predictions)

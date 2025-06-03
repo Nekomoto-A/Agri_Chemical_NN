@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from sklearn.metrics import accuracy_score, r2_score, mean_squared_error, f1_score
+from sklearn.metrics import accuracy_score, r2_score, mean_squared_error, f1_score, mean_absolute_error
 import matplotlib.pyplot as plt
 from src.experiments.visualize import visualize_tsne
 
@@ -22,22 +22,28 @@ def test_MT(x_te,y_te,model,reg_list,scalers):
     predicts = {}
     trues = {}
     with torch.no_grad():
+        #outputs,sigmas = model(x_te)  # 予測値を取得
         outputs = model(x_te)  # 予測値を取得
 
         #print(outputs)
         # 各出力の予測結果と実際の値をリストに格納
         for i,reg in enumerate(reg_list):
             if torch.is_floating_point(y_te[i]) == True:
-                output = scalers[reg].inverse_transform(outputs[i].numpy())
-                true = scalers[reg].inverse_transform(y_te[i].numpy())
+                if reg in scalers:
+                    output = scalers[reg].inverse_transform(outputs[i].numpy())
+                    true = scalers[reg].inverse_transform(y_te[i].numpy())
+                else:
+                    output = outputs[i].numpy()
+                    true = y_te[i].numpy()
 
                 predicts[reg] = output
                 trues[reg] = true
-
+                
                 r2 = r2_score(true,output)
                 #print(r2)
                 r2_scores.append(r2)
-                mse = mean_squared_error(true,output)
+                #mse = mean_squared_error(true,output)
+                mse = mean_absolute_error(true,output)
                 #print(mse)
                 mse_scores.append(mse)
             else:
@@ -58,7 +64,9 @@ def test_MT(x_te,y_te,model,reg_list,scalers):
 from src.training.train import training_MT
 from src.test.test import test_MT
 from src.models.MT_CNN import MTCNNModel
+from src.models.MT_CNN_catph import MTCNN_catph
 from src.models.MT_NN import MTNNModel
+from src.models.MT_CNN_soft import MTCNN_SPS
 
 import numpy as np
 import os
@@ -88,43 +96,60 @@ def write_result(r2_results, mse_results, columns_list, csv_dir, method, ind):
     aligned_data.to_csv(csv_dir, mode="a", header=not os.path.exists(csv_dir), index=True, encoding="utf-8")
 
 def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predictions, trues, 
-                  input_dim, method, index, reg_list, csv_dir, vis_dir, model_name, 
-                  lr=config['learning_rate']
+                  input_dim, method, index, reg_list, csv_dir, vis_dir, model_name, test_ids, 
                   ):
 
     output_dims = []
     #print(Y_train)
-    for num in range(len(reg_list)):
-        all = torch.cat((Y_train[num],Y_val[num], Y_test[num]), dim=0)
-        if torch.is_floating_point(all) == True:
+    for num,reg in enumerate(reg_list):
+        if reg == 'pHtype':
             output_dims.append(1)
         else:
-            #print(torch.unique(all))
-            output_dims.append(len(torch.unique(all)))
-    #output_dims = np.ones(len(reg_list), dtype="int16")
+            all = torch.cat((Y_train[num],Y_val[num], Y_test[num]), dim=0)
+            if torch.is_floating_point(all) == True:
+                output_dims.append(1)
+            else:
+                #print(torch.unique(all))
+                output_dims.append(len(torch.unique(all)))
+        #output_dims = np.ones(len(reg_list), dtype="int16")
 
     if model_name == 'CNN':
-        model = MTCNNModel(input_dim = input_dim,output_dims = output_dims)
+        model = MTCNNModel(input_dim = input_dim,output_dims = output_dims,reg_list=reg_list)
     elif model_name == 'NN':
         model = MTNNModel(input_dim = input_dim,output_dims = output_dims, hidden_layers=[128, 64, 64])
+    elif model_name == 'CNN_catph':
+        model = MTCNN_catph(input_dim = input_dim,reg_list=reg_list)
+    elif model_name == 'CNN_soft':
+        model = MTCNN_SPS(input_dim = input_dim,output_dims = output_dims,reg_list=reg_list)
 
-    optimizer = optim.Adam(model.parameters(), lr=lr)
-
-    model_trained = training_MT(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val,model = model,
-                                optimizer = optimizer, 
+    #optimizer = optim.Adam(model.parameters(), lr=0.001)
+    model_trained = training_MT(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model,
+                                #optimizer = optimizer, 
                                 output_dim=output_dims,
                                 reg_list = reg_list, output_dir = vis_dir, 
                                 model_name = model_name)
 
     predicts, true, r2_results, mse_results = test_MT(X_test,Y_test,model_trained,reg_list,scalers)
 
-    visualize_tsne(model = model_trained, model_name = model_name , X = X_test, Y = Y_test, reg_list = reg_list, output_dir = vis_dir, file_name = 'test.png')
+    #visualize_tsne(model = model_trained, model_name = model_name , X = X_test, Y = Y_test, reg_list = reg_list, output_dir = vis_dir, file_name = 'test.png')
 
-    # --- 4. 結果を表示 ---
+    # --- 4. 結果を表示
     for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
         print(f"Output {i+1} ({reg_list[i]}): R^2 Score = {r2:.3f}, MSE = {mse:.3f}")
 
     for reg in reg_list:
+        #print(test_ids)
+        loss = np.abs(predicts[reg]-true[reg])
+        #print(loss)
+        loss_dir = os.path.join(vis_dir, reg)
+        out = os.path.join(loss_dir, 'loss.png')
+        plt.figure(figsize=(18, 14))
+        plt.bar(test_ids.to_numpy().ravel(),loss.ravel())
+        plt.xticks(rotation=90)
+        #plt.tight_layout()
+        plt.savefig(out)
+        plt.close()
+
         predictions.setdefault(method, {}).setdefault(reg, []).append(predicts[reg])
         trues.setdefault(method, {}).setdefault(reg, []).append(true[reg])
 
