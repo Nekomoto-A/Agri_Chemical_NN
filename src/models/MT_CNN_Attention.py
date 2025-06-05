@@ -25,7 +25,7 @@ class ChannelAttention1D(nn.Module):
         return x * y
 
 class MTCNNModel_Attention(nn.Module):
-    def __init__(self, input_dim, output_dims, conv_layers=[(64,5,1,1),(64,5,1,1)], hidden_dim=128):
+    def __init__(self, input_dim, output_dims, conv_layers=[(64,5,1,1)], hidden_dim=128):
         super(MTCNNModel_Attention, self).__init__()
         self.input_sizes = input_dim
         self.hidden_dim = hidden_dim
@@ -38,9 +38,6 @@ class MTCNNModel_Attention(nn.Module):
             self.sharedconv.add_module(f"conv{i+1}", nn.Conv1d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding))
             self.sharedconv.add_module(f"batchnorm{i+1}", nn.BatchNorm1d(out_channels))
             self.sharedconv.add_module(f"relu{i+1}", nn.ReLU())
-            
-            self.sharedconv.add_module(f"channel attention{i+1}", ChannelAttention1D(64))
-
             self.sharedconv.add_module(f"maxpool{i+1}", nn.MaxPool1d(kernel_size=2))
             in_channels = out_channels  # 次の層の入力チャネル数は現在の出力チャネル数
 
@@ -53,6 +50,7 @@ class MTCNNModel_Attention(nn.Module):
         # 出力層を動的に作成
         self.outputs = nn.ModuleList([
             nn.Sequential(
+                #ChannelAttention1D(total_features),
                 nn.Linear(total_features, self.hidden_dim),
                 nn.ReLU(),
                 nn.Linear(self.hidden_dim, 64),

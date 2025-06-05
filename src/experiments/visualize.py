@@ -12,7 +12,7 @@ from matplotlib.lines import Line2D
 def reduce_feature(model,X1,model_name, X2 = None):
     model.eval()
     with torch.no_grad():
-        if model_name =='CNN' or model_name =='Attention_CNN' or model_name == 'CNN_catph':
+        if model_name =='CNN' or model_name =='Attention_CNN' or model_name == 'CNN_catph' or model_name == 'CNN_SA':
             shared_features1 = model.sharedconv(X1.unsqueeze(1)).cpu().numpy()  # 共有層の出力を取得
             shared_features1 = shared_features1.reshape(shared_features1.shape[0], -1)
             

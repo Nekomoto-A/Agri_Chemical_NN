@@ -3,6 +3,8 @@ from src.training.statsmodel_train import statsmodel_train
 from src.test.test import write_result
 import numpy as np
 import pprint
+import matplotlib.pyplot as plt
+import os
 
 def statsmodel_test(X, Y, models, scalers, reg, result_dir,index):
     X = X.numpy()
@@ -20,8 +22,22 @@ def statsmodel_test(X, Y, models, scalers, reg, result_dir,index):
             else:
                 Y_pp = Y
                 pred = model.predict(X).reshape(-1, 1)
+            
+            stats_dir = os.path.dirname(result_dir)
+            stats_dir = os.path.join(stats_dir, f'{name}_result.png')
+            plt.figure()
+            plt.scatter(Y_pp,pred)
+            plt.xlabel('true_data')
+            plt.ylabel('predicted_data')
+            plt.savefig(stats_dir)
+            plt.close()
 
-            r2 = r2_score(pred,Y_pp)
+            #r2 = r2_score(pred,Y_pp)
+            #r2 = r2_score(true,output)
+            corr_matrix = np.corrcoef(Y_pp.ravel(),pred.ravel())
+
+            # 相関係数（xとyの間の値）は [0, 1] または [1, 0] の位置
+            r2 = corr_matrix[0, 1]
             #mse = mean_squared_error(pred,Y_pp)
             mse = mean_absolute_error(pred,Y_pp)
             print(f'決定係数：{r2}')

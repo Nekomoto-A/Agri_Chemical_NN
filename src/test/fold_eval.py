@@ -21,7 +21,8 @@ with open(yaml_path, "r") as file:
 
 def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path = config['target_path'], exclude_ids = config['exclude_ids'],
                   k = config['k_fold'], output_dir = config['result_dir'], csv_path = config['result_fold'], 
-                  final_output = config['result_average'], model_name = config['model_name'], reduced_feature_path = config['reduced_feature']
+                  final_output = config['result_average'], model_name = config['model_name'], reduced_feature_path = config['reduced_feature'],
+                  comp_method = config['comp_method']
                   ):
     os.makedirs(output_dir,exist_ok=True)
     sub_dir = os.path.join(output_dir, f'{reg_list}')
@@ -37,11 +38,15 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
 
     input_dim = X.shape[1]
     method = 'MT'
+    method_comp = 'MT_comp'
     method_st = 'ST'
     kf = KFold(n_splits=k, shuffle=True, random_state=42)
 
     predictions = {}
     trues = {}
+
+    predictions_comp = {}
+    trues_comp = {}
 
     reduced = {}
 
@@ -55,34 +60,58 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
         fold_dir = os.path.join(sub_dir, index[0])
         os.makedirs(fold_dir,exist_ok=True)
         
-        vis_dir = os.path.join(fold_dir, method)
-        os.makedirs(vis_dir,exist_ok=True)
+        vis_dir_main = os.path.join(fold_dir, method)
+        os.makedirs(vis_dir_main,exist_ok=True)
 
         X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers,_,_,test_ids = transform_after_split(X_train,X_test,Y_train,Y_test, reg_list = reg_list,fold = fold_dir)
+        
         print(X_train_tensor.shape)
         predictions, trues, r2_results, mse_results,model_trained = train_and_test(
             X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor, 
             scalers, predictions, trues, input_dim, method, index , reg_list, csv_dir,
-            vis_dir = vis_dir, model_name = model_name, test_ids = test_ids
+            vis_dir = vis_dir_main, model_name = model_name, test_ids = test_ids
+            )
+        for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
+            #print(r2_results)
+            t = reg_list[i]
+            scores.setdefault('R2', {}).setdefault(method, {}).setdefault(t, []).append(r2)
+            scores.setdefault('MSE', {}).setdefault(method, {}).setdefault(t, []).append(mse)
+        
+        vis_dir_comp = os.path.join(fold_dir, method_comp)
+        os.makedirs(vis_dir_comp,exist_ok=True)
+
+        predictions, trues, r2_results, mse_results,model_trained_comp = train_and_test(
+            X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor, scalers, 
+            predictions, trues, 
+            input_dim, 
+            method_comp, 
+            index , reg_list, csv_dir,
+            vis_dir = vis_dir_comp, 
+            model_name = model_name, test_ids = test_ids,
+            loss_sum = comp_method
             )
         
+        #print(r2_results)
+        
+        '''
         if model_name == 'CNN' or model_name == 'CNN_catph':
             reduced_features = model_trained.sharedconv(X_test_tensor.unsqueeze(1)).detach().numpy()
         elif model_name == 'NN':
             reduced_features = model_trained.sharedfc(X_test_tensor).detach().numpy()
 
-        '''
         reduced_features = reduced_features.reshape(reduced_features.shape[0], -1)
         reduced.setdefault(method_st, {}).setdefault('all', []).append(reduced_features)
         '''
 
         for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
+            #print(r2_results)
             t = reg_list[i]
-            scores.setdefault('R2', {}).setdefault(method, {}).setdefault(t, []).append(r2)
-            scores.setdefault('MSE', {}).setdefault(method, {}).setdefault(t, []).append(mse)
+            scores.setdefault('R2', {}).setdefault(method_comp, {}).setdefault(t, []).append(r2)
+            scores.setdefault('MSE', {}).setdefault(method_comp, {}).setdefault(t, []).append(mse)
 
-        vis_dir = os.path.join(fold_dir, method_st)
-        os.makedirs(vis_dir,exist_ok=True)
+
+        vis_dir_st = os.path.join(fold_dir, method_st)
+        os.makedirs(vis_dir_st,exist_ok=True)
 
         for i,r in enumerate(reg_list):
             Y_train_single, Y_val_single, Y_test_single =[Y_train_tensor[i]], [Y_val_tensor[i]], [Y_test_tensor[i]]
@@ -92,7 +121,7 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
             predictions, trues, r2_result, mse_result, model_trained = train_and_test(
             X_train = X_train_tensor, X_val = X_val_tensor, X_test = X_test_tensor, Y_train = Y_train_single, Y_val = Y_val_single, Y_test = Y_test_single, 
             scalers = scalers, predictions = predictions, trues = trues, input_dim = input_dim, method = method_st, index = index , reg_list = reg, csv_dir = csv_dir, 
-            vis_dir = vis_dir, model_name = model_name,test_ids = test_ids
+            vis_dir = vis_dir_st, model_name = model_name,test_ids = test_ids
             )
 
             #reduced_features = reduce_feature(model = model_trained, X = X_test_tensor, model_name = model_name)
@@ -127,6 +156,7 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
     for model, sub_dict in trues.items()
     }
 
+    '''
     reducer = TSNE(n_components=2, perplexity=30, random_state=42)
     #reducer = umap.UMAP(n_components=2, random_state=42)
 
@@ -134,15 +164,14 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
     model: {key: reducer.fit_transform(np.concatenate(value)) for key, value in sub_dict.items()}
     for model, sub_dict in reduced.items()
     }
-
     #print(tests)
     #print(predictions)
-    reduced_feature_dir = os.path.join(sub_dir, reduced_feature_path)
-    os.makedirs(reduced_feature_dir,exist_ok=True)
+    #reduced_feature_dir = os.path.join(sub_dir, reduced_feature_path)
+    #os.makedirs(reduced_feature_dir,exist_ok=True)
     for key, features in reduced.items():
-        model_dir = os.path.join(reduced_feature_dir, key)
-        os.makedirs(model_dir,exist_ok=True)
-
+       # model_dir = os.path.join(reduced_feature_dir, key)
+        #os.makedirs(model_dir,exist_ok=True)
+        
         for reg in reg_list:
             reg_dir = os.path.join(model_dir, f'{reg}.png')
             
@@ -172,6 +201,7 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
             #plt.show()
             plt.savefig(reg_dir)
             plt.close()
+        '''
 
     #pprint.pprint(reduced)
     pprint.pprint(scores)
@@ -186,7 +216,7 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
                 result = f'{avg}±{std}'
                 avg_std.setdefault(metrics, {}).setdefault(method_name, {})[target] = result
     
-    method_order = ["MT", "ST"]  # 先に固定するキー
+    method_order = [method,method_comp, method_st]  # 先に固定するキー
     # "MT" -> "ST" -> その他 の順にソートする関数
     def sort_methods(method_dict):
         # "MT", "ST" を最優先し、それ以外をアルファベット順で並べる

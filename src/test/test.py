@@ -13,7 +13,7 @@ script_name = os.path.basename(__file__)
 with open(yaml_path, "r") as file:
     config = yaml.safe_load(file)[script_name]
 
-def test_MT(x_te,y_te,model,reg_list,scalers):
+def test_MT(x_te,y_te,model,reg_list,scalers,output_dir):
     model.eval()  # モデルを評価モードに
     # 出力ごとの予測と実際のデータをリストに格納
     r2_scores = []
@@ -39,7 +39,21 @@ def test_MT(x_te,y_te,model,reg_list,scalers):
                 predicts[reg] = output
                 trues[reg] = true
                 
-                r2 = r2_score(true,output)
+                result_dir = os.path.join(output_dir, reg)
+                os.makedirs(output_dir,exist_ok=True)
+                TP_dir = os.path.join(result_dir, 'true_predict.png')
+                plt.figure()
+                plt.scatter(true,output)
+                plt.xlabel('true_data')
+                plt.ylabel('predicted_data')
+                plt.savefig(TP_dir)
+                plt.close()
+
+                #r2 = r2_score(true,output)
+                corr_matrix = np.corrcoef(true.ravel(),output.ravel())
+
+                # 相関係数（xとyの間の値）は [0, 1] または [1, 0] の位置
+                r2 = corr_matrix[0, 1]
                 #print(r2)
                 r2_scores.append(r2)
                 #mse = mean_squared_error(true,output)
@@ -64,10 +78,11 @@ def test_MT(x_te,y_te,model,reg_list,scalers):
 from src.training.train import training_MT
 from src.test.test import test_MT
 from src.models.MT_CNN import MTCNNModel
+from src.models.MT_CNN_Attention import MTCNNModel_Attention
 from src.models.MT_CNN_catph import MTCNN_catph
 from src.models.MT_NN import MTNNModel
 from src.models.MT_CNN_soft import MTCNN_SPS
-
+from src.models.MT_CNN_SA import MTCNNModel_SA
 import numpy as np
 import os
 import pandas as pd
@@ -97,7 +112,7 @@ def write_result(r2_results, mse_results, columns_list, csv_dir, method, ind):
 
 def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predictions, trues, 
                   input_dim, method, index, reg_list, csv_dir, vis_dir, model_name, test_ids, 
-                  ):
+                  loss_sum = config['loss_sum']):
 
     output_dims = []
     #print(Y_train)
@@ -121,15 +136,21 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         model = MTCNN_catph(input_dim = input_dim,reg_list=reg_list)
     elif model_name == 'CNN_soft':
         model = MTCNN_SPS(input_dim = input_dim,output_dims = output_dims,reg_list=reg_list)
+    elif model_name == 'CNN_attention':
+        model = MTCNNModel_Attention(input_dim = input_dim,output_dims = output_dims)
+    elif model_name == 'CNN_SA':
+        model = MTCNNModel_SA(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
 
     #optimizer = optim.Adam(model.parameters(), lr=0.001)
     model_trained = training_MT(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model,
                                 #optimizer = optimizer, 
                                 output_dim=output_dims,
                                 reg_list = reg_list, output_dir = vis_dir, 
-                                model_name = model_name)
+                                model_name = model_name,
+                                loss_sum = loss_sum
+                                )
 
-    predicts, true, r2_results, mse_results = test_MT(X_test,Y_test,model_trained,reg_list,scalers)
+    predicts, true, r2_results, mse_results = test_MT(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir)
 
     #visualize_tsne(model = model_trained, model_name = model_name , X = X_test, Y = Y_test, reg_list = reg_list, output_dir = vis_dir, file_name = 'test.png')
 
@@ -142,7 +163,9 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         loss = np.abs(predicts[reg]-true[reg])
         #print(loss)
         loss_dir = os.path.join(vis_dir, reg)
+        os.makedirs(loss_dir,exist_ok=True)
         out = os.path.join(loss_dir, 'loss.png')
+
         plt.figure(figsize=(18, 14))
         plt.bar(test_ids.to_numpy().ravel(),loss.ravel())
         plt.xticks(rotation=90)

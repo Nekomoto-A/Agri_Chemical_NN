@@ -40,6 +40,9 @@ class MTCNN_SPS(nn.Module):
             # 畳み込み層を含む特徴抽出部分を構築
             feature_extractor = nn.Sequential()
             in_channels = 1 # 最初の入力チャネル数
+            if not conv_layers:
+                raise ValueError("conv_layersは空にできません。少なくとも1つの畳み込み層が必要です。")
+            # 畳み込み層の構築
             for i, (out_channels, kernel_size, stride, padding) in enumerate(conv_layers):
                 feature_extractor.add_module(f"conv{i+1}", nn.Conv1d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding))
                 feature_extractor.add_module(f"batchnorm{i+1}", nn.BatchNorm1d(out_channels))
@@ -67,9 +70,15 @@ class MTCNN_SPS(nn.Module):
             # ModuleDictにモデルを登録
             self.models[reg_name] = current_model
     def forward(self, x):
-        outputs = []
+        """
+        フォワードパス。
+        Args:
+            x (torch.Tensor): 入力データ。
+        Returns:
+            dict: 各予測ターゲット名（reg_name）をキーとし、対応するモデルの出力を値とする辞書。
+        """
+        outputs = {}
         # 各予測ターゲットに対応するモデルを適用
-        x = x.unsqueeze(1)  # (バッチサイズ, チャネル数=1, シーケンス長)
         for reg_name, model in self.models.items():
-            outputs.append(model(x))
+            outputs[reg_name] = model(x)
         return outputs

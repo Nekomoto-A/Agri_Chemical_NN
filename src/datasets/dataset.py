@@ -10,6 +10,8 @@ from sklearn.neighbors import LocalOutlierFactor
 from sklearn.preprocessing import LabelEncoder
 from sklearn.cluster import DBSCAN
 from skbio.stats.composition import clr, multiplicative_replacement
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 import yaml
 import os
@@ -27,6 +29,7 @@ class data_create:
 
         self.label_list = label_list
     def __iter__(self):
+        self.chem_data.columns = [col.replace('.', '_') for col in self.chem_data.columns]
         if config['level'] != 'asv':
             asv_data = self.asv_data.loc[:, self.asv_data.columns.str.contains('d_')]
         
@@ -170,7 +173,6 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
 
     for reg in reg_list:
         if np.issubdtype(y_train_split[reg].dtype, np.floating):
-
             pp = StandardScaler()
             #pp = MinMaxScaler()
             #pp = PowerTransformer(method='yeo-johnson')
@@ -182,7 +184,6 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
                 y_test_pp = pp.transform(y_test[reg].values.reshape(-1, 1))
 
                 scalers[reg] = pp  # スケーラーを保存
-            
             else:
                 #pp = pp.fit(y_train_split[reg].values.reshape(-1, 1))
                 y_train_split_pp = y_train_split[reg].values.reshape(-1, 1)
@@ -194,11 +195,24 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
             Y_train_tensor.append(torch.tensor(y_train_split_pp, dtype=torch.float32))
             Y_val_tensor.append(torch.tensor(y_val_pp, dtype=torch.float32))
             Y_test_tensor.append(torch.tensor(y_test_pp, dtype=torch.float32))
-
         else:
             #print(y_train_split[reg])
             Y_train_tensor.append(torch.tensor(y_train_split[reg].values, dtype=torch.int64))
             Y_val_tensor.append(torch.tensor(y_val[reg].values, dtype=torch.int64))
             Y_test_tensor.append(torch.tensor(y_test[reg].values, dtype=torch.int64))
-    return X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids
 
+    data = []
+    if len(reg_list) >= 2:
+        corr_dir = os.path.join(fold, f'corr.png')
+        for i,reg in enumerate(reg_list):
+            data.append(Y_train_tensor[i].numpy().ravel())
+        corr_matrix = np.corrcoef(data)
+        plt.figure(figsize=(20,20))
+        sns.heatmap(corr_matrix, cmap= sns.color_palette('coolwarm', 10), annot=True,fmt='.2f', vmin = -1, vmax = 1, xticklabels=reg_list, yticklabels=reg_list)
+        plt.savefig(corr_dir)
+        plt.close()
+        binary_matrix = (corr_matrix >= 0.5).astype(float)
+        np.fill_diagonal(binary_matrix, 1.0)
+        #print(corr_matrix)
+        #print(binary_matrix)
+    return X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids
