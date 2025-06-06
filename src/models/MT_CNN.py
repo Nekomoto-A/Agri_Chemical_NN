@@ -51,6 +51,7 @@ class MTCNNModel(nn.Module):
 
         self.shared_fc = nn.Sequential(
                     nn.Linear(total_features, self.hidden_dim),
+                    #nn.Dropout(0.2),
                     nn.ReLU()
                     #nn.Dropout(0.2) # ドロップアウトはオプション
                 )
@@ -73,10 +74,10 @@ class MTCNNModel(nn.Module):
         x = self.sharedconv(x)
         x = x.view(x.size(0), -1)  # フラット化
         #x = self.sharedfc(x)
-        x = self.shared_fc(x)
+        shared_features = self.shared_fc(x)
         
         outputs = []
         # 各出力層を適用
         for (reg, output_layer) in zip(self.reg_list,self.outputs):
-            outputs.append(output_layer(x))
-        return outputs#, self.log_sigma_sqs  # リストとして出力
+            outputs.append(output_layer(shared_features))
+        return outputs, shared_features#, self.log_sigma_sqs  # リストとして出力

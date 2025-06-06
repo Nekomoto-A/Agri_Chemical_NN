@@ -13,20 +13,20 @@ def reduce_feature(model,X1,model_name, X2 = None):
     model.eval()
     with torch.no_grad():
         if model_name =='CNN' or model_name =='Attention_CNN' or model_name == 'CNN_catph' or model_name == 'CNN_SA':
-            shared_features1 = model.sharedconv(X1.unsqueeze(1)).cpu().numpy()  # 共有層の出力を取得
-            shared_features1 = shared_features1.reshape(shared_features1.shape[0], -1)
+            #shared_features1 = model.sharedconv(X1.unsqueeze(1)).cpu().numpy()  # 共有層の出力を取得
+            _,shared_features = model(X1)  # 共有層の出力を取得
+            shared_features = shared_features.reshape(shared_features.shape[0], -1)
             
             if X2 != None:
-                labels = np.ones(len(shared_features1), dtype=int)
-
-                shared_features2 = model.sharedconv(X2.unsqueeze(1)).cpu().numpy()  # 共有層の出力を取得
-                #print(shared_features.shape)
+                labels = np.ones(len(shared_features), dtype=int)
+                #shared_features = model.sharedconv(X2.unsqueeze(1)).cpu().numpy()  # 共有層の出力を取得
+                _,shared_features2 = model(X2)  # 共有層の出力を取得
                 shared_features2 = shared_features2.reshape(shared_features2.shape[0], -1)
 
-                shared_features = np.concatenate([shared_features1, shared_features2])
+                shared_features = np.concatenate([shared_features, shared_features2])
                 labels = np.concatenate([labels, np.zeros(len(shared_features2), dtype=int)])
-            else:
-                shared_features = shared_features1
+            #else:
+            #    shared_features = shared_features1
 
         elif model_name =='NN':
             shared_features1 = model.sharedfc(X1).cpu().numpy()  # 共有層の出力を取得
@@ -51,13 +51,12 @@ def reduce_feature(model,X1,model_name, X2 = None):
         return labels, reduced_features
 
 # t-SNE による可視化関数
-def visualize_tsne(model, X, Y, reg_list, output_dir,file_name, model_name, X2 = None, Y2 = None, label_encoders = None):
+def visualize_tsne(model, X, Y, reg_list, output_dir,file_name, model_name,scalers, X2 = None, Y2 = None, label_encoders = None):
     #print(reduced_features)
     if X2 != None:
         #print(Y2)
         labels, reduced_features = reduce_feature(model,X, model_name,X2 = X2)
         for i,reg in enumerate(reg_list):
-            
             reg_dir = os.path.join(output_dir, f'{reg}')
             os.makedirs(reg_dir,exist_ok=True)
             sub_dir = os.path.join(reg_dir, f'{file_name}')
@@ -102,8 +101,9 @@ def visualize_tsne(model, X, Y, reg_list, output_dir,file_name, model_name, X2 =
                         color_handles.append(Line2D([0], [0], marker='o', color='w', markerfacecolor=color, markersize=10, label=f'{lc}'))
                     plt.legend(handles=color_handles, loc='upper left')
 
-
                 else:
+                    if reg in scalers:
+                        Y_single = scalers[reg].inverse_transform(Y_single)
                     cmap = plt.cm.coolwarm  # 他に 'plasma', 'coolwarm', 'inferno' なども
                     # 連続値ラベルの場合
                     #scaler = MinMaxScaler()
@@ -119,7 +119,7 @@ def visualize_tsne(model, X, Y, reg_list, output_dir,file_name, model_name, X2 =
                     sc = plt.scatter([], [], c=[], cmap=cmap)  # ダミーで色範囲の情報を保持
                     cbar = plt.colorbar(sc)
                     cbar.set_label(f'{reg}')
-                
+                    #plt.legend()
             else:
                 # ラベルなし
                 plt.scatter(reduced_features[:, 0], reduced_features[:, 1], alpha=0.7)
@@ -132,7 +132,6 @@ def visualize_tsne(model, X, Y, reg_list, output_dir,file_name, model_name, X2 =
             #plt.show()
             plt.savefig(sub_dir)
             plt.close()
-
     else:
         reduced_features = reduce_feature(model,X, model_name)
 
@@ -142,6 +141,9 @@ def visualize_tsne(model, X, Y, reg_list, output_dir,file_name, model_name, X2 =
             sub_dir = os.path.join(reg_dir, f'{file_name}')
 
             Y_single = Y[i].detach().numpy()
+            if reg in scalers:
+                Y_single = scalers[reg].inverse_transform(Y_single)
+            cmap = plt.cm.coolwarm  # 他に 'plasma', 'coolwarm', 'inferno' なども
             # プロット
             plt.figure(figsize=(8, 6))
             if Y is not None:
@@ -155,8 +157,16 @@ def visualize_tsne(model, X, Y, reg_list, output_dir,file_name, model_name, X2 =
                     # 連続値ラベルの場合
                     #scaler = MinMaxScaler()
                     #Y_single = scaler.fit_transform(Y_single)
-                    scatter = plt.scatter(reduced_features[:, 0], reduced_features[:, 1], c=Y_single, cmap='viridis')
-                    plt.colorbar(label=f"{reg}")  # 連続値の場合はカラーバーを表示
+                    plt.scatter(reduced_features[:, 0], reduced_features[:, 1],
+                                    c=Y_single,
+                                    cmap=cmap,
+                                    #marker=marker_map[ls],
+                                    edgecolor='k', 
+                                    s=80
+                                    )
+                    sc = plt.scatter([], [], c=[], cmap=cmap)  # ダミーで色範囲の情報を保持
+                    cbar = plt.colorbar(sc)
+                    cbar.set_label(f'{reg}')
             else:
                 # ラベルなし
                 plt.scatter(reduced_features[:, 0], reduced_features[:, 1], alpha=0.7)

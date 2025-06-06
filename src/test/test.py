@@ -23,7 +23,7 @@ def test_MT(x_te,y_te,model,reg_list,scalers,output_dir):
     trues = {}
     with torch.no_grad():
         #outputs,sigmas = model(x_te)  # 予測値を取得
-        outputs = model(x_te)  # 予測値を取得
+        outputs,_ = model(x_te)  # 予測値を取得
 
         #print(outputs)
         # 各出力の予測結果と実際の値をリストに格納
@@ -144,6 +144,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
     #optimizer = optim.Adam(model.parameters(), lr=0.001)
     model_trained = training_MT(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model,
                                 #optimizer = optimizer, 
+                                scalers = scalers,
                                 output_dim=output_dims,
                                 reg_list = reg_list, output_dir = vis_dir, 
                                 model_name = model_name,

@@ -118,7 +118,7 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
             reg = [r]
             print(X_train_tensor.shape)
 
-            predictions, trues, r2_result, mse_result, model_trained = train_and_test(
+            predictions, trues, r2_result, mse_result, model_trained_st = train_and_test(
             X_train = X_train_tensor, X_val = X_val_tensor, X_test = X_test_tensor, Y_train = Y_train_single, Y_val = Y_val_single, Y_test = Y_test_single, 
             scalers = scalers, predictions = predictions, trues = trues, input_dim = input_dim, method = method_st, index = index , reg_list = reg, csv_dir = csv_dir, 
             vis_dir = vis_dir_st, model_name = model_name,test_ids = test_ids
@@ -143,7 +143,7 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
             
             for metrics, dict in stats_scores.items():
                 for method_name, regs in dict.items():
-                      for reg_name, value in regs.items():
+                    for reg_name, value in regs.items():
                         scores.setdefault(metrics, {}).setdefault(method_name, {}).setdefault(reg_name, []).append(value[0])
 
     predictions = {

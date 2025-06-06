@@ -24,6 +24,11 @@ def statsmodel_test(X, Y, models, scalers, reg, result_dir,index):
                 pred = model.predict(X).reshape(-1, 1)
             
             stats_dir = os.path.dirname(result_dir)
+            print(index)
+            stats_dir = os.path.join(stats_dir, index[0])
+            os.makedirs(stats_dir,exist_ok=True)
+            stats_dir = os.path.join(stats_dir, name)
+            os.makedirs(stats_dir,exist_ok=True)
             stats_dir = os.path.join(stats_dir, f'{name}_result.png')
             plt.figure()
             plt.scatter(Y_pp,pred)

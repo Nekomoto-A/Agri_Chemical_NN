@@ -261,6 +261,7 @@ class PCGradOptimizer:
         # ラップされたオプティマイザのステップを実行し、パラメータを更新
         self.optimizer.step()
 
+
 def custom_nanmin(tensor):
     """
     テンソル内のNaNではない最小値を返します。
@@ -398,6 +399,7 @@ def calculate_initial_loss_weights_by_correlation(
     return initial_weights.float() # float型で返す
 
 def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, model_name,loss_sum, #optimizer, 
+                scalers,
                 label_encoders = None, #scheduler = None, 
                 epochs = config['epochs'], patience = config['patience'],early_stopping = config['early_stopping'],
                 #loss_sum = config['loss_sum'],
@@ -496,11 +498,13 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
         if visualize == True:
             if epoch == 0:
                 vis_name = f'{epoch}epoch.png'
-                visualize_tsne(model = model, model_name = model_name , X = x_tr, Y = y_tr, reg_list = reg_list, output_dir = output_dir, file_name = vis_name,X2 = x_val,Y2 = y_val)
+                visualize_tsne(model = model, model_name = model_name,scalers = scalers, X = x_tr, Y = y_tr, reg_list = reg_list, output_dir = output_dir, file_name = vis_name,
+                               #X2 = x_val,Y2 = y_val
+                               )
 
         model.train()
         #torch.autograd.set_detect_anomaly(True)
-        outputs = model(x_tr)
+        outputs,_ = model(x_tr)
         
         train_losses = []
         for j in range(len(output_dim)):
@@ -568,7 +572,7 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
             model.eval()
             val_loss = 0
             with torch.no_grad():
-                outputs = model(x_val)
+                outputs,_ = model(x_val)
 
                 val_losses = []
                 for j in range(len(output_dim)):
@@ -626,7 +630,9 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
             if visualize == True:
                 if (epoch + 1) % 10 == 0:
                     vis_name = f'{epoch+1}epoch.png'
-                    visualize_tsne(model = model, model_name = model_name , X = x_tr, Y = y_tr, reg_list = reg_list, output_dir = output_dir, file_name = vis_name, label_encoders = label_encoders,X2 = x_val,Y2 = y_val)
+                    visualize_tsne(model = model, model_name = model_name,scalers = scalers, X = x_tr, Y = y_tr, reg_list = reg_list, output_dir = output_dir, file_name = vis_name, label_encoders = label_encoders,
+                                   #X2 = x_val,Y2 = y_val
+                                   )
 
                     vis_losses = []
                     vis_losses_val = []
