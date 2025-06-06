@@ -11,27 +11,31 @@ train.py:
   early_stopping: False
   patience: 5
   least_epoch: 0
-  loss_sum: 'SUM'
-  visualize: False
-  epochs: 100
+  visualize: True
+  epochs: 30
   validation: True
-  lambda: 0.0
-  learning_rate: 0.001
+  lambda: 0.001
+  learning_rate: [0.0001]
   weights: [0.7, 0.3]
 test.py:
-  learning_rate: 0.001
+  loss_sum: 'PCgrad_initial_weight'
 fold_eval.py:
   k_fold: 5
-  model_name: 'CNN_soft'
-  result_dir: 'result_MIRU'
+  model_name: 'CNN'
+  result_dir: 'result_MIRU2'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
+  comp_method: 'PCgrad'
   exclude_ids: [
+    '041_20_Sait_Carr', '042_20_Sait_Eggp', '043_20_Sait_Carr', '044_20_Sait_Broc',
+    '045_20_Sait_Broc', '046_20_Sait_Burd', '047_20_Sait_Burd', '048_20_Sait_Yama',
+    '049_20_Sait_Yama', '050_20_Sait_Stra', '061_20_Naga_Barl', '062_20_Naga_Barl',
+    '067_20_Naga_Pump', '331_22_Niig_jpea', '332_22_Niig_jpea'
   ]
   feature_path: 'data/raw/taxon_data/lv7.csv'
   target_path: 'data/raw/chem_data.xlsx'
 main.py:
   reg_list: [
-            ['pH','Available.P']
+            ['NO3.N','NH4.N','Available.P','Exchangeable.K','pH','EC']
       ]

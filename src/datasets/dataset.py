@@ -29,7 +29,7 @@ class data_create:
 
         self.label_list = label_list
     def __iter__(self):
-        self.chem_data.columns = [col.replace('.', '_') for col in self.chem_data.columns]
+        #self.chem_data.columns = [col.replace('.', '_') for col in self.chem_data.columns]
         if config['level'] != 'asv':
             asv_data = self.asv_data.loc[:, self.asv_data.columns.str.contains('d_')]
         

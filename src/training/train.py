@@ -279,7 +279,7 @@ def calculate_initial_loss_weights_by_correlation(
     true_targets: list[torch.Tensor], # 訓練データセットの各タスクの真のターゲット値を含むPyTorchテンソルのリスト
     min_weight: float = 0.05,        # 最小損失重み (タスクが完全に無視されないように)
     neg_corr_threshold: float = -0.3, # この閾値より低い負の相関で重みを減らす
-    pos_corr_threshold: float = 0.45,  # この閾値より高い正の相関で重みを増やす
+    pos_corr_threshold: float = 0.3,  # この閾値より高い正の相関で重みを増やす
     pos_bonus_factor: float = 0.4,    # 正の相関による重み増加の倍率
     reg_list: list[str] = None        # 予測対象名 (タスク名) のリスト。Noneの場合、自動生成される。
 ) -> torch.Tensor:
@@ -371,7 +371,7 @@ def calculate_initial_loss_weights_by_correlation(
         positive_correlations = other_tasks_corr[other_tasks_corr > 0]
         avg_pos_corr_i = torch.mean(positive_correlations) if positive_correlations.numel() > 0 else 0.0
         
-        #print(f"タスク '{task_name_i}': 正の相関の平均 = {avg_pos_corr_i:.4f}")
+        print(f"タスク '{task_name_i}': 正の相関の平均 = {avg_pos_corr_i:.4f}")
 
         if avg_pos_corr_i > pos_corr_threshold:
             # ベースの重みにボーナスを加算
@@ -391,10 +391,10 @@ def calculate_initial_loss_weights_by_correlation(
         # すべての重みを1.0にリセットするなどの代替策も考えられる
         initial_weights = torch.ones(num_tasks)
 
-    #print(f"\n--- 最終的な初期損失重み (正規化後) ---")
-    #for i, w in enumerate(initial_weights):
-        #print(f"タスク '{task_names[i]}': {w:.4f}")
-    #print("--------------------------------------")
+    print(f"\n--- 最終的な初期損失重み (正規化後) ---")
+    for i, w in enumerate(initial_weights):
+        print(f"タスク '{task_names[i]}': {w:.4f}")
+    print("--------------------------------------")
 
     return initial_weights.float() # float型で返す
 
