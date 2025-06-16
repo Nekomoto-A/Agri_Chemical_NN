@@ -41,8 +41,8 @@ def reduce_feature(model,X1,model_name, X2 = None):
                 shared_features = shared_features1
         
         # t-SNE で2次元に圧縮
-        reducer = TSNE(n_components=2, perplexity=20, random_state=42, init = 'random')
-        #reducer = umap.UMAP(n_components=2, random_state=42)
+        #reducer = TSNE(n_components=2, perplexity=20, random_state=42, init = 'random')
+        reducer = umap.UMAP(n_components=2, random_state=42)
         #reducer = PCA(n_components=2)
         reduced_features = reducer.fit_transform(shared_features)
     if X2 == None:

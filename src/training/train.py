@@ -351,6 +351,7 @@ def calculate_initial_loss_weights_by_correlation(
         other_tasks_corr = correlation_matrix[i].clone()
         other_tasks_corr[i] = float('nan') # 自分自身との相関を除外
 
+        '''
         # --- 負の相関による調整 ---
         # NaNを除外して最小値を取得
         min_corr_i = custom_nanmin(other_tasks_corr) if not torch.isnan(other_tasks_corr).all() else 0.0
@@ -365,12 +366,14 @@ def calculate_initial_loss_weights_by_correlation(
         else:
             #print(f"  -> 負の相関が強くないため、初期重みは {initial_weights[i]:.4f} (ベースライン) のまま。")
             pass
+        '''
         # --- 正の相関による調整 ---
         # 正の相関のみを抽出し、その平均を計算
         # 空の場合は 0.0 とする (正の相関が全くない場合)
         positive_correlations = other_tasks_corr[other_tasks_corr > 0]
         avg_pos_corr_i = torch.mean(positive_correlations) if positive_correlations.numel() > 0 else 0.0
-        
+        #avg_pos_corr_i = torch.mean(other_tasks_corr)# if positive_correlations.numel() > 0 else 0.0
+
         print(f"タスク '{task_name_i}': 正の相関の平均 = {avg_pos_corr_i:.4f}")
 
         if avg_pos_corr_i > pos_corr_threshold:
@@ -404,7 +407,7 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                 epochs = config['epochs'], patience = config['patience'],early_stopping = config['early_stopping'],
                 #loss_sum = config['loss_sum'],
                 visualize = config['visualize'], val = config['validation'], lambda_norm = config['lambda'],least_epoch = config['least_epoch'],
-                lr=config['learning_rate'],weights = config['weights']):
+                lr=config['learning_rate'],weights = config['weights'],vis_step = config['vis_step'],SUM_train_lim = config['SUM_train_lim'],personal_train_lim = config['personal_train_lim']):
 
     if len(lr) == 1:
         lr = lr[0]
@@ -628,7 +631,7 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
 
             #print(loss)[]
             if visualize == True:
-                if (epoch + 1) % 10 == 0:
+                if (epoch + 1) % vis_step == 0:
                     vis_name = f'{epoch+1}epoch.png'
                     visualize_tsne(model = model, model_name = model_name,scalers = scalers, X = x_tr, Y = y_tr, reg_list = reg_list, output_dir = output_dir, file_name = vis_name, label_encoders = label_encoders,
                                    #X2 = x_val,Y2 = y_val
@@ -689,9 +692,9 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
         plt.grid()
         plt.tight_layout()
         if reg == 'SUM':
-            plt.ylim(0,10)
+            plt.ylim(0,SUM_train_lim)
         else:
-            plt.ylim(0,10)
+            plt.ylim(0,personal_train_lim)
         #plt.show()
         plt.savefig(train_loss_history_dir)
         plt.close()

@@ -55,6 +55,7 @@ class MTCNNModel(nn.Module):
                     nn.ReLU()
                     #nn.Dropout(0.2) # ドロップアウトはオプション
                 )
+        
         self.outputs = nn.ModuleList([ 
             nn.Sequential(
                 #ChannelAttention1D(total_features),
@@ -75,7 +76,7 @@ class MTCNNModel(nn.Module):
         x = x.view(x.size(0), -1)  # フラット化
         #x = self.sharedfc(x)
         shared_features = self.shared_fc(x)
-        
+
         outputs = []
         # 各出力層を適用
         for (reg, output_layer) in zip(self.reg_list,self.outputs):

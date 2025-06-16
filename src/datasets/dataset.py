@@ -208,7 +208,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
             data.append(Y_train_tensor[i].numpy().ravel())
         corr_matrix = np.corrcoef(data)
         plt.figure(figsize=(20,20))
-        sns.heatmap(corr_matrix, cmap= sns.color_palette('coolwarm', 10), annot=True,fmt='.2f', vmin = -1, vmax = 1, xticklabels=reg_list, yticklabels=reg_list)
+        sns.heatmap(corr_matrix, cmap= sns.color_palette('coolwarm', 10), annot=True,fmt='.2f', vmin = -1, vmax = 1, xticklabels=reg_list, yticklabels=reg_list,annot_kws={"fontsize": 30})
         plt.savefig(corr_dir)
         plt.close()
         binary_matrix = (corr_matrix >= 0.5).astype(float)

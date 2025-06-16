@@ -14,7 +14,7 @@ def statsmodel_test(X, Y, models, scalers, reg, result_dir,index):
     scores = {}
     for name, model in models.items():
         if np.issubdtype(Y.dtype, np.floating):
-            print(f'test:{reg}:{Y.dtype}')
+            #print(f'test:{reg}:{Y.dtype}')
 
             if reg in scalers:
                 Y_pp = scalers[reg].inverse_transform(Y)
@@ -29,6 +29,8 @@ def statsmodel_test(X, Y, models, scalers, reg, result_dir,index):
             os.makedirs(stats_dir,exist_ok=True)
             stats_dir = os.path.join(stats_dir, name)
             os.makedirs(stats_dir,exist_ok=True)
+            stats_dir = os.path.join(stats_dir, reg)
+            os.makedirs(stats_dir,exist_ok=True)
             stats_dir = os.path.join(stats_dir, f'{name}_result.png')
             plt.figure()
             plt.scatter(Y_pp,pred)
@@ -40,12 +42,13 @@ def statsmodel_test(X, Y, models, scalers, reg, result_dir,index):
             #r2 = r2_score(pred,Y_pp)
             #r2 = r2_score(true,output)
             corr_matrix = np.corrcoef(Y_pp.ravel(),pred.ravel())
-
             # 相関係数（xとyの間の値）は [0, 1] または [1, 0] の位置
             r2 = corr_matrix[0, 1]
             #mse = mean_squared_error(pred,Y_pp)
             mse = mean_absolute_error(pred,Y_pp)
+            print(f'{name}：')
             print(f'決定係数：{r2}')
+            print(f'MAE：{mse}')
         else:
             Y_pp = Y
             pred = models[name].predict(X)
