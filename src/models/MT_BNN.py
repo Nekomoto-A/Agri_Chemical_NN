@@ -79,34 +79,34 @@ class LinearReparameterization(nn.Module):
 # マルチタスク学習のためのベイジアンニューラルネットワークを定義します。
 # 共有のエンコーダと、各タスク専用の複数のヘッドを持つアーキテクチャを採用します。
 class MTBNNModel(nn.Module):
-    def __init__(self, input_dim,reg_list, shared_hidden_dim, task_hidden_dim, output_dims):
+    def __init__(self, input_dim,reg_list, output_dims):
         super(MTBNNModel, self).__init__()
         self.reg_list = reg_list
         self.output_dims = output_dims # 各タスクの出力次元を辞書で保持
 
         # 共有エンコーダ層：入力からタスク共通の特徴を抽出します。
         self.shared_encoder = nn.Sequential(
-            LinearReparameterization(input_dim, shared_hidden_dim), # BNN線形層
+            LinearReparameterization(input_dim, 256), # BNN線形層
             nn.ReLU(), # 活性化関数
-            LinearReparameterization(shared_hidden_dim, shared_hidden_dim),
+            LinearReparameterization(256, 128),
             nn.ReLU()
         )
 
         # 各タスクに対するヘッド層：共有特徴量を受け取り、各タスク固有の出力を生成します。
         # nn.ModuleDictを使用して、タスク名でヘッドにアクセスできるようにします。
         self.task_heads = nn.ModuleDict()
-        for i,out_dim in enumerate(output_dims):
-            self.task_heads[reg_list[i]] = nn.Sequential(
-                LinearReparameterization(shared_hidden_dim, task_hidden_dim),
+        for task_name,out_dim in zip(reg_list,output_dims):
+            self.task_heads[task_name] = nn.Sequential(
+                LinearReparameterization(128, 64),
                 nn.ReLU(),
-                LinearReparameterization(task_hidden_dim, out_dim) # 最終出力層
+                LinearReparameterization(64, out_dim) # 最終出力層
             )
 
     # フォワードパス：入力が共有エンコーダを通過し、その後各タスクヘッドに分配されます。
     def forward(self, x):
         shared_features = self.shared_encoder(x) # 共有特徴量を計算
-        #outputs = {}
-        outputs = []
+        outputs = {}
+        #outputs = []
         for task_name, head in self.task_heads.items():
             outputs[task_name] = head(shared_features) # 各タスクの出力を計算
 
@@ -118,20 +118,21 @@ class MTBNNModel(nn.Module):
     def sample_elbo(self, input, target_outputs, num_samples=1):
         total_nll = 0.0 # 負の対数尤度の合計
         # 各タスクのNLLを記録するための辞書を初期化
-        task_nlls = {task_name: 0.0 for task_name in self.output_dims.keys()}
+        task_nlls = {task_name: 0.0 for task_name in self.reg_list}
         total_kl = 0.0 # KLダイバージェンスの合計
 
         # MC (モンテカルロ) サンプルを複数回実行してELBOを推定します。
         for _ in range(num_samples):
             outputs = self.forward(input) # モデルのフォワードパスを実行
-
+            #print(outputs)
             # 各タスクに対する負の対数尤度 (NLL) を計算します。
-            for task_name, pred_output in outputs.items():
+            for task_name,output_dim, (dict_key, pred_output) in zip(self.reg_list,self.output_dims,outputs.items()):
                 target = target_outputs[task_name]
                 # タスクの出力次元に基づいて回帰か分類かを自動判定します。
                 # self.output_dims から現在のタスクの出力次元を取得
-                output_dim = self.output_dims[task_name]
-
+                #output_dim = self.output_dims[task_name]
+                #print(pred_output)
+                #print(target)
                 if output_dim == 1: # 回帰タスク (出力次元が1の場合)
                     # 平均二乗誤差 (MSE) をNLLとして使用
                     nll = nn.functional.mse_loss(pred_output, target, reduction='sum')
@@ -192,7 +193,7 @@ if __name__ == '__main__':
     X_train, y_train_dict = generate_synthetic_data(NUM_DATA_POINTS, INPUT_DIM, OUTPUT_DIMS)
 
     # モデル、オプティマイザを初期化します。
-    model = MTBNNModel(INPUT_DIM,REG_LIST, SHARED_HIDDEN_DIM, TASK_HIDDEN_DIM, OUTPUT_DIMS)
+    model = MTBNNModel(INPUT_DIM,REG_LIST, OUTPUT_DIMS)
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE) # Adamオプティマイザを使用
 
     # トレーニングループを開始します。
@@ -202,7 +203,7 @@ if __name__ == '__main__':
         indices = np.random.choice(NUM_DATA_POINTS, BATCH_SIZE, replace=False)
         x_batch = X_train[indices]
         # 選択されたインデックスに対応する各タスクのターゲットを取得
-        y_batch_dict = {task: y_train_dict[task][indices] for task in OUTPUT_DIMS.keys()}
+        y_batch_dict = {task: y_train_dict[task][indices] for task in REG_LIST}
 
         optimizer.zero_grad() # 勾配をゼロクリア
 

@@ -75,14 +75,78 @@ def test_MT(x_te,y_te,model,reg_list,scalers,output_dir):
                 mse_scores.append(mse)
     return predicts, trues, r2_scores, mse_scores
 
-from src.training.train import training_MT
-from src.test.test import test_MT
+
+def test_MT_BNN(x_te,y_te,model,reg_list,scalers,output_dir):
+    model.eval()  # モデルを評価モードに
+    # 出力ごとの予測と実際のデータをリストに格納
+    r2_scores = []
+    mse_scores = []
+
+    predicts = {}
+    trues = {}
+    with torch.no_grad():
+        #outputs,sigmas = model(x_te)  # 予測値を取得
+        outputs,_ = model(x_te)  # 予測値を取得
+
+        #print(outputs)
+        # 各出力の予測結果と実際の値をリストに格納
+        for i,reg in enumerate(reg_list):
+            if torch.is_floating_point(y_te[i]) == True:
+                if reg in scalers:
+                    output = scalers[reg].inverse_transform(outputs[i].numpy())
+                    true = scalers[reg].inverse_transform(y_te[i].numpy())
+                else:
+                    output = outputs[i].numpy()
+                    true = y_te[i].numpy()
+
+                predicts[reg] = output
+                trues[reg] = true
+                
+                result_dir = os.path.join(output_dir, reg)
+                os.makedirs(output_dir,exist_ok=True)
+                TP_dir = os.path.join(result_dir, 'true_predict.png')
+                plt.figure()
+                plt.scatter(true,output)
+                plt.xlabel('true_data')
+                plt.ylabel('predicted_data')
+                plt.savefig(TP_dir)
+                plt.close()
+
+                #r2 = r2_score(true,output)
+                corr_matrix = np.corrcoef(true.ravel(),output.ravel())
+
+                # 相関係数（xとyの間の値）は [0, 1] または [1, 0] の位置
+                r2 = corr_matrix[0, 1]
+                #print(r2)
+                r2_scores.append(r2)
+                #mse = mean_squared_error(true,output)
+                mse = mean_absolute_error(true,output)
+                #print(mse)
+                mse_scores.append(mse)
+            else:
+                output = torch.argmax(outputs[i], dim=-1).numpy()
+                true = y_te[i].numpy()
+
+                predicts[reg] = output
+                trues[reg] = true
+
+                r2 = accuracy_score(true,output)
+                #print(r2)
+                r2_scores.append(r2)
+                mse = f1_score(true,output, average='macro')
+                #print(mse)
+                mse_scores.append(mse)
+    return predicts, trues, r2_scores, mse_scores
+
+from src.training.train import training_MT,training_MT_BNN
+
 from src.models.MT_CNN import MTCNNModel
 from src.models.MT_CNN_Attention import MTCNNModel_Attention
 from src.models.MT_CNN_catph import MTCNN_catph
 from src.models.MT_NN import MTNNModel
 from src.models.MT_CNN_soft import MTCNN_SPS
 from src.models.MT_CNN_SA import MTCNNModel_SA
+from src.models.MT_BNN import MTBNNModel
 import numpy as np
 import os
 import pandas as pd
@@ -140,16 +204,29 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         model = MTCNNModel_Attention(input_dim = input_dim,output_dims = output_dims)
     elif model_name == 'CNN_SA':
         model = MTCNNModel_SA(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
+    elif model_name == 'BNN':
+        model = MTBNNModel(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
 
-    #optimizer = optim.Adam(model.parameters(), lr=0.001)
-    model_trained = training_MT(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model,
-                                #optimizer = optimizer, 
-                                scalers = scalers,
-                                output_dim=output_dims,
-                                reg_list = reg_list, output_dir = vis_dir, 
-                                model_name = model_name,
-                                loss_sum = loss_sum
-                                )
+
+    if 'BNN' in model_name:
+        model_trained = training_MT_BNN(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model,
+                                    #optimizer = optimizer, 
+                                    scalers = scalers,
+                                    output_dim=output_dims,
+                                    reg_list = reg_list, output_dir = vis_dir, 
+                                    model_name = model_name,
+                                    loss_sum = loss_sum
+                                    )
+    else:
+        #optimizer = optim.Adam(model.parameters(), lr=0.001)
+        model_trained = training_MT(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model,
+                                    #optimizer = optimizer, 
+                                    scalers = scalers,
+                                    output_dim=output_dims,
+                                    reg_list = reg_list, output_dir = vis_dir, 
+                                    model_name = model_name,
+                                    loss_sum = loss_sum
+                                    )
 
     predicts, true, r2_results, mse_results = test_MT(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir)
 

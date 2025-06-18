@@ -713,8 +713,6 @@ def training_MT_BNN(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_di
     optimizer = optim.Adam(model.parameters() , lr=lr)
     
     personal_losses = []
-    optimizer.zero_grad() # 勾配をゼロクリア
-
     NUM_SAMPLES_ELBO = 1
 
     
@@ -733,67 +731,35 @@ def training_MT_BNN(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_di
                                )
         '''
         model.train()
+
+        optimizer.zero_grad() # 勾配をゼロクリア
         # ELBO損失と各タスクのNLLを計算します。
-        loss, train_losses = model.sample_elbo(x_tr, y_tr, num_samples=NUM_SAMPLES_ELBO)
-        loss.backward() # 誤差逆伝播を実行し、勾配を計算
+        train_loss, train_losses = model.sample_elbo(x_tr, y_tr, num_samples=NUM_SAMPLES_ELBO)
+        train_loss.backward() # 誤差逆伝播を実行し、勾配を計算
         optimizer.step() # オプティマイザのステップを実行し、モデルパラメータを更新
-        
-        
 
         if len(reg_list)>1:
             train_loss_history.setdefault('SUM', []).append(train_loss.item())
+        for reg in reg_list:
+            train_loss_history.setdefault(reg, []).append(train_losses[reg].item())
 
         if val == True:
             # モデルを評価モードに設定（検証データ用）
             model.eval()
             val_loss = 0
             with torch.no_grad():
-                outputs,_ = model(x_val)
-
-                val_losses = []
-                for j in range(len(output_dim)):
-                    loss = personal_losses[j](outputs[j], y_val[j])
-
-                    val_loss_history.setdefault(reg_list[j], []).append(loss.item())
-                    
-                    val_losses.append(loss)
-
-                if loss_sum == 'PCgrad' or loss_sum == 'PCgrad_initial_weight':
-                    if len(reg_list)==1:
-                        val_loss = val_losses[0]
-                    else:
-                        val_loss = sum(val_losses)
-                else:
-                    if len(reg_list)==1:
-                        val_loss = val_losses[0]
-                    #elif loss_sum == 'UncertaintyWeighted':
-                    #    val_loss = uncertainty_weighted_loss(val_losses, val_sigmas)
-                    elif loss_sum == 'Normalized':
-                        val_loss = loss_fn(val_losses)
-                    elif loss_sum == 'Uncertainlyweighted':
-                        val_loss = loss_fn(val_losses)
-                    elif loss_sum == 'SUM':
-                        val_loss = sum(val_losses)
-                    elif loss_sum == 'WeightedSUM':
-                        val_loss = 0
-                        #weight_list = [1,0.01]
-                        for k,l in enumerate(val_losses):
-                            val_loss += weight_list[k] * l
-                    elif loss_sum == 'Graph_weight':
-                        val_loss = sum(val_losses)
-                        val_loss += lambda_norm * np.abs(val_losses[0].item()-val_losses[1].item())**2
-                    elif loss_sum == 'LearnableTaskWeighted':
-                        val_loss = loss_fn(val_losses)
-                    #val_loss += lambda_norm * l1_norm
-                    #val_loss = sum(val_losses)
+                val_loss, val_losses = model.sample_elbo(x_val, y_val, num_samples=NUM_SAMPLES_ELBO)
 
                 if len(reg_list)>1:
                     val_loss_history.setdefault('SUM', []).append(val_loss.item())
-                    
+                for reg in reg_list:
+                    val_loss_history.setdefault(reg, []).append(val_losses[reg].item())     
+                
             print(f"Epoch [{epoch+1}/{epochs}], "
                 f"Train Loss: {train_loss.item():.4f}, "
                 f"Validation Loss: {val_loss.item():.4f}"
                 )
+            
             '''
             for n,name in enumerate(reg_list):
                 print(f'Train sigma_{name}:{train_sigmas[n].item()}',
@@ -803,6 +769,7 @@ def training_MT_BNN(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_di
             last_epoch += 1
 
             #print(loss)[]
+            '''
             if visualize == True:
                 if (epoch + 1) % vis_step == 0:
                     vis_name = f'{epoch+1}epoch.png'
@@ -814,7 +781,6 @@ def training_MT_BNN(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_di
                     vis_losses_val = []
                     loss_list = []
 
-                    '''
                     for j,reg in enumerate(reg_list):
                         if torch.is_floating_point(y_tr[j]):
                             vis_loss = torch.abs(y_tr[j] - model(x_tr)[j])
@@ -828,6 +794,7 @@ def training_MT_BNN(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_di
                     vis_name_loss = f'{epoch+1}epoch_loss.png'
                     visualize_tsne(model = model, model_name = model_name , X = x_tr, Y = vis_losses, reg_list = loss_list, output_dir = output_dir, file_name = vis_name_loss,X2 = x_val,Y2 = vis_loss_val)
                     '''
+        
             if early_stopping == True:
                 if epoch >= least_epoch:
                     # --- 早期終了の判定 ---
