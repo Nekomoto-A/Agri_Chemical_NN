@@ -476,21 +476,15 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
             # ここではAdamオプティマイザを使用していますが、SGDなど他のオプティマイザも同様に機能します。
             optimizer = optim.Adam(optimizer_params)
     
-    personal_losses = []
-    for i, out in enumerate(output_dim):
+    #personal_losses = []
+    personal_losses = {}
+    for reg,out in zip(reg_list,output_dim):
         if out == 1:
+            #personal_losses.append(MSLELoss())
             #personal_losses.append(nn.MSELoss())
-            
-            if reg_list[i] == 'pH':
-                personal_losses.append(nn.MSELoss())
-                #personal_losses.append(MSLELoss())
-            elif reg_list[i] == 'pHtype':
-                personal_losses.append(nn.NLLLoss())
-            else:
-                #personal_losses.append(MSLELoss())
-                personal_losses.append(nn.MSELoss())
+            personal_losses[reg] = nn.MSELoss()
         else:
-            personal_losses.append(nn.CrossEntropyLoss())
+            personal_losses[reg] = nn.CrossEntropyLoss()
     
     best_loss = float('inf')  # 初期値は無限大
     train_loss_history = {}
@@ -510,9 +504,10 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
         outputs,_ = model(x_tr)
         
         train_losses = []
-        for j in range(len(output_dim)):
-            loss = personal_losses[j](outputs[j], y_tr[j])
-            train_loss_history.setdefault(reg_list[j], []).append(loss.item())
+        #for j in range(len(output_dim)):
+        for reg in reg_list:
+            loss = personal_losses[reg](outputs[reg], y_tr[reg])
+            train_loss_history.setdefault(reg, []).append(loss.item())
 
             train_losses.append(loss)
         
@@ -579,10 +574,11 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                 outputs,_ = model(x_val)
 
                 val_losses = []
-                for j in range(len(output_dim)):
-                    loss = personal_losses[j](outputs[j], y_val[j])
+                #for j in range(len(output_dim)):
+                for reg in reg_list:
+                    loss = personal_losses[reg](outputs[reg], y_val[reg])
 
-                    val_loss_history.setdefault(reg_list[j], []).append(loss.item())
+                    val_loss_history.setdefault(reg, []).append(loss.item())
                     
                     val_losses.append(loss)
 
@@ -709,12 +705,12 @@ def training_MT_BNN(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_di
                 #loss_sum = config['loss_sum'],
                 visualize = config['visualize'], val = config['validation'], lambda_norm = config['lambda'],least_epoch = config['least_epoch'],
                 lr=config['learning_rate'],weights = config['weights'],vis_step = config['vis_step'],SUM_train_lim = config['SUM_train_lim'],personal_train_lim = config['personal_train_lim']):
-
-    optimizer = optim.Adam(model.parameters() , lr=lr)
+    #print(f"Type of lr: {type(lr)}")
+    #print(f"Value of lr: {lr}")
+    optimizer = optim.Adam(model.parameters() , lr=lr[0])
     
     personal_losses = []
     NUM_SAMPLES_ELBO = 1
-
     
     best_loss = float('inf')  # 初期値は無限大
     train_loss_history = {}

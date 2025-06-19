@@ -28,13 +28,13 @@ def test_MT(x_te,y_te,model,reg_list,scalers,output_dir):
         #print(outputs)
         # 各出力の予測結果と実際の値をリストに格納
         for i,reg in enumerate(reg_list):
-            if torch.is_floating_point(y_te[i]) == True:
+            if torch.is_floating_point(y_te[reg]) == True:
                 if reg in scalers:
-                    output = scalers[reg].inverse_transform(outputs[i].numpy())
-                    true = scalers[reg].inverse_transform(y_te[i].numpy())
+                    output = scalers[reg].inverse_transform(outputs[reg].numpy())
+                    true = scalers[reg].inverse_transform(y_te[reg].numpy())
                 else:
-                    output = outputs[i].numpy()
-                    true = y_te[i].numpy()
+                    output = outputs[reg].numpy()
+                    true = y_te[reg].numpy()
 
                 predicts[reg] = output
                 trues[reg] = true
@@ -61,8 +61,8 @@ def test_MT(x_te,y_te,model,reg_list,scalers,output_dir):
                 #print(mse)
                 mse_scores.append(mse)
             else:
-                output = torch.argmax(outputs[i], dim=-1).numpy()
-                true = y_te[i].numpy()
+                output = torch.argmax(outputs[reg], dim=-1).numpy()
+                true = y_te[reg].numpy()
 
                 predicts[reg] = output
                 trues[reg] = true
@@ -75,8 +75,7 @@ def test_MT(x_te,y_te,model,reg_list,scalers,output_dir):
                 mse_scores.append(mse)
     return predicts, trues, r2_scores, mse_scores
 
-
-def test_MT_BNN(x_te,y_te,model,reg_list,scalers,output_dir):
+def test_MT_BNN(x_te,y_te,model,reg_list,scalers,output_dir,num_predictive_samples = config['num_predictive_samples']):
     model.eval()  # モデルを評価モードに
     # 出力ごとの予測と実際のデータをリストに格納
     r2_scores = []
@@ -84,20 +83,31 @@ def test_MT_BNN(x_te,y_te,model,reg_list,scalers,output_dir):
 
     predicts = {}
     trues = {}
-    with torch.no_grad():
-        #outputs,sigmas = model(x_te)  # 予測値を取得
-        outputs,_ = model(x_te)  # 予測値を取得
+    all_task_predictions = {task_name: [] for task_name in reg_list}
 
+    with torch.no_grad(): # 勾配計算を無効にします。推論時には不要です。
+        for _ in range(num_predictive_samples):
+            predictions = model(x_te) # テストデータ全体に対して予測を取得
+            for task_name, pred_output in predictions.items():
+                #if OUTPUT_DIMS[task_name] == 1: # 回帰タスク
+                if torch.is_floating_point(y_te[task_name]) == True:
+                    all_task_predictions[task_name].append(pred_output.squeeze().numpy())
+                else: # 分類タスク
+                    # 分類タスクはソフトマックスを適用して確率を得る
+                    all_task_predictions[task_name].append(torch.softmax(pred_output, dim=-1).numpy())
         #print(outputs)
         # 各出力の予測結果と実際の値をリストに格納
-        for i,reg in enumerate(reg_list):
-            if torch.is_floating_point(y_te[i]) == True:
+        for reg in reg_list:
+            #print(y_te)
+            #true_target = all_task_predictions[reg].squeeze().numpy()
+            if torch.is_floating_point(y_te[reg]) == True:
+                avg_predictions = np.mean(all_task_predictions[reg], axis=0).reshape(y_te[reg].numpy().shape)
                 if reg in scalers:
-                    output = scalers[reg].inverse_transform(outputs[i].numpy())
-                    true = scalers[reg].inverse_transform(y_te[i].numpy())
+                    output = scalers[reg].inverse_transform(avg_predictions)
+                    true = scalers[reg].inverse_transform(y_te[reg].numpy())
                 else:
-                    output = outputs[i].numpy()
-                    true = y_te[i].numpy()
+                    output = np.mean(all_task_predictions[reg], axis=0)
+                    true = y_te[reg].numpy()
 
                 predicts[reg] = output
                 trues[reg] = true
@@ -124,8 +134,9 @@ def test_MT_BNN(x_te,y_te,model,reg_list,scalers,output_dir):
                 #print(mse)
                 mse_scores.append(mse)
             else:
-                output = torch.argmax(outputs[i], dim=-1).numpy()
-                true = y_te[i].numpy()
+                avg_probs = np.mean(all_task_predictions[reg], axis=0)
+                output = np.argmax(avg_probs, axis=1)
+                true = y_te[reg].numpy()
 
                 predicts[reg] = output
                 trues[reg] = true
@@ -143,7 +154,7 @@ from src.training.train import training_MT,training_MT_BNN
 from src.models.MT_CNN import MTCNNModel
 from src.models.MT_CNN_Attention import MTCNNModel_Attention
 from src.models.MT_CNN_catph import MTCNN_catph
-from src.models.MT_NN import MTNNModel
+#from src.models.MT_NN import MTNNModel
 from src.models.MT_CNN_soft import MTCNN_SPS
 from src.models.MT_CNN_SA import MTCNNModel_SA
 from src.models.MT_BNN import MTBNNModel
@@ -180,11 +191,11 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
 
     output_dims = []
     #print(Y_train)
-    for num,reg in enumerate(reg_list):
+    for reg in reg_list:
         if reg == 'pHtype':
             output_dims.append(1)
         else:
-            all = torch.cat((Y_train[num],Y_val[num], Y_test[num]), dim=0)
+            all = torch.cat((Y_train[reg],Y_val[reg], Y_test[reg]), dim=0)
             if torch.is_floating_point(all) == True:
                 output_dims.append(1)
             else:
@@ -194,8 +205,8 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
 
     if model_name == 'CNN':
         model = MTCNNModel(input_dim = input_dim,output_dims = output_dims,reg_list=reg_list)
-    elif model_name == 'NN':
-        model = MTNNModel(input_dim = input_dim,output_dims = output_dims, hidden_layers=[128, 64, 64])
+    #elif model_name == 'NN':
+    #    model = MTNNModel(input_dim = input_dim,output_dims = output_dims, hidden_layers=[128, 64, 64])
     elif model_name == 'CNN_catph':
         model = MTCNN_catph(input_dim = input_dim,reg_list=reg_list)
     elif model_name == 'CNN_soft':
@@ -217,6 +228,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                     model_name = model_name,
                                     loss_sum = loss_sum
                                     )
+        predicts, true, r2_results, mse_results = test_MT_BNN(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir)
     else:
         #optimizer = optim.Adam(model.parameters(), lr=0.001)
         model_trained = training_MT(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model,
@@ -227,9 +239,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                     model_name = model_name,
                                     loss_sum = loss_sum
                                     )
-
-    predicts, true, r2_results, mse_results = test_MT(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir)
-
+        predicts, true, r2_results, mse_results = test_MT(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir)
     #visualize_tsne(model = model_trained, model_name = model_name , X = X_test, Y = Y_test, reg_list = reg_list, output_dir = vis_dir, file_name = 'test.png')
 
     # --- 4. 結果を表示

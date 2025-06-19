@@ -114,7 +114,7 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
         os.makedirs(vis_dir_st,exist_ok=True)
 
         for i,r in enumerate(reg_list):
-            Y_train_single, Y_val_single, Y_test_single =[Y_train_tensor[i]], [Y_val_tensor[i]], [Y_test_tensor[i]]
+            Y_train_single, Y_val_single, Y_test_single ={r:Y_train_tensor[r]}, {r:Y_val_tensor[r]}, {r:Y_test_tensor[r]}
             reg = [r]
             print(X_train_tensor.shape)
 

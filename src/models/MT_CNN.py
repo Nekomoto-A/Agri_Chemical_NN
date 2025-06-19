@@ -77,8 +77,10 @@ class MTCNNModel(nn.Module):
         #x = self.sharedfc(x)
         shared_features = self.shared_fc(x)
 
-        outputs = []
-        # 各出力層を適用
+        #outputs = []
+        outputs = {}
+        #  各出力層を適用
         for (reg, output_layer) in zip(self.reg_list,self.outputs):
-            outputs.append(output_layer(shared_features))
+            #outputs.append(output_layer(shared_features))
+            outputs[reg] = output_layer(shared_features)
         return outputs, shared_features#, self.log_sigma_sqs  # リストとして出力

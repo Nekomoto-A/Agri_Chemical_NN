@@ -127,6 +127,7 @@ class MTBNNModel(nn.Module):
             #print(outputs)
             # 各タスクに対する負の対数尤度 (NLL) を計算します。
             for task_name,output_dim, (dict_key, pred_output) in zip(self.reg_list,self.output_dims,outputs.items()):
+                #print(target_outputs)
                 target = target_outputs[task_name]
                 # タスクの出力次元に基づいて回帰か分類かを自動判定します。
                 # self.output_dims から現在のタスクの出力次元を取得

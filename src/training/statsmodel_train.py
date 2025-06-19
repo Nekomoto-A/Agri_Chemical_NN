@@ -16,7 +16,7 @@ def statsmodel_train(X,Y,scalers,reg):
     #    Y = scalers[reg].inverse_transform(Y[0].numpy().reshape(-1, 1))
     #else:
     #    Y = Y[0].numpy().reshape(-1, 1)
-    Y = Y[0].numpy().reshape(-1, 1)
+    Y = Y[reg].numpy().reshape(-1, 1)
     #print(Y.dtype)
     #print(f'train:{reg}:{Y.dtype}')
     if np.issubdtype(Y.dtype, np.floating):

@@ -23,7 +23,9 @@ with open(yaml_path, "r") as file:
 class data_create:
     def __init__(self,path_asv,path_chem,reg_list,exclude_ids, label_list = None):
         self.asv_data = pd.read_csv(path_asv)#.drop('index',axis = 1)
+        #self.chem_data = pd.read_excel(path_chem)
         self.chem_data = pd.read_excel(path_chem)
+        self.chem_data.columns = self.chem_data.columns.str.replace('.', '_', regex=False)
         self.reg_list = reg_list
         self.exclude_ids = exclude_ids
 
@@ -52,6 +54,7 @@ class data_create:
 
         chem_data = self.chem_data
         #print(asv_data)
+        #print(chem_data)
         if self.exclude_ids != None:
             mask = ~chem_data['crop-id'].isin(self.exclude_ids)
             asv_data,chem_data = asv_data[mask], chem_data[mask]
@@ -169,7 +172,8 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
     X_test_tensor = torch.tensor(x_test.to_numpy(), dtype=torch.float32)
 
     scalers = {}
-    Y_train_tensor, Y_val_tensor, Y_test_tensor = [], [], []
+    #Y_train_tensor, Y_val_tensor, Y_test_tensor = [], [], []
+    Y_train_tensor, Y_val_tensor, Y_test_tensor = {}, {}, {}
 
     for reg in reg_list:
         if np.issubdtype(y_train_split[reg].dtype, np.floating):
@@ -192,20 +196,28 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
 
                 #scalers[reg] = pp  # スケーラーを保存
 
-            Y_train_tensor.append(torch.tensor(y_train_split_pp, dtype=torch.float32))
-            Y_val_tensor.append(torch.tensor(y_val_pp, dtype=torch.float32))
-            Y_test_tensor.append(torch.tensor(y_test_pp, dtype=torch.float32))
+            #Y_train_tensor.append(torch.tensor(y_train_split_pp, dtype=torch.float32))
+            #Y_val_tensor.append(torch.tensor(y_val_pp, dtype=torch.float32))
+            #Y_test_tensor.append(torch.tensor(y_test_pp, dtype=torch.float32))
+            Y_train_tensor[reg] = torch.tensor(y_train_split_pp, dtype=torch.float32)
+            Y_val_tensor[reg] = torch.tensor(y_val_pp, dtype=torch.float32)
+            Y_test_tensor[reg] = torch.tensor(y_test_pp, dtype=torch.float32)
         else:
             #print(y_train_split[reg])
-            Y_train_tensor.append(torch.tensor(y_train_split[reg].values, dtype=torch.int64))
-            Y_val_tensor.append(torch.tensor(y_val[reg].values, dtype=torch.int64))
-            Y_test_tensor.append(torch.tensor(y_test[reg].values, dtype=torch.int64))
+            #Y_train_tensor.append(torch.tensor(y_train_split[reg].values, dtype=torch.int64))
+            #Y_val_tensor.append(torch.tensor(y_val[reg].values, dtype=torch.int64))
+            #Y_test_tensor.append(torch.tensor(y_test[reg].values, dtype=torch.int64))
+            Y_train_tensor[reg] = torch.tensor(y_train_split_pp, dtype=torch.int64)
+            Y_val_tensor[reg] = torch.tensor(y_val_pp, dtype=torch.int64)
+            Y_test_tensor[reg] = torch.tensor(y_test_pp, dtype=torch.int64)
 
     data = []
+    #data = {}
     if len(reg_list) >= 2:
         corr_dir = os.path.join(fold, f'corr.png')
         for i,reg in enumerate(reg_list):
-            data.append(Y_train_tensor[i].numpy().ravel())
+            data.append(Y_train_tensor[reg].numpy().ravel())
+            #data = Y_train_tensor[i].numpy().ravel()
         corr_matrix = np.corrcoef(data)
         plt.figure(figsize=(20,20))
         sns.heatmap(corr_matrix, cmap= sns.color_palette('coolwarm', 10), annot=True,fmt='.2f', vmin = -1, vmax = 1, xticklabels=reg_list, yticklabels=reg_list,annot_kws={"fontsize": 30})
@@ -216,3 +228,4 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
         #print(corr_matrix)
         #print(binary_matrix)
     return X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids
+

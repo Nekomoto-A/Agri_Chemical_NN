@@ -8,7 +8,7 @@ import os
 
 def statsmodel_test(X, Y, models, scalers, reg, result_dir,index):
     X = X.numpy()
-    Y = Y[0].numpy().reshape(-1, 1)
+    Y = Y[reg].numpy().reshape(-1, 1)
     print(Y.shape)
     print(X.shape)
     scores = {}

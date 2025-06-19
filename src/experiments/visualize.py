@@ -61,10 +61,12 @@ def visualize_tsne(model, X, Y, reg_list, output_dir,file_name, model_name,scale
             os.makedirs(reg_dir,exist_ok=True)
             sub_dir = os.path.join(reg_dir, f'{file_name}')
 
-            Y_single1 = Y[i].detach().numpy()
+            #Y_single1 = Y[i].detach().numpy()
+            Y_single1 = Y[reg].detach().numpy()
             #print(Y_single1.shape)
             #print(Y_single1)
-            Y_single2 = Y2[i].detach().numpy()
+            #Y_single2 = Y2[i].detach().numpy()
+            Y_single2 = Y2[reg].detach().numpy()
             #print(Y_single2.shape)
             #print(Y_single2)
             Y_single = np.concatenate([Y_single1,Y_single2])
@@ -140,7 +142,7 @@ def visualize_tsne(model, X, Y, reg_list, output_dir,file_name, model_name,scale
             os.makedirs(reg_dir,exist_ok=True)
             sub_dir = os.path.join(reg_dir, f'{file_name}')
 
-            Y_single = Y[i].detach().numpy()
+            Y_single = Y[reg].detach().numpy()
             if reg in scalers:
                 Y_single = scalers[reg].inverse_transform(Y_single)
             cmap = plt.cm.coolwarm  # 他に 'plasma', 'coolwarm', 'inferno' なども

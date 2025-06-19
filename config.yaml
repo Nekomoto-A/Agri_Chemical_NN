@@ -12,7 +12,7 @@ train.py:
   patience: 5
   least_epoch: 0
   visualize: True
-  epochs: 30
+  epochs: 50
   vis_step: 5
   validation: True
   lambda: 0.001
@@ -22,9 +22,10 @@ train.py:
   personal_train_lim: 1
 test.py:
   loss_sum: 'PCgrad'
+  num_predictive_samples: 100
 fold_eval.py:
   k_fold: 5
-  model_name: 'CNN'
+  model_name: 'BNN'
   result_dir: 'result'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
