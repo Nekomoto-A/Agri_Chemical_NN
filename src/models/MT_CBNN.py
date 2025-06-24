@@ -165,10 +165,12 @@ class BNN_MTCNNModel(nn.Module):
         x = x.view(x.size(0), -1) # フラット化
         shared_features = self.shared_fc(x)
 
-        outputs = []
+        #outputs = []
+        outputs = {}
         # 各出力層を適用
         for (reg, output_layer) in zip(self.reg_list, self.outputs):
-            outputs.append(output_layer(shared_features))
+            #outputs.append(output_layer(shared_features))
+            outputs[reg] = output_layer(shared_features)
         return outputs, shared_features
 
     # モデル全体のKLダイバージェンスを計算

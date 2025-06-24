@@ -229,6 +229,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                     loss_sum = loss_sum
                                     )
         predicts, true, r2_results, mse_results = test_MT_BNN(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir)
+
     else:
         #optimizer = optim.Adam(model.parameters(), lr=0.001)
         model_trained = training_MT(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model,
@@ -247,19 +248,20 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         print(f"Output {i+1} ({reg_list[i]}): R^2 Score = {r2:.3f}, MSE = {mse:.3f}")
 
     for reg in reg_list:
-        #print(test_ids)
-        loss = np.abs(predicts[reg]-true[reg])
-        #print(loss)
-        loss_dir = os.path.join(vis_dir, reg)
-        os.makedirs(loss_dir,exist_ok=True)
-        out = os.path.join(loss_dir, 'loss.png')
+        if 'CNN' in model_name:
+            #print(test_ids)
+            loss = np.abs(predicts[reg]-true[reg])
+            #print(loss)
+            loss_dir = os.path.join(vis_dir, reg)
+            os.makedirs(loss_dir,exist_ok=True)
+            out = os.path.join(loss_dir, 'loss.png')
 
-        plt.figure(figsize=(18, 14))
-        plt.bar(test_ids.to_numpy().ravel(),loss.ravel())
-        plt.xticks(rotation=90)
-        #plt.tight_layout()
-        plt.savefig(out)
-        plt.close()
+            plt.figure(figsize=(18, 14))
+            plt.bar(test_ids.to_numpy().ravel(),loss.ravel())
+            plt.xticks(rotation=90)
+            #plt.tight_layout()
+            plt.savefig(out)
+            plt.close()
 
         predictions.setdefault(method, {}).setdefault(reg, []).append(predicts[reg])
         trues.setdefault(method, {}).setdefault(reg, []).append(true[reg])
