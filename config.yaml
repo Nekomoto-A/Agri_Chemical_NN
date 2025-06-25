@@ -7,12 +7,13 @@ dataset.py:
   val_size: 0.2
   level: 7
   transformer: 'SS'
+  feature_transformer: 'ILR'
 train.py:
   early_stopping: False
   patience: 5
   least_epoch: 0
   visualize: True
-  epochs: 50
+  epochs: 60
   vis_step: 5
   validation: True
   lambda: 0.001
@@ -25,7 +26,7 @@ test.py:
   num_predictive_samples: 100
 fold_eval.py:
   k_fold: 5
-  model_name: 'BNN'
+  model_name: 'CNN'
   result_dir: 'result'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
