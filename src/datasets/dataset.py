@@ -20,15 +20,48 @@ script_name = os.path.basename(__file__)
 with open(yaml_path, "r") as file:
     config = yaml.safe_load(file)[script_name]
 
+# ilr変換行列を作成する関数
+# ここでは、Aitchisonの標準的な基底 (SBPに基づかない汎用的なもの) を用いる
+def create_ilr_basis(D):
+    """
+    D次元の組成データのためのilr変換基底行列を作成します。
+    この基底は、Aitchisonの定義に従い、特定の順序付けに基づきます。
+    """
+    if D < 2:
+        raise ValueError("組成データの次元Dは2以上である必要があります。")
+
+    basis = np.zeros((D - 1, D))
+    for j in range(D - 1):
+        denominator = np.sqrt((j + 1) * (j + 2))
+        basis[j, j] = (j + 1) / denominator
+        basis[j, j+1] = -1 / denominator
+        # 残りの要素は0のまま (これは一般的なAitchison基底の形状)
+        # SBPに基づく基底は、より複雑な構造を持つ
+        # ここでは、最もシンプルな直交基底の一例を使用
+    return basis.T # 転置して (D, D-1) 行列にする
+
+# ilr変換関数
+def ilr_transform(data_array):
+    D = data_array.shape[1] # 成分の数
+    basis = create_ilr_basis(D)
+    
+    # clr変換を内部的に行い、その後ilr基底を適用する
+    geometric_mean = np.exp(np.mean(np.log(data_array), axis=1, keepdims=True))
+    clr_data = np.log(data_array / geometric_mean)
+    
+    # clr_data (N, D) と basis (D, D-1) を乗算
+    ilr_data = np.dot(clr_data, basis)
+    return ilr_data
+
 class data_create:
-    def __init__(self,path_asv,path_chem,reg_list,exclude_ids, label_list = None):
+    def __init__(self,path_asv,path_chem,reg_list,exclude_ids, label_list = None, feature_transformer = config['feature_transformer']):
         self.asv_data = pd.read_csv(path_asv)#.drop('index',axis = 1)
         #self.chem_data = pd.read_excel(path_chem)
         self.chem_data = pd.read_excel(path_chem)
         self.chem_data.columns = self.chem_data.columns.str.replace('.', '_', regex=False)
         self.reg_list = reg_list
         self.exclude_ids = exclude_ids
-
+        self.feature_transformer = feature_transformer
         self.label_list = label_list
     def __iter__(self):
         #self.chem_data.columns = [col.replace('.', '_') for col in self.chem_data.columns]
@@ -125,15 +158,28 @@ class data_create:
                 label_map = dict(zip(le.classes_, le.transform(le.classes_)))
                 print(f"{r} → 数値 のマッピング:", label_map)
                 #print(chem_data[r].unique())
-
+        
         #print(asv_data)
-        asv_data = asv_data.div(asv_data.sum(axis=1), axis=0)
-        asv_array = multiplicative_replacement(asv_data.values)
-        clr_array = clr(asv_array)
+        if self.feature_transformer=='CLR':
+            asv_data = asv_data.div(asv_data.sum(axis=1), axis=0)
+            asv_array = multiplicative_replacement(asv_data.values)
+            #print(asv_data)
+            clr_array = clr(asv_array)
+            # 結果をDataFrameに戻す
+            asv_feature = pd.DataFrame(clr_array, columns=asv_data.columns, index=asv_data.index)
+        elif self.feature_transformer=='ILR':
+            #print(asv_data)
 
-        # 結果をDataFrameに戻す
-        asv_clr = pd.DataFrame(clr_array, columns=asv_data.columns, index=asv_data.index)
-        yield asv_clr
+            #print(len(asv_data.columns))
+            #print(asv_data.columns)
+            asv_data = asv_data.div(asv_data.sum(axis=1), axis=0)
+            asv_array = multiplicative_replacement(asv_data.values)
+            ilr_array = ilr_transform(asv_array)
+            #print(ilr_array.shape)
+            # 結果をDataFrameに戻す
+            asv_feature = pd.DataFrame(ilr_array, columns=asv_data.columns[:-1], index=asv_data.index)
+            print(asv_feature)
+        yield asv_feature
         yield chem_data
         yield label_encoders
         
@@ -212,6 +258,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
             Y_test_tensor[reg] = torch.tensor(y_test_pp, dtype=torch.int64)
 
     data = []
+    data_cov = []
     #data = {}
     if len(reg_list) >= 2:
         corr_dir = os.path.join(fold, f'corr.png')
@@ -225,6 +272,23 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
         plt.close()
         binary_matrix = (corr_matrix >= 0.5).astype(float)
         np.fill_diagonal(binary_matrix, 1.0)
+        #print(corr_matrix)
+        #print(binary_matrix)
+
+
+        cov_dir = os.path.join(fold, f'covar.png')
+        for i,reg in enumerate(reg_list):
+            data_cov.append(Y_train_tensor[reg].numpy().ravel())
+            #data = Y_train_tensor[i].numpy().ravel()
+        #data = np.stack(data)
+        #print(data)
+        cov_matrix = np.cov(data, rowvar=True)
+        plt.figure(figsize=(20,20))
+        sns.heatmap(cov_matrix, cmap= sns.color_palette('coolwarm', 10), annot=True,fmt='.2f', vmin = -1, vmax = 1, xticklabels=reg_list, yticklabels=reg_list,annot_kws={"fontsize": 30})
+        plt.savefig(cov_dir)
+        plt.close()
+        #binary_matrix = (cov_matrix >= 0.5).astype(float)
+        #np.fill_diagonal(binary_matrix, 1.0)
         #print(corr_matrix)
         #print(binary_matrix)
     return X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids

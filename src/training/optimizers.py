@@ -404,7 +404,7 @@ import numpy as np
 # MGDA (Multi-Gradient Descent Algorithm) にインスパイアされたカスタムPyTorchオプティマイザ。
 # この実装は、勾配の凸包における最小ノルム点を見つけることで、共通の降下方向を計算します。
 # 外部の二次計画法（QP）ソルバーを使用せず、勾配の重みを決定するために反復的なアプローチを使用します。
-class MGDAOptimizer(optim.Optimizer):
+class MGDAOptimizer(torch.optim.Optimizer):
     """
     Multi-Gradient Descent Algorithm (MGDA) inspired optimizer.
     This implementation focuses on finding a common descent direction
@@ -426,6 +426,8 @@ class MGDAOptimizer(optim.Optimizer):
     def _compute_task_gradients(self, losses):
         """
         共有パラメータに対する各タスク損失の勾配を計算し、平坦なテンソルとして格納します。
+        各タスクの勾配ベクトルが同じ次元を持つように、
+        勾配が計算されなかったパラメータに対してはゼロを埋め込みます。
 
         Args:
             losses (list of torch.Tensor): 各タスクの損失テンソルのリスト。
@@ -433,12 +435,13 @@ class MGDAOptimizer(optim.Optimizer):
         self.grads_tasks = []
         self.num_tasks = len(losses)
         
-        # 勾配計算に必要な共有パラメータを抽出
-        shared_params = [p for group in self.param_groups for p in group['params'] if p.requires_grad]
-
+        # 勾配計算に必要なすべての訓練可能パラメータを抽出 (共有+タスク固有)
+        # このリストの順序はすべてのタスクで一貫している必要があります。
+        all_trainable_params = [p for group in self.param_groups for p in group['params'] if p.requires_grad]
+        
         for i in range(self.num_tasks):
-            # 特定のタスクの新しい勾配を計算する前に、既存の勾配をゼロクリア
-            for p in shared_params:
+            # 新しい勾配を計算する前に、すべてのパラメータの既存の勾配をゼロクリア
+            for p in all_trainable_params:
                 if p.grad is not None:
                     p.grad.zero_()
 
@@ -446,17 +449,21 @@ class MGDAOptimizer(optim.Optimizer):
             # 最後のタスク以外はグラフを保持 (retain_graph=True)
             losses[i].backward(retain_graph=True if i < self.num_tasks - 1 else False)
 
-            # このタスクの勾配を収集
+            # このタスクの勾配を収集し、勾配がない場合はゼロテンソルを使用
             task_grad = []
-            for p in shared_params:
+            for p in all_trainable_params:
                 if p.grad is not None:
-                    # 勾配を平坦化してリストに追加
-                    task_grad.append(p.grad.view(-1).clone()) # .clone() を追加してテンソルが共有されないようにする
+                    task_grad.append(p.grad.view(-1).clone())
+                else:
+                    # 勾配がNoneの場合、そのパラメータサイズのゼロテンソルを追加
+                    # これにより、すべてのタスクの勾配テンソルが同じ合計サイズを持つことが保証されます。
+                    task_grad.append(torch.zeros_like(p).view(-1).clone().to(p.device)) # 同じデバイスに移動
+                    
             self.grads_tasks.append(torch.cat(task_grad))
         
         # すべてのタスク固有の勾配を収集した後、共有パラメータの勾配をゼロクリア
         # これにより、後続のmodel.zero_grad()が期待通りに機能することが保証されます。
-        for p in shared_params:
+        for p in all_trainable_params: # Consistency: Use all_trainable_params here as well
             if p.grad is not None:
                 p.grad.zero_()
 
@@ -535,17 +542,20 @@ class MGDAOptimizer(optim.Optimizer):
 
         # モデルパラメータに共通の降下勾配を適用
         offset = 0
-        for group in self.param_groups:
-            for p in group['params']:
-                if p.requires_grad:
-                    num_param = p.numel()
-                    # 計算された共通降下勾配をパラメータのgrad属性に割り当てる
-                    p.grad = common_descent_grad[offset:offset + num_param].view(p.size())
-                    offset += num_param
-                    
-                    # 割り当てられた勾配を使用して最適化ステップを実行
-                    # p.data.add_はインプレース操作です。
-                    p.data.add_(p.grad, alpha=-group['lr'])
+        # all_trainable_paramsを使用して、勾配が適用されるパラメータの順序とセットが
+        # _compute_task_gradients で勾配が収集された順序と一致することを確認します。
+        all_trainable_params = [p for group in self.param_groups for p in group['params'] if p.requires_grad]
+        
+        for p in all_trainable_params:
+            if p.requires_grad:
+                num_param = p.numel()
+                # 計算された共通降下勾配をパラメータのgrad属性に割り当てる
+                p.grad = common_descent_grad[offset:offset + num_param].view(p.size())
+                offset += num_param
+                
+                # 割り当てられた勾配を使用して最適化ステップを実行
+                # p.data.add_はインプレース操作です。
+                p.data.add_(p.grad, alpha=-p.grad.new_full(p.grad.shape, -self.defaults['lr'])) # Ensure alpha is a tensor on the same device and type
 
         # 次のステップのために格納されたタスク勾配をクリア
         self.grads_tasks = []

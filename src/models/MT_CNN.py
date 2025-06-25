@@ -1,28 +1,6 @@
 import torch
 import torch.nn as nn
-import yaml
 import os
-yaml_path = 'config.yaml'
-script_name = os.path.basename(__file__)
-with open(yaml_path, "r") as file:
-    config = yaml.safe_load(file)[script_name]
-
-class ChannelAttention1D(nn.Module):
-    def __init__(self, in_channels, reduction=16):
-        super().__init__()
-        self.pool = nn.AdaptiveAvgPool1d(1)
-        self.fc = nn.Sequential(
-            nn.Linear(in_channels, in_channels),
-            nn.ReLU(),
-            nn.Linear(in_channels, in_channels),
-            nn.Sigmoid()
-        )
-    
-    def forward(self, x):
-        b, c, l = x.size()
-        y = self.pool(x).view(b, c)  # (B, C)
-        y = self.fc(y).view(b, c, 1)  # (B, C, 1)
-        return x * y
 
 class MTCNNModel(nn.Module):
     def __init__(self, input_dim, output_dims, reg_list,raw_thresholds = [], conv_layers=[(64,5,1,1)], hidden_dim=128):

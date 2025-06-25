@@ -16,7 +16,7 @@ script_name = os.path.basename(__file__)
 with open(yaml_path, "r") as file:
     config = yaml.safe_load(file)[script_name]
 
-from src.training.optimizers import NormalizedLoss,PCGradOptimizer,UncertainlyweightedLoss,LearnableTaskWeightedLoss,calculate_initial_loss_weights_by_correlation,MGDAOptimizer
+from src.training import optimizers
 
 def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, model_name,loss_sum, #optimizer, 
                 scalers,
@@ -30,20 +30,20 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
         lr = lr[0]
         if loss_sum == 'Normalized':
             optimizer = optim.Adam(model.parameters() , lr=lr)
-            loss_fn = NormalizedLoss(len(output_dim))
+            loss_fn = optimizers.NormalizedLoss(len(output_dim))
         elif loss_sum == 'Uncertainlyweighted':
-            loss_fn = UncertainlyweightedLoss(reg_list)
+            loss_fn = optimizers.UncertainlyweightedLoss(reg_list)
             optimizer = optim.Adam(list(model.parameters()) + list(loss_fn.parameters()), lr=lr)
             #optimizer = optim.Adam(model.parameters() + list(loss_fn.parameters()), lr=lr)
         elif loss_sum == 'LearnableTaskWeighted':
-            loss_fn = LearnableTaskWeightedLoss(reg_list)
+            loss_fn = optimizers.LearnableTaskWeightedLoss(reg_list)
             optimizer = optim.Adam(list(model.parameters()) + list(loss_fn.parameters()), lr=lr)
         elif loss_sum == 'PCgrad' or loss_sum == 'PCgrad_initial_weight':
             base_optimizer = optim.Adam(model.parameters(), lr=lr)
-            optimizer = PCGradOptimizer(base_optimizer, model.parameters())
+            optimizer = optimizers.PCGradOptimizer(base_optimizer, model.parameters())
         elif loss_sum == 'MGDA':
             optimizer_single = optim.Adam(model.parameters(), lr=lr)
-            optimizer = MGDAOptimizer(model.parameters(), lr=lr)
+            optimizer = optimizers.MGDAOptimizer(model.parameters(), lr=lr)
         else:
             optimizer = optim.Adam(model.parameters() , lr=lr)
     else:
@@ -64,9 +64,9 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
 
             optimizer = optim.Adam(param_groups)
             
-            loss_fn = NormalizedLoss(len(output_dim))
+            loss_fn = optimizers.NormalizedLoss(len(output_dim))
         elif loss_sum == 'Uncertainlyweighted':
-            loss_fn = UncertainlyweightedLoss(reg_list)
+            loss_fn = optimizers.UncertainlyweightedLoss(reg_list)
             optimizer_params = []
             for reg_name in reg_list:
                 if reg_name in model.models:
@@ -140,7 +140,7 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
             else:
                 if loss_sum == 'PCgrad_initial_weight':
                     #print(y_tr)
-                    initial_loss_weights = calculate_initial_loss_weights_by_correlation(true_targets= y_tr,reg_list=reg_list)
+                    initial_loss_weights = optimizers.calculate_initial_loss_weights_by_correlation(true_targets= y_tr,reg_list=reg_list)
 
                     weighted_train_losses = []
                     for n, raw_loss in enumerate(train_losses):
@@ -165,7 +165,6 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                 optimizer_single.step()
             else:
                 optimizer._compute_task_gradients(train_losses)
-
                 # 共通の降下勾配を使用して最適化ステップを実行
                 optimizer.step()
         else:
@@ -212,11 +211,12 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                     
                     val_losses.append(loss)
 
-                if loss_sum == 'PCgrad' or loss_sum == 'PCgrad_initial_weight':
+                if loss_sum == 'PCgrad' or loss_sum == 'PCgrad_initial_weight' or loss_sum == 'MGDA':
                     if len(reg_list)==1:
                         val_loss = val_losses[0]
                     else:
                         val_loss = sum(val_losses)
+                
                 else:
                     if len(reg_list)==1:
                         val_loss = val_losses[0]
