@@ -18,13 +18,32 @@ with open(yaml_path, "r") as file:
 
 from src.training import optimizers
 
+def calculate_shared_l2_regularization(model, lambda_shared):
+    l2_reg = torch.tensor(0., device=model.parameters().__next__().device) # デバイスをモデルのパラメータに合わせる
+    
+    # sharedconvのパラメータに対するL2正則化
+    for name, param in model.sharedconv.named_parameters():
+        if 'weight' in name or 'bias' in name: # 重みとバイアス両方にかける場合
+            l2_reg += torch.sum(param**2)
+            
+    # shared_fcのパラメータに対するL2正則化
+    for name, param in model.shared_fc.named_parameters():
+        if 'weight' in name or 'bias' in name: # 重みとバイアス両方にかける場合
+            l2_reg += torch.sum(param**2)
+            
+    return lambda_shared * l2_reg
+
+
+
 def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, model_name,loss_sum, #optimizer, 
                 scalers,
                 label_encoders = None, #scheduler = None, 
                 epochs = config['epochs'], patience = config['patience'],early_stopping = config['early_stopping'],
                 #loss_sum = config['loss_sum'],
                 visualize = config['visualize'], val = config['validation'], lambda_norm = config['lambda'],least_epoch = config['least_epoch'],
-                lr=config['learning_rate'],weights = config['weights'],vis_step = config['vis_step'],SUM_train_lim = config['SUM_train_lim'],personal_train_lim = config['personal_train_lim']):
+                lr=config['learning_rate'],weights = config['weights'],vis_step = config['vis_step'],SUM_train_lim = config['SUM_train_lim'],personal_train_lim = config['personal_train_lim'],
+                l2_shared = config['l2_shared'],lambda_l2 = config['lambda_l2']
+                ):
 
     if len(lr) == 1:
         lr = lr[0]
@@ -247,6 +266,11 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                 reg_loss = model.calculate_sum_zero_penalty()
                 train_loss = sum(train_losses)
                 learning_loss = train_loss + lambda_norm * reg_loss    
+
+            if l2_shared == True:
+                l2_loss = calculate_shared_l2_regularization(model = model,lambda_shared=lambda_l2)
+                learning_loss += l2_loss
+
             optimizer.zero_grad()
             learning_loss.backward()
             optimizer.step()
