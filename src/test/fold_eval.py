@@ -38,7 +38,7 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
 
     input_dim = X.shape[1]
     method = 'MT'
-    method_comp = 'MT_comp'
+    method_comp = f'MT_{comp_method}'
     method_st = 'ST'
     kf = KFold(n_splits=k, shuffle=True, random_state=42)
 

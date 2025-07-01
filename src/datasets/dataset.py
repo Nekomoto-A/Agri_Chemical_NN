@@ -162,7 +162,8 @@ class data_create:
         #print(asv_data)
         if self.feature_transformer=='CLR':
             asv_data = asv_data.div(asv_data.sum(axis=1), axis=0)
-            asv_array = multiplicative_replacement(asv_data.values)
+            #asv_array = multiplicative_replacement(asv_data.values)
+            asv_array = asv_data.where(asv_data != 0, asv_data + 1e-100).values
             #print(asv_data)
             clr_array = clr(asv_array)
             # 結果をDataFrameに戻す
@@ -173,12 +174,18 @@ class data_create:
             #print(len(asv_data.columns))
             #print(asv_data.columns)
             asv_data = asv_data.div(asv_data.sum(axis=1), axis=0)
-            asv_array = multiplicative_replacement(asv_data.values)
+            #asv_array = multiplicative_replacement(asv_data.values)
+            asv_array = asv_data.where(asv_data != 0, asv_data + 1e-100).values
             ilr_array = ilr_transform(asv_array)
             #print(ilr_array.shape)
             # 結果をDataFrameに戻す
             asv_feature = pd.DataFrame(ilr_array, columns=asv_data.columns[:-1], index=asv_data.index)
-            print(asv_feature)
+            #print(asv_feature)
+        else:
+            asv_data = asv_data.div(asv_data.sum(axis=1), axis=0)
+            #asv_array = multiplicative_replacement(asv_data.values)
+            asv_array = asv_data.where(asv_data != 0, asv_data + 1e-100).values
+            asv_feature = pd.DataFrame(asv_array, columns=asv_data.columns, index=asv_data.index)
         yield asv_feature
         yield chem_data
         yield label_encoders
@@ -190,12 +197,20 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
     x_train_split,x_val,y_train_split,y_val = train_test_split(x_train,y_train,test_size = val_size,random_state=0)
 
     if fold != None:
-        train_dir = os.path.join(fold, f'train_data.csv')
-        y_train_split.to_csv(train_dir)
-        val_dir = os.path.join(fold, f'val_data.csv')
-        y_val.to_csv(val_dir)
-        test_dir = os.path.join(fold, f'test_data.csv')
-        y_test.to_csv(test_dir)
+        train_feature_dir = os.path.join(fold, f'train_feature.csv')
+        x_train_split.to_csv(train_feature_dir)
+        train_target_dir = os.path.join(fold, f'train_chem.csv')
+        y_train_split.to_csv(train_target_dir)
+
+        val_feature_dir = os.path.join(fold, f'val_feature.csv')
+        x_val.to_csv(val_feature_dir)
+        val_target_dir = os.path.join(fold, f'val_chem.csv')
+        y_val.to_csv(val_target_dir)
+
+        test_feature_dir = os.path.join(fold, f'test_feature.csv')
+        x_test.to_csv(test_feature_dir)
+        test_target_dir = os.path.join(fold, f'test_chem.csv')
+        y_test.to_csv(test_target_dir)
 
     print('学習データ数:',len(x_train_split))
     print('検証データ数:',len(x_val))
@@ -274,7 +289,6 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
         np.fill_diagonal(binary_matrix, 1.0)
         #print(corr_matrix)
         #print(binary_matrix)
-
 
         cov_dir = os.path.join(fold, f'covar.png')
         for i,reg in enumerate(reg_list):

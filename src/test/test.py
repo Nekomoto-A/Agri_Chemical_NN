@@ -157,7 +157,9 @@ from src.models.MT_CNN_catph import MTCNN_catph
 #from src.models.MT_NN import MTNNModel
 from src.models.MT_CNN_soft import MTCNN_SPS
 from src.models.MT_CNN_SA import MTCNNModel_SA
+from src.models.MT_CNN_Di import MTCNNModel_Di
 from src.models.MT_BNN import MTBNNModel
+from src.models.MT_BNN_MG import MTBNNModel_MG
 import numpy as np
 import os
 import pandas as pd
@@ -215,8 +217,12 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         model = MTCNNModel_Attention(input_dim = input_dim,output_dims = output_dims)
     elif model_name == 'CNN_SA':
         model = MTCNNModel_SA(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
+    elif model_name == 'CNN_Di':
+        model = MTCNNModel_Di(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
     elif model_name == 'BNN':
         model = MTBNNModel(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
+    elif model_name == 'BNN_MG':
+        model = MTBNNModel_MG(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
 
 
     if 'BNN' in model_name:

@@ -41,9 +41,17 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
         elif loss_sum == 'PCgrad' or loss_sum == 'PCgrad_initial_weight':
             base_optimizer = optim.Adam(model.parameters(), lr=lr)
             optimizer = optimizers.PCGradOptimizer(base_optimizer, model.parameters())
+        elif loss_sum == 'CAgrad':
+            #base_optimizer = optim.Adam(model.parameters(), lr=lr)
+            optimizer = optimizers.CAGradOptimizer(model.parameters(), lr=lr, c=0.5)
         elif loss_sum == 'MGDA':
             optimizer_single = optim.Adam(model.parameters(), lr=lr)
-            optimizer = optimizers.MGDAOptimizer(model.parameters(), lr=lr)
+            mgda_solver = optimizers.MGDA(optimizer_single)
+        elif loss_sum =='GradNorm':
+            # GradNorm のインスタンス化
+            grad_norm = optimizers.GradNorm(tasks=reg_list, alpha=1.0)
+            optimizer = optim.Adam(model.parameters(), lr=lr)
+            grad_norm.set_model_shared_params(model) # 共有層のパラメータを設定
         else:
             optimizer = optim.Adam(model.parameters() , lr=lr)
     else:
@@ -103,6 +111,7 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
             #personal_losses.append(MSLELoss())
             #personal_losses.append(nn.MSELoss())
             personal_losses[reg] = nn.MSELoss()
+            #personal_losses[reg] = nn.SmoothL1Loss()
         else:
             personal_losses[reg] = nn.CrossEntropyLoss()
     
@@ -111,6 +120,11 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
     val_loss_history = {}
     last_epoch = 1
 
+    #print(y_tr)
+
+    if loss_sum == 'Graph_weight':
+        correlation_matrix_tensor = optimizers.create_correlation_matrix(y_tr)
+
     for epoch in range(epochs):
         if visualize == True:
             if epoch == 0:
@@ -118,25 +132,27 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                 visualize_tsne(model = model, model_name = model_name,scalers = scalers, X = x_tr, Y = y_tr, reg_list = reg_list, output_dir = output_dir, file_name = vis_name,
                                #X2 = x_val,Y2 = y_val
                                )
-
         model.train()
         #torch.autograd.set_detect_anomaly(True)
-        outputs,_ = model(x_tr)
+        outputs,shared = model(x_tr)
         
-        train_losses = []
+        #train_losses = []
+        train_losses = {}
         #for j in range(len(output_dim)):
         for reg in reg_list:
             loss = personal_losses[reg](outputs[reg], y_tr[reg])
             train_loss_history.setdefault(reg, []).append(loss.item())
 
-            train_losses.append(loss)
+            #train_losses.append(loss)
+            train_losses[reg] = loss
         
         if loss_sum == 'PCgrad' or loss_sum == 'PCgrad_initial_weight':
             if len(reg_list)==1:
-                train_loss = train_losses[0]
+                train_loss = train_losses[reg]
                 base_optimizer.zero_grad()
                 train_loss.backward()
                 base_optimizer.step()
+        
             else:
                 if loss_sum == 'PCgrad_initial_weight':
                     #print(y_tr)
@@ -156,22 +172,50 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                     # PCGradOptimizerのstepメソッドに重み付けされた損失のリストを渡す
                     optimizer.step(train_losses) # 修正点: ここで新しいリストを渡す
                     # 表示用の総損失
-                    train_loss = sum(train_losses) # 表示用に合計する
+                    train_loss = sum(train_losses.values()) # 表示用に合計する
+        elif loss_sum == 'CAgrad':
+            optimizer.step(train_losses)
+            train_loss = sum(train_losses.values())
         elif loss_sum == 'MGDA':
             if len(reg_list)==1:
-                train_loss = train_losses[0]
+                train_loss = train_losses[reg_list[0]]
                 optimizer_single.zero_grad()
                 train_loss.backward()
                 optimizer_single.step()
             else:
-                optimizer._compute_task_gradients(train_losses)
-                # 共通の降下勾配を使用して最適化ステップを実行
-                optimizer.step()
+                # MGDAを適用してタスクの重みを計算
+                # model.parameters() はすべてのパラメータのジェネレータ
+                weights = mgda_solver.solve(train_losses, list(model.parameters()))
+
+                # 計算された重みを使って各タスクの勾配を調整し、最適化ステップを実行
+                # mgda_solver.get_weighted_grads() は、モデルのパラメータの .grad 属性を直接上書きします。
+                mgda_solver.get_weighted_grads(weights, list(model.parameters()))
+                
+                optimizer_single.step()
+                train_loss = sum(train_losses.values())
+        elif loss_sum =='GradNorm':
+            # GradNorm の損失重み更新
+            # モデルのオプティマイザを渡すことで、その学習率をloss_weightsの更新に利用できる
+            current_loss_weights = grad_norm.update_loss_weights(train_losses, optimizer)
+            
+            # 全体の加重損失計算
+            total_loss = sum(current_loss_weights[i] * train_losses[reg_list[i]] for i in range(len(reg_list)))
+
+            # バックワードパスと最適化 (モデルパラメータの更新)
+            optimizer.zero_grad()
+            total_loss.backward()
+            optimizer.step()
+
+            train_loss = sum(train_losses.values())
+
         else:
             if len(reg_list)==1:
-                train_loss = train_losses[0]
+                learning_loss = train_losses[reg_list[0]]
+                train_loss = learning_loss
+
             elif loss_sum == 'SUM':
-                train_loss = sum(train_losses)
+                learning_loss = sum(train_losses.values())
+                train_loss = learning_loss
             elif loss_sum == 'WeightedSUM':
                 train_loss = 0
                 weight_list = weights
@@ -182,13 +226,29 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
             elif loss_sum == 'Uncertainlyweighted':
                 train_loss = loss_fn(train_losses)
             elif loss_sum == 'Graph_weight':
-                train_loss = sum(train_losses)
-                train_loss += lambda_norm * np.abs(train_losses[0].item()-train_losses[1].item())**2
+
+                train_loss = sum(train_losses.values())
+                #train_loss += lambda_norm * np.abs(train_losses[0].item()-train_losses[1].item())**2
+                 # ネットワークLasso正則化項の計算
+
+                lasso_loss = optimizers.calculate_network_lasso_loss(model, correlation_matrix_tensor, lambda_norm)
+
+                #総損失にLasso項を加算
+                learning_loss = train_loss + lasso_loss
+
+                #reg_loss = model.calculate_sum_zero_penalty()
+                #train_loss += reg_loss
+
+
             elif loss_sum == 'LearnableTaskWeighted':
-                train_loss = loss_fn(train_losses)
-            
+                train_loss = sum(train_losses.values())
+                learning_loss = loss_fn(train_losses)
+            elif loss_sum == 'ZeroSUM':
+                reg_loss = model.calculate_sum_zero_penalty()
+                train_loss = sum(train_losses)
+                learning_loss = train_loss + lambda_norm * reg_loss    
             optimizer.zero_grad()
-            train_loss.backward()
+            learning_loss.backward()
             optimizer.step()
             #if scheduler != None:
             #scheduler.step()
@@ -211,37 +271,10 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                     
                     val_losses.append(loss)
 
-                if loss_sum == 'PCgrad' or loss_sum == 'PCgrad_initial_weight' or loss_sum == 'MGDA':
-                    if len(reg_list)==1:
-                        val_loss = val_losses[0]
-                    else:
-                        val_loss = sum(val_losses)
-                
+                if len(reg_list)==1:
+                    val_loss = val_losses[0]
                 else:
-                    if len(reg_list)==1:
-                        val_loss = val_losses[0]
-                    #elif loss_sum == 'UncertaintyWeighted':
-                    #    val_loss = uncertainty_weighted_loss(val_losses, val_sigmas)
-                    elif loss_sum == 'Normalized':
-                        val_loss = loss_fn(val_losses)
-                    elif loss_sum == 'Uncertainlyweighted':
-                        val_loss = loss_fn(val_losses)
-                    elif loss_sum == 'SUM':
-                        val_loss = sum(val_losses)
-                    elif loss_sum == 'WeightedSUM':
-                        val_loss = 0
-                        #weight_list = [1,0.01]
-                        for k,l in enumerate(val_losses):
-                            val_loss += weight_list[k] * l
-                    elif loss_sum == 'Graph_weight':
-                        val_loss = sum(val_losses)
-                        val_loss += lambda_norm * np.abs(val_losses[0].item()-val_losses[1].item())**2
-                    elif loss_sum == 'LearnableTaskWeighted':
-                        val_loss = loss_fn(val_losses)
-                    #val_loss += lambda_norm * l1_norm
-                    #val_loss = sum(val_losses)
-
-                if len(reg_list)>1:
+                    val_loss = sum(val_losses)
                     val_loss_history.setdefault('SUM', []).append(val_loss.item())
                     
             print(f"Epoch [{epoch+1}/{epochs}], "
@@ -382,8 +415,8 @@ def training_MT_BNN(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_di
                     val_loss_history.setdefault(reg, []).append(val_losses[reg].item())     
                 
             print(f"Epoch [{epoch+1}/{epochs}], "
-                f"Train Loss: {train_loss.item():.4f}, "
-                f"Validation Loss: {val_loss.item():.4f}"
+                f"Train Loss: {sum(train_losses.values()).item():.4f}, "
+                f"Validation Loss: {sum(val_losses.values()).item():.4f}"
                 )
             
             '''

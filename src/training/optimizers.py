@@ -95,7 +95,7 @@ class UncertainlyweightedLoss(nn.Module):
         # この実装は、論文「Multi-Task Learning Using Uncertainty to Weigh Losses for Scene Geometry and Semantics」
         # (Kendall et al., 2018) に基づいています。
         total_loss = 0
-        for i, loss in enumerate(losses):
+        for i, loss in enumerate(losses.values()):
             # 精度 (precision) は分散の逆数として定義されます。
             # exp(-log_var) は 1 / exp(log_var) と等しく、分散の逆数に対応します。
             precision = torch.exp(-self.log_vars[i])
@@ -237,7 +237,7 @@ class PCGradOptimizer:
 
         # 各タスクの勾配を個別に計算し、リストに格納
         per_task_flat_grads = []
-        for loss in losses:
+        for loss in losses.values():
             # 各タスクの損失に対する共有パラメータの勾配を計算し、フラットなベクトルとして取得
             # この関数内でp.gradはゼロにリセットされる
             flat_grad = self._get_flat_grad(loss)
@@ -396,167 +396,524 @@ def calculate_initial_loss_weights_by_correlation(
 
     return initial_weights.float() # float型で返す
 
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import numpy as np
+# --- MGDAクラスの定義 ---
+class MGDA:
+    def __init__(self, optimizer):
+        self.optimizer = optimizer
+        self.grads = {}
 
-# MGDA (Multi-Gradient Descent Algorithm) にインスパイアされたカスタムPyTorchオプティマイザ。
-# この実装は、勾配の凸包における最小ノルム点を見つけることで、共通の降下方向を計算します。
-# 外部の二次計画法（QP）ソルバーを使用せず、勾配の重みを決定するために反復的なアプローチを使用します。
-class MGDAOptimizer(torch.optim.Optimizer):
-    """
-    Multi-Gradient Descent Algorithm (MGDA) inspired optimizer.
-    This implementation focuses on finding a common descent direction
-    by computing the minimum norm point in the convex hull of the gradients.
-    It does not explicitly solve a quadratic program, but rather uses an
-    iterative approach to find the weights.
-    """
-    def __init__(self, params, lr=1e-3):
-        # オプティマイザのデフォルト値を設定
-        defaults = dict(lr=lr)
-        super(MGDAOptimizer, self).__init__(params, defaults)
+    def _get_grads(self, loss, model_params):
+        """指定された損失に対する勾配を取得します。"""
+        # ここに allow_unused=True を追加
+        grads = torch.autograd.grad(loss, model_params, retain_graph=True, allow_unused=True)
         
-        # 各タスクの勾配を格納するためのリスト
-        self.grads_tasks = []
-        # タスク数を保持する変数
-        self.num_tasks = 0
+        # None が返される可能性があるので、それを除外して連結する
+        # 例えば、grads = [Tensor, None, Tensor] のような場合がある
+        return torch.cat([g.contiguous().view(-1) for g in grads if g is not None])
 
-    @torch.no_grad()
-    def _compute_task_gradients(self, losses):
+    def solve(self, losses, model_params):
         """
-        共有パラメータに対する各タスク損失の勾配を計算し、平坦なテンソルとして格納します。
-        各タスクの勾配ベクトルが同じ次元を持つように、
-        勾配が計算されなかったパラメータに対してはゼロを埋め込みます。
-
+        MGDAを適用して、各タスクの勾配の重みを計算します。
         Args:
-            losses (list of torch.Tensor): 各タスクの損失テンソルのリスト。
-        """
-        self.grads_tasks = []
-        self.num_tasks = len(losses)
-        
-        # 勾配計算に必要なすべての訓練可能パラメータを抽出 (共有+タスク固有)
-        # このリストの順序はすべてのタスクで一貫している必要があります。
-        all_trainable_params = [p for group in self.param_groups for p in group['params'] if p.requires_grad]
-        
-        for i in range(self.num_tasks):
-            # 新しい勾配を計算する前に、すべてのパラメータの既存の勾配をゼロクリア
-            for p in all_trainable_params:
-                if p.grad is not None:
-                    p.grad.zero_()
-
-            # 現在のタスクの損失に対して逆伝播を実行
-            # 最後のタスク以外はグラフを保持 (retain_graph=True)
-            losses[i].backward(retain_graph=True if i < self.num_tasks - 1 else False)
-
-            # このタスクの勾配を収集し、勾配がない場合はゼロテンソルを使用
-            task_grad = []
-            for p in all_trainable_params:
-                if p.grad is not None:
-                    task_grad.append(p.grad.view(-1).clone())
-                else:
-                    # 勾配がNoneの場合、そのパラメータサイズのゼロテンソルを追加
-                    # これにより、すべてのタスクの勾配テンソルが同じ合計サイズを持つことが保証されます。
-                    task_grad.append(torch.zeros_like(p).view(-1).clone().to(p.device)) # 同じデバイスに移動
-                    
-            self.grads_tasks.append(torch.cat(task_grad))
-        
-        # すべてのタスク固有の勾配を収集した後、共有パラメータの勾配をゼロクリア
-        # これにより、後続のmodel.zero_grad()が期待通りに機能することが保証されます。
-        for p in all_trainable_params: # Consistency: Use all_trainable_params here as well
-            if p.grad is not None:
-                p.grad.zero_()
-
-    @torch.no_grad()
-    def _min_norm_element_from_set(self, grads):
-        """
-        勾配ベクトル集合の凸包における最小ノルム点を見つけます。
-        MGDA論文のアルゴリズムを適応させたものです。
-        これは、外部の二次計画法（QP）ソルバーを使用せずに、
-        最小ノルム点を見つけるための反復アルゴリズムです。
-
-        Args:
-            grads (list of torch.Tensor): 平坦化された勾配テンソルのリスト。
-                                          それぞれが1つのタスクの勾配を表します。
+            losses (dict): タスク名とそれに対応するスカラー損失値の辞書。
+            model_params (iterable): 最適化するモデルのパラメータ。
         Returns:
-            torch.Tensor: 共通の降下勾配（最小ノルム点）。
+            torch.Tensor: 各タスクの損失に対する重み。
         """
-        num_tasks = len(grads)
-        if num_tasks == 1:
-            return grads[0]
-
-        # 簡単に操作できるように単一のテンソルに変換
-        G = torch.stack(grads) # 形状: (タスク数, 勾配の次元)
-
-        # 最小ノルム点を見つけるための反復アルゴリズム。
-        # これは、Gilbertのアルゴリズムまたは関連する最小ノルム点アルゴリズムの簡略化されたバージョンです。
+        self.optimizer.zero_grad()
         
-        # 現在の解（最小ノルム点の候補）を最初の勾配で初期化
-        v_current = G[0] 
+        task_names = list(losses.keys())
+        num_tasks = len(task_names)
+        
+        # 各タスクの勾配を計算
+        for task_name in task_names:
+            self.grads[task_name] = self._get_grads(losses[task_name], model_params)
+            
+        # 勾配のリストを作成
+        G = torch.stack([self.grads[task_name] for task_name in task_names])
 
-        max_iter = 100 # 最大反復回数
-        tolerance = 1e-6 # 収束許容誤差
+        # MGDAの解決フェーズ
+        # これは最小ノルムソリューションを見つけるための二次計画問題に帰着します。
+        # ここでは簡略化のため、最も基本的なアプローチ（複数の勾配の平均）を示しますが、
+        # より高度なMGDAの実装では、凸最適化ソルバーやFrank-Wolfeアルゴリズムが使われます。
+        # 厳密なMGDAを実装するには、CVXPYやPyTorchのカスタム最適化などが必要です。
+        # ここでは、論文 "Multi-task Learning as Multi-objective Optimization" (Sener & Koltun, 2018)
+        # に記載されているGD方式の簡易版を実装します。
 
-        for _ in range(max_iter):
-            # 現在のv_currentと最も対立する（内積が最小となる）頂点をGから見つける
-            min_dot_idx = torch.argmin(torch.matmul(G, v_current))
+        # 勾配のノルムを均一化する（オプションだが推奨されることが多い）
+        # gradient_norms = torch.norm(G, dim=1, keepdim=True)
+        # G = G / (gradient_norms + 1e-6) # 小さい値を加えてゼロ除算を避ける
+
+        # 単純なGD方式（Frank-Wolfeまたは二次計画法なし）
+        # 各タスクの勾配を単純に合計し、その方向に進む場合、これは通常のマルチタスク学習と変わりません。
+        # MGDAの核心は、各タスクの勾配の凸結合を見つけることです。
+        
+        # Sener & Koltun (2018) のGD方式の簡易実装に倣い、
+        # 各タスクの勾配を独立に扱うのではなく、共通の方向を見つけるための係数を計算します。
+        # 具体的には、各タスクの勾配の平均方向を求めるのが一つの方法です。
+        # ただし、これだと単純な平均化と変わらないため、ここではより一般的なMGDAの考え方に沿って、
+        # 各タスクの勾配の重みを計算するステップのプレースホルダーを提供します。
+        
+        # 厳密なMGDA (Frank-Wolfe/Quadratic Programming) の実装は複雑であり、
+        # PyTorchだけで完結させるには追加の最適化ロジックが必要です。
+        # ここでは、概念的な理解を助けるために、各タスクの損失に適用する「仮想的な重み」を計算する
+        # 最も単純なアプローチを説明します。これは、各タスクの勾配間のコサイン類似度などに基づいて、
+        # 衝突する勾配を調整する重みを見つけることを目指します。
+        
+        # 最も単純なケースとして、各タスクの勾配のノルムに基づいて重みを割り当てることも考えられます。
+        # ノルムが大きいタスクに低い重みを与えるなど。
+        # ここでは、勾配ベクトルの線形結合を生成し、そのノルムを最小化する重みを探すための
+        # プレースホルダーとして、以下の計算を行います。
+        # 実際には、このwは Frank-Wolfe アルゴリズムや二次計画法で計算されるべきです。
+        
+        # Frank-Wolfe アルゴリズムの簡易版のステップ（概念のみ）
+        # 1. 各タスクの勾配 g_i を計算
+        # 2. 現在の重み w_i を初期化（例: w_i = 1/num_tasks）
+        # 3. 以下のステップを収束するまで繰り返す:
+        #    a. G_w = sum(w_i * g_i) を計算
+        #    b. argmin_{i} (g_i . G_w) となるインデックス k を見つける
+        #    c. w を更新する。例えば、新しいステップサイズ alpha を用いて w = (1-alpha)w + alpha * e_k
+        #       (e_k は k番目の要素が1で他が0のベクトル)
+        
+        # ここでは、これらの複雑な最適化ステップを直接実装するのではなく、
+        # 各タスクの勾配の方向に基づいて「調整された勾配」を計算するようなロジックを示します。
+
+        # 一つの簡略化されたアプローチとして、各勾配の正規化された和を考えます。
+        # これだけではMGDAの真髄ではないことに注意してください。
+        # MGDAは、勾配の凸包の中に原点が含まれるかどうかを判定し、含まれない場合に
+        # 原点に最も近い点を特定することで、すべてのタスクにとって最適な方向を見つけます。
+        # Frank-Wolfeや二次計画法を使わずにそれを実装するのは困難です。
+
+        # 暫定的に、各タスクの勾配を等しく扱うか、あるいは何らかのヒューリスティックな重み付けを行う。
+        # 厳密なMGDAの実装は、別途Frank-WolfeアルゴリズムやQPソルバーを実装する必要があります。
+        # 例として、各タスクの勾配の平均を取ることで「共通の方向」を模倣します。
+        # これは厳密なMGDAではありませんが、概念的なスタート地点としては有効です。
+        
+        # 各タスクの勾配ベクトルをスタックした行列 G
+        # G shape: (num_tasks, total_params)
+
+        # PyTorchでのFrank-Wolfeアルゴリズムの簡易実装例 (MGDAの目的のため)
+        # これはあくまで概念的な実装であり、厳密な収束性や効率性を保証するものではありません。
+        
+        weights = torch.ones(num_tasks).to(G.device) / num_tasks # 初期重みは均等
+        
+        for _ in range(50): # 適当な反復回数
+            # 現在の重みでの結合勾配
+            combined_grad = torch.matmul(weights, G)
             
-            # その頂点をg_starとする
-            g_star = G[min_dot_idx]
+            # 各タスクの勾配と結合勾配の内積を計算
+            dot_products = torch.matmul(G, combined_grad)
             
-            # v_currentとg_starを結ぶ線分上でノルムを最小化する最適なステップ（gamma）を見つける線形探索
-            diff_vec = g_star - v_current
-            denom = torch.dot(diff_vec, diff_vec)
+            # 最も内積が小さい（最も衝突している）タスクを見つける
+            k = torch.argmin(dot_products)
             
-            if denom < 1e-8: # ベクトルが同一の場合、ゼロ除算を避ける
-                gamma = 0.0
+            # ステップサイズ（Sener & Koltunの論文を参照）
+            # ここでは固定値だが、通常は反復ごとに減少させる
+            alpha = 2.0 / (2.0 + _) # 簡易的なステップサイズ減少
+
+            # 重みを更新 (シンプレックスへの射影)
+            new_weights = (1 - alpha) * weights
+            new_weights[k] += alpha
+            
+            weights = new_weights
+            
+        return weights # 各タスクに適用する重み
+
+    def get_weighted_grads(self, weights, model_params):
+        """
+        計算された重みと各タスクの勾配を使って、重み付けされた勾配を計算します。
+        """
+        combined_grad = torch.zeros_like(self.grads[list(self.grads.keys())[0]])
+        task_names = list(self.grads.keys())
+        
+        for i, task_name in enumerate(task_names):
+            combined_grad += weights[i] * self.grads[task_name]
+        
+        # combined_gradをモデルのパラメータの形状に戻す
+        # これは少しトリッキーですが、optimizer.step() に渡すために必要です。
+        # 代わりに、計算された combined_grad を直接パラメータに適用する方が簡単かもしれません。
+        # self.optimizer.step() の前に、モデルの勾配をこの combined_grad で上書きします。
+        
+        # モデルのパラメータに勾配をセット
+        start = 0
+        for p in model_params:
+            if p.grad is not None: # 勾配が計算されているか確認
+                end = start + p.numel()
+                p.grad = combined_grad[start:end].view(p.shape)
+                start = end
+
+def create_correlation_matrix(data_dict):
+    """
+    辞書型の学習データからタスク間の相関係数行列 (Tensor) を作成します。
+
+    Args:
+        data_dict (dict): 各キーがタスク名、値がそのタスクのターゲットデータ (torch.Tensor, shape: (samples, 1)) の辞書。
+
+    Returns:
+        torch.Tensor: 各タスク間のピアソン相関係数を示す正方行列。
+                      形状は (num_tasks, num_tasks)。
+    """
+    task_names = list(data_dict.keys())
+    num_tasks = len(task_names)
+
+    # 各タスクのデータを一次元に平坦化してリストに格納
+    # .squeeze() は (N, 1) -> (N,) に変換します
+    task_data_list = [data_dict[name].squeeze() for name in task_names]
+
+    # 相関係数行列を初期化 (全て0)
+    correlation_matrix = torch.zeros(num_tasks, num_tasks, dtype=torch.float32)
+
+    for i in range(num_tasks):
+        for j in range(num_tasks):
+            # 同じタスク間の相関は1
+            if i == j:
+                correlation_matrix[i, j] = 1.0
             else:
-                gamma = -torch.dot(v_current, diff_vec) / denom
-                # gammaを[0, 1]の範囲にクリップし、線分上でのステップを保証する
-                gamma = torch.clamp(gamma, 0.0, 1.0) 
-
-            # 現在の解を更新
-            v_new = (1.0 - gamma) * v_current + gamma * g_star
-
-            # 収束をチェック
-            if torch.norm(v_new - v_current) < tolerance:
-                v_current = v_new
-                break
-            v_current = v_new
-        
-        return v_current
-
-    @torch.no_grad()
-    def step(self, closure=None):
-        """
-        単一の最適化ステップを実行します。
-        このメソッドが呼び出される前に、ユーザーは_compute_task_gradients(losses)を
-        呼び出して各タスクの勾配を計算し、self.grads_tasksに格納しておく必要があります。
-        """
-        # タスク勾配が計算されていることを確認
-        if not self.grads_tasks:
-            raise RuntimeError("タスク勾配が計算されていません。まず_compute_task_gradients(losses)を呼び出してください。")
-        
-        # 共通の降下勾配を計算
-        common_descent_grad = self._min_norm_element_from_set(self.grads_tasks)
-
-        # モデルパラメータに共通の降下勾配を適用
-        offset = 0
-        # all_trainable_paramsを使用して、勾配が適用されるパラメータの順序とセットが
-        # _compute_task_gradients で勾配が収集された順序と一致することを確認します。
-        all_trainable_params = [p for group in self.param_groups for p in group['params'] if p.requires_grad]
-        
-        for p in all_trainable_params:
-            if p.requires_grad:
-                num_param = p.numel()
-                # 計算された共通降下勾配をパラメータのgrad属性に割り当てる
-                p.grad = common_descent_grad[offset:offset + num_param].view(p.size())
-                offset += num_param
+                # 異なるタスク間の相関を計算
+                # torch.corrcoef を使用するため、データをスタックして (2, num_samples) の形にする
+                stacked_data = torch.stack((task_data_list[i], task_data_list[j]), dim=0)
                 
-                # 割り当てられた勾配を使用して最適化ステップを実行
-                # p.data.add_はインプレース操作です。
-                p.data.add_(p.grad, alpha=-p.grad.new_full(p.grad.shape, -self.defaults['lr'])) # Ensure alpha is a tensor on the same device and type
+                # 相関係数行列を計算
+                # torch.corrcoef は共分散行列から相関係数行列を導出します
+                # 結果は 2x2 行列なので、(0,1) または (1,0) 成分がピアソン相関係数
+                corr_coeff_matrix = torch.corrcoef(stacked_data)
+                if corr_coeff_matrix[0, 1] >= 0.5:
+                    correlation_matrix[i, j] = 1.0
+                else:
+                    correlation_matrix[i, j] = 0.0
+                #correlation_matrix[i, j] = corr_coeff_matrix[0, 1]
 
-        # 次のステップのために格納されたタスク勾配をクリア
-        self.grads_tasks = []
+    #print(correlation_matrix)
+    
+    return correlation_matrix
 
+def calculate_network_lasso_loss(model, correlation_matrix_tensor, lambda_lasso):
+    """
+    ネットワークLasso正則化項を計算する関数
+
+    Args:
+        model (MTCNNModel): トレーニング中のモデルインスタンス
+        correlation_matrix_tensor (torch.Tensor): タスク間の相関係数行列 (絶対値)
+        lambda_lasso (float): ネットワークLasso正則化の強さを調整するハイパーパラメータ
+
+    Returns:
+        torch.Tensor: ネットワークLasso正則化項
+    """
+    task_weights = model.get_task_weights() # 各タスクの最終層の重みリスト
+    num_tasks = len(task_weights)
+    
+    # ネットワークLasso項
+    network_lasso_reg = 0.0
+    for i in range(num_tasks):
+        for j in range(i + 1, num_tasks):
+            # 相関係数を重みとして使用
+            # ここでは、相関が高いほどペナルティが大きくなるように (1 - abs(corr)) を使用
+            # あるいは、相関が高いほどペナルティを小さくするために、重みを直接abs(corr)として、
+            # ペナルティ項を w_ij * ||beta_i - beta_j||_1 のように定義することも可能。
+            # 目的は「似たタスクのパラメータを似せる」ことなので、
+            # 相関が高いほど ||beta_i - beta_j||_1 にかかる重みを大きくする方が直感的。
+            # その場合、w_ij = correlation_matrix_tensor[i, j] (絶対値)とする。
+
+            # ここでは、相関が高いほどパラメータを似せる (差分が小さくなるようにする) ために、
+            # w_ij = correlation_matrix_tensor[i, j] (絶対値) を重みとして使用し、
+            # w_ij * ||beta_i - beta_j||_1 (または L2ノルム) をペナルティに加算する。
+            
+            # 各タスクの重みはテンソルなので、形状を合わせるために平坦化するか、適切な差分計算を行う
+            # ここでは簡単のため、L2ノルムの二乗を使用 (Squared Frobenius Norm)
+            # 実際には、L1ノルム (||W_i - W_j||_1) が "Lasso" の名前の由来となるスパース性を促進します。
+            # ただし、L1ノルムは微分不可能点で問題があるため、Smoothed L1やL2^2が使われることもあります。
+            
+            # 各タスクの重み行列のサイズが異なる場合、適切な処理が必要になります。
+            # 一般的には、共有層の重みに対して適用するか、最終層の重みの次元を揃える必要があります。
+            # このモデルの場合、出力次元は異なりますが、前の層からの入力次元は同じです (64)。
+            # そのため、重み行列の形は (out_dim, 64) となります。
+            # 異なる out_dim の重み行列の差分を取ることはできません。
+
+            # したがって、ネットワークLassoを適用する対象は、
+            # 1. 各タスクの最終層の**入力側の重み**（64次元ベクトル）にする
+            #    つまり、Linear(64, out_dim) の 64次元の入力に対する重みベクトル、
+            #    あるいは Linear(self.hidden_dim, 64) の重み
+            # 2. あるいは、各タスクの最終層の前の層の出力（`shared_features`）に、
+            #    各タスクに固有の重みベクトルを乗算するような構造にして、
+            #    その重みベクトルに対してLassoを適用する
+
+            # 今回のモデル構造では、`shared_fc`の出力 `shared_features` (self.hidden_dim) が
+            # 各タスクの出力層の入力となります。
+            # この場合、各タスクの出力層の Linear(self.hidden_dim, 64) の重みに適用するのが自然です。
+            # あるいは、Linear(64, out_dim) の前の層の出力（64次元）に注目し、
+            # その64次元の特徴量に対して各タスクの出力層の重みを適用すると考える。
+
+            # ここでは、より一般的なケースとして、各タスクの出力層の最初の線形層の重み `outputs[i][0].weight` に適用します。
+            # これらは、共有特徴量 `shared_features` から各タスク固有の特徴量 (64次元) への変換を行う層です。
+            
+            # 各タスクの出力層の最初の線形層の重み
+            # model.outputs[i][0].weight の形状は (64, self.hidden_dim)
+            weight_i = model.outputs[i][0].weight
+            weight_j = model.outputs[j][0].weight
+
+            # 重み行列の差分
+            # ここでは、タスクの重み行列が異なる形状を持つ可能性があるため、
+            # 差分を計算する前に何らかの共通の表現に変換するか、
+            # より適切な層の重みをターゲットにする必要があります。
+            # ただし、このモデルの `outputs[i][0]` はすべて `nn.Linear(self.hidden_dim, 64)` なので、
+            # 重み行列の形状は `(64, self.hidden_dim)` で共通です。
+            
+            # Frobenius Norm (L2) の二乗
+            # Lassoという名前なのでL1ノルムが望ましいですが、L2ノルムもよく使われます。
+            # L1ノルム: torch.sum(torch.abs(weight_i - weight_j))
+            # L2ノルムの二乗: torch.sum((weight_i - weight_j)**2)
+            
+            # タスク間の相関係数を重みとして利用
+            # w_ij は相関係数の絶対値
+            w_ij = correlation_matrix_tensor[i, j]
+            
+            # L1ノルムによる差分のペナルティ
+            network_lasso_reg += w_ij * torch.sum(torch.abs(weight_i - weight_j))
+            
+    return lambda_lasso * network_lasso_reg
+
+# --- GradNorm の実装 ---
+class GradNorm:
+    def __init__(self, tasks, alpha=2.0, device='cpu'):
+        self.tasks = tasks  # タスク名のリスト (e.g., ['task1', 'task2'])
+        self.num_tasks = len(tasks)
+        self.alpha = alpha
+        self.device = device
+
+        # タスクごとの損失重み w_i を学習可能なパラメータとして定義
+        # 初期値はすべて1に設定
+        self.loss_weights = nn.Parameter(torch.ones(self.num_tasks, requires_grad=True).to(device))
+        
+        # 各タスクの初期損失 (L_i(0)) を保存するための辞書
+        self.initial_losses = {task: None for task in self.tasks}
+
+        # 共有層のパラメータを特定するために、model.sharedconv と model.shared_fc を参照する
+        self.shared_params = None
+
+    def set_model_shared_params(self, model):
+        # 共有層のパラメータをリストとして保存
+        # MTCNNModelの場合、sharedconv と shared_fc が共有層
+        self.shared_params = list(model.sharedconv.parameters()) + list(model.shared_fc.parameters())
+
+    def update_loss_weights(self, losses, model_optimizer):
+        if self.shared_params is None:
+            raise ValueError("Shared parameters for GradNorm are not set. Call set_model_shared_params(model) first.")
+
+        # 各タスクの初期損失を記録 (最初のイテレーションのみ)
+        for i, task in enumerate(self.tasks):
+            if self.initial_losses[task] is None:
+                self.initial_losses[task] = losses[task].item()
+        
+        # モデルの勾配をゼロにする (損失重み更新のための勾配計算のため)
+        model_optimizer.zero_grad()
+        
+        # 各タスクの損失と共有層に対する勾配を計算
+        # 各タスクの勾配ノルムを計算するために、個々の損失に対してbackward()を実行
+        # retain_graph=True は、共有層の勾配を複数回計算するために必要
+        # create_graph=True は、loss_weightsの更新のための勾配を計算するために必要
+
+        # 総損失を計算（loss_weightsはまだ更新されていないが、これで勾配を伝播させる）
+        # この総損失は、通常のモデルパラメータの更新には使われず、
+        # loss_weightsの更新のための勾配計算のみに使われる
+        weighted_loss = sum(self.loss_weights[i] * losses[self.tasks[i]] for i in range(self.num_tasks))
+        weighted_loss.backward(retain_graph=True, create_graph=True) # retain_graphは、後に共有層のパラメータに対する各タスクの勾配を個別に計算するために必要
+
+        # 各タスクの勾配ノルム G_i(t) を計算
+        grad_norm_dict = {}
+        for i, task in enumerate(self.tasks):
+            # i番目のタスク損失が共有層のパラメータに与える勾配
+            # losses[task]をloss_weights[i]で乗算する前の勾配を使用
+            # PyTorch 1.10以降では、.gradはbackward()の後に利用可能
+            # または、torch.autograd.grad() を使用して、明示的に勾配を計算
+            
+            # shared_paramsに対する各タスクの損失の勾配を計算
+            # ここでは、model.parameters()ではなく、shared_paramsに絞って計算
+            grads_i = torch.autograd.grad(losses[task], self.shared_params, retain_graph=True)
+            
+            # 勾配のノルムを計算
+            # 各shared_paramに対する勾配を平坦化し、連結してノルムを計算
+            grad_norm_dict[task] = 0.0
+            for grad in grads_i:
+                if grad is not None:
+                    grad_norm_dict[task] += grad.norm(2).item() ** 2 # 各勾配のノルムの二乗の和
+            grad_norm_dict[task] = grad_norm_dict[task] ** 0.5 # 最後に平方根を取る
+
+        # 平均勾配ノルム G_avg(t) を計算
+        avg_grad_norm = sum(grad_norm_dict.values()) / self.num_tasks
+
+        # タスクの相対学習速度 r_i(t) と目的勾配ノルム G_i^*(t) を計算
+        target_grad_norm = torch.zeros(self.num_tasks, device=self.device)
+        for i, task in enumerate(self.tasks):
+            # L_i(t) / L_i(0)
+            relative_loss = losses[task].item() / self.initial_losses[task]
+            target_grad_norm[i] = avg_grad_norm * (relative_loss ** self.alpha)
+
+        # GradNorm 損失 L_gradnorm を計算
+        # 各タスクの現在の勾配ノルムと目的勾配ノルムの差の絶対値の和
+        grad_norm_loss = sum(torch.abs(self.loss_weights[i] * grad_norm_dict[self.tasks[i]] - target_grad_norm[i]) for i in range(self.num_tasks))
+        
+        # GradNorm 損失に対する loss_weights の勾配を計算
+        # これにより、loss_weightsが更新される
+        self.loss_weights.grad = torch.autograd.grad(grad_norm_loss, self.loss_weights)[0]
+        
+        # loss_weights を更新 (ここでは勾配降下法)
+        with torch.no_grad():
+            self.loss_weights.data -= self.loss_weights.grad * model_optimizer.param_groups[0]['lr'] # 学習率をモデルの学習率と合わせるか調整
+            
+            # loss_weights を正規化 (ソフトマックスは使わず、合計がnum_tasksになるように調整)
+            # オリジナルのGradNormでは、重みの合計を一定に保つための正規化は必須ではないが、
+            # 一般的には、相対的な重みを維持するために合計が一定になるように調整することが多い
+            # ここでは、sum(w_i) = num_tasks となるように調整
+            coeff = self.num_tasks / self.loss_weights.data.sum()
+            self.loss_weights.data *= coeff
+
+            # 負の値にならないようにクリッピング (オプション)
+            self.loss_weights.data = torch.clamp(self.loss_weights.data, min=0.0)
+
+        # loss_weightsをdetachして、次のイテレーションでのモデルの勾配計算に影響を与えないようにする
+        self.loss_weights.data = self.loss_weights.data.detach()
+
+        return self.loss_weights.data
+
+# --- CAGrad Optimizerの実装 ---
+class CAGradOptimizer(optim.Optimizer):
+    def __init__(self, params, lr=1e-3, c=0.5):
+        """
+        CAGradオプティマイザのコンストラクタ。
+        params: モデルのパラメータ
+        lr: 学習率
+        c: CAGradのハイパーパラメータ (0 <= c < 1)。制約の厳しさを制御。
+        """
+        if not 0 <= c < 1:
+            raise ValueError(f"Invalid c value: {c}. c must be in [0, 1).")
+        defaults = dict(lr=lr, c=c)
+        super(CAGradOptimizer, self).__init__(params, defaults)
+
+    def _get_grad_vec(self, loss, params):
+        """
+        指定された損失とパラメータに対する勾配ベクトルを計算し、連結して返す。
+        """
+        # 勾配を計算 (retain_graph=Trueでグラフを保持)
+        grads = torch.autograd.grad(loss, params, allow_unused=True, retain_graph=True)
+        # 勾配を1つのベクトルにフラット化
+        # Noneの勾配はゼロベクトルに変換
+        grad_vec = torch.cat([g.view(-1) if g is not None else torch.zeros(p.numel(), device=p.device) for g, p in zip(grads, params)])
+        return grad_vec
+
+    def _solve_cagrad_qp(self, gradients, c):
+        """
+        CAGradの二次計画問題を解き、最適な更新方向を計算します。
+        この実装は、外部ライブラリ (例: cvxpy) を使用せずに、
+        CAGradの精神を模倣した**簡略化されたヒューリスティックな代替**です。
+        厳密なCAGradの実装には、専用のQPソルバーが必要です。
+
+        gradients: 各タスクの勾配ベクトルリスト [g1, g2, ..., gN]
+        c: CAGradのハイパーパラメータ
+        """
+        num_tasks = len(gradients)
+        if num_tasks == 1:
+            return gradients[0] # タスクが1つの場合、そのままの勾配を返す
+
+        # 平均勾配を計算
+        g_avg = torch.mean(torch.stack(gradients), dim=0)
+
+        # 平均勾配に沿った各タスクの改善率の最小値
+        min_dot_g_avg = torch.min(torch.stack([torch.dot(g, g_avg) for g in gradients]))
+
+        # もしすべての勾配が平均勾配と衝突しない（または改善方向にある）場合
+        if min_dot_g_avg >= 0:
+            return g_avg # 平均勾配をそのまま使用
+
+        # --- ここからがCAGradのQPソルバーの代替またはプレースホルダー ---
+        # 厳密なCAGradのQPソルバーは、以下の問題を解きます:
+        # min_d 0.5 * ||d - g_0||^2
+        # s.t. min_i <g_i, d> >= c * min_j <g_j, g_0>
+
+        # 外部ライブラリ (cvxpyなど) を使用できないため、
+        # ここでは非常にシンプルな反復的な調整を行います。
+        # これは厳密なCAGradの理論的解を保証するものではありませんが、
+        # 勾配の衝突を軽減し、各タスクの改善を考慮する試みです。
+
+        # 初期更新方向を平均勾配とする
+        d_star = g_avg.clone()
+        
+        # 簡易的な反復調整 (ヒューリスティック)
+        # 最悪の改善率が制約を満たすまで、d_starを調整
+        # 調整は、最も改善が遅いタスクの勾配の方向へd_starを少し動かすことで行う
+        num_iterations = 100 # 調整の反復回数
+        learning_rate_adjust = 0.1 # 調整の学習率
+
+        for _ in range(num_iterations):
+            current_min_dot_d_star = torch.min(torch.stack([torch.dot(g, d_star) for g in gradients]))
+            
+            # 目標とする最小改善率
+            target_min_dot = c * min_dot_g_avg
+            
+            if current_min_dot_d_star >= target_min_dot:
+                # 制約が満たされている場合、調整を終了
+                break
+            
+            # 制約が満たされない場合、最も改善が遅いタスクの勾配を見つける
+            worst_task_idx = torch.argmin(torch.stack([torch.dot(g, d_star) for g in gradients]))
+            g_worst = gradients[worst_task_idx]
+            
+            # d_star を g_worst の方向に少し調整して、最悪の改善を向上させる
+            # これは非常にシンプルなヒューリスティックであり、厳密なQPソルバーではありません
+            d_star = d_star + learning_rate_adjust * (g_worst - d_star)
+            # ノルムを平均勾配のノルムに合わせることで、更新の大きさを維持
+            d_star = d_star / (torch.norm(d_star) + 1e-8) * torch.norm(g_avg) 
+            
+        return d_star
+
+    def step(self, losses):
+        """
+        CAGradの最適化ステップを実行します。
+        losses: 各タスクの損失のリスト (例: [loss1, loss2, ...])
+        """
+        # モデルのパラメータを取得
+        params = [p for group in self.param_groups for p in group['params']]
+        
+        # 各タスクの勾配を計算し、フラットなベクトルとして格納
+        individual_gradients = []
+        # 各タスクの勾配計算前に、モデル全体の勾配をゼロクリア
+        # これにより、各loss.backward()が独立した勾配を計算できる
+        self.zero_grad() 
+        for loss in losses.values():
+            # retain_graph=True: 複数回backward()を呼び出すために計算グラフを保持
+            loss.backward(retain_graph=True) 
+            # 各パラメータの勾配を連結して1つのベクトルにする
+            grad_vec = torch.cat([p.grad.view(-1) if p.grad is not None else torch.zeros(p.numel(), device=p.device) for p in params])
+            individual_gradients.append(grad_vec)
+            # 次のタスクの勾配計算のために、現在の勾配をゼロクリア（累積を防ぐ）
+            # ただし、retain_graph=Trueなので、モデルのパラメータのgradは保持される。
+            # そのため、次のloss.backward()で累積されないように、
+            # grad_vecを収集した後に、モデルのパラメータのgradをゼロクリアする必要がある。
+            # または、各loss.backward()の前にoptimizer.zero_grad()を呼び出す。
+            # ここでは、各loss.backward()の前にoptimizer.zero_grad()を呼び出すことで対応。
+
+        # 勾配を調整 (CAGradのQPソルバーの代替)
+        cagrad_direction = self._solve_cagrad_qp(individual_gradients, self.defaults['c'])
+
+        # モデルのパラメータに調整された勾配を適用
+        # まず、既存の勾配をゼロクリア（累積された勾配をリセット）
+        self.zero_grad()
+
+        # 調整された勾配ベクトルをモデルのパラメータに「逆伝播」させる
+        # これは、通常のoptimizer.step()が勾配を適用するのと同じ効果を持つ
+        start = 0
+        for p in params:
+            if p.grad is None:
+                p.grad = torch.zeros_like(p.data)
+            
+            num_param = p.numel()
+            # CAGradによって計算された勾配をパラメータのgrad属性にコピー
+            p.grad.copy_(cagrad_direction[start:start + num_param].view(p.shape))
+            start += num_param
+        
+        # 通常の勾配降下ステップを実行
+        # CAGradによって計算された方向が適用される
+        for group in self.param_groups:
+            for p in group['params']:
+                if p.grad is not None:
+                    # p.data = p.data - lr * p.grad
+                    p.data.add_(p.grad, alpha=-group['lr'])
