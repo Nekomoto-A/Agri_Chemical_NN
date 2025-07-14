@@ -156,55 +156,9 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
     for model, sub_dict in trues.items()
     }
 
-    '''
-    reducer = TSNE(n_components=2, perplexity=30, random_state=42)
-    #reducer = umap.UMAP(n_components=2, random_state=42)
-
-    reduced = {
-    model: {key: reducer.fit_transform(np.concatenate(value)) for key, value in sub_dict.items()}
-    for model, sub_dict in reduced.items()
-    }
-    #print(tests)
-    #print(predictions)
-    #reduced_feature_dir = os.path.join(sub_dir, reduced_feature_path)
-    #os.makedirs(reduced_feature_dir,exist_ok=True)
-    for key, features in reduced.items():
-       # model_dir = os.path.join(reduced_feature_dir, key)
-        #os.makedirs(model_dir,exist_ok=True)
-        
-        for reg in reg_list:
-            reg_dir = os.path.join(model_dir, f'{reg}.png')
-            
-            if key == 'MT':
-                x = features['all']
-            else:
-                x = features[reg]
-            y = trues[key][reg]
-            plt.figure(figsize=(8, 6))
-
-            if Y is not None:
-                if np.issubdtype(y.dtype, np.integer):  
-                    # カテゴリ（離散ラベル）の場合（20クラス未満）
-                    scatter = plt.scatter(x[:, 0], x[:, 1], c=y, cmap='tab10')
-                    plt.legend(*scatter.legend_elements(), title="Classes")
-                else:
-                    scatter = plt.scatter(x[:, 0], x[:, 1], c=y, cmap='viridis')
-                    plt.colorbar(label="Label Value")  # 連続値の場合はカラーバーを表示
-            else:
-                # ラベルなし
-                plt.scatter(x[:, 0], x[:, 1], alpha=0.7)
-            
-            #plt.title("t-SNE Visualization of Shared Layer Features")
-            plt.xlabel("t-SNE Component 1")
-            plt.ylabel("t-SNE Component 2")
-            plt.tight_layout()
-            #plt.show()
-            plt.savefig(reg_dir)
-            plt.close()
-        '''
-
+    pprint.pprint(predictions)
     #pprint.pprint(reduced)
-    pprint.pprint(scores)
+    #pprint.pprint(scores)
     
     # 平均値を格納する辞書
     avg_std = {}

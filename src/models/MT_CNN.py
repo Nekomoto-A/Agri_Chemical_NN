@@ -17,7 +17,7 @@ class MTCNNModel(nn.Module):
             self.sharedconv.add_module(f"conv{i+1}", nn.Conv1d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding))
             self.sharedconv.add_module(f"batchnorm{i+1}", nn.BatchNorm1d(out_channels))
             self.sharedconv.add_module(f"relu{i+1}", nn.ReLU())
-            self.sharedconv.add_module(f"dropout{i+1}", nn.Dropout(0.2))
+            #self.sharedconv.add_module(f"dropout{i+1}", nn.Dropout(0.2))
             self.sharedconv.add_module(f"maxpool{i+1}", nn.MaxPool1d(kernel_size=2))
             in_channels = out_channels  # 次の層の入力チャネル数は現在の出力チャネル数
 
@@ -42,6 +42,8 @@ class MTCNNModel(nn.Module):
                 nn.Linear(self.hidden_dim, 64),
                 nn.ReLU(),
                 #nn.Dropout(0.2),
+                #nn.Linear(64, 32),
+                #nn.ReLU(),
                 nn.Linear(64, out_dim),
                 #nn.ReLU()
                 #nn.Softplus() 
@@ -91,3 +93,4 @@ class MTCNNModel(nn.Module):
             # この例では、nn.Linear(64, out_dim) が最後の層
             task_weights.append(output_layer[2].weight) # output_layer[0]はLinear(self.hidden_dim, 64), output_layer[1]はReLU, output_layer[2]はLinear(64, out_dim)
         return task_weights
+

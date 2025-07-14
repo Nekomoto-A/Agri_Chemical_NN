@@ -111,7 +111,7 @@ class MTBNNModel(nn.Module):
             outputs[task_name] = head(shared_features) # 各タスクの出力を計算
 
         return outputs
-
+    '''
     # ELBO (Evidence Lower Bound) 損失を計算します。
     # これは、ベイジアンモデルの学習目標であり、データに対する負の対数尤度（NLL）と
     # モデルの複雑さを示すKLダイバージェンスの合計です。
@@ -139,7 +139,7 @@ class MTBNNModel(nn.Module):
                     nll = nn.functional.mse_loss(pred_output, target, reduction='sum')
                 else: # 分類タスク (出力次元が1以外の場合)
                     # CrossEntropyLossはロジットを入力として受け取り、ターゲットはクラスインデックスです。
-                    nll = nn.functional.cross_entropy(pred_output, target, reduction='sum')
+                    nll = nn.functional.cross_entropy(pred_output, target.ravel(), reduction='sum')
                 total_nll += nll
                 task_nlls[task_name] += nll # 各タスクのNLLを加算
 
@@ -157,6 +157,33 @@ class MTBNNModel(nn.Module):
 
         elbo_loss = (total_nll + total_kl) / num_samples
         return elbo_loss, task_nlls # ELBO損失と各タスクのNLLを返します。
+        '''
+    def sample_elbo(self, input, target_outputs, num_samples=10, beta=1e-5):
+        total_nll = 0.0
+        task_nlls = {task_name: 0.0 for task_name in self.reg_list}
+        total_kl = 0.0
+
+        for _ in range(num_samples):
+            outputs = self.forward(input)
+            for task_name, output_dim, (dict_key, pred_output) in zip(self.reg_list, self.output_dims, outputs.items()):
+                target = target_outputs[task_name]
+                if output_dim == 1:
+                    nll = nn.functional.mse_loss(pred_output, target, reduction='sum')
+                else:
+                    nll = nn.functional.cross_entropy(pred_output, target.ravel(), reduction='sum')
+                total_nll += nll
+                task_nlls[task_name] += nll
+
+            for module in self.modules():
+                if isinstance(module, LinearReparameterization):
+                    total_kl += module.kl_divergence()
+
+        for task_name in task_nlls:
+            task_nlls[task_name] /= num_samples
+
+        elbo_loss = (total_nll + beta * total_kl) / num_samples
+        return elbo_loss, task_nlls
+
 
 # --- デモンストレーションのためのデータ生成、トレーニング、推論 ---
 
@@ -227,7 +254,7 @@ if __name__ == '__main__':
     # 新しい単一のデータポイントを生成し、予測を試みます。
     X_test, _ = generate_synthetic_data(1, INPUT_DIM, OUTPUT_DIMS)
 
-    NUM_PREDICTIVE_SAMPLES = 100 # 予測の不確実性を評価するためのサンプル数
+    NUM_PREDICTIVE_SAMPLES = 1000 # 予測の不確実性を評価するためのサンプル数
                                  # BNNでは、複数のフォワードパスを通じて予測の分布を得ます。
 
     task1_predictions = []

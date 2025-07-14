@@ -140,122 +140,116 @@ class LearnableTaskWeightedLoss(nn.Module):
         return total_loss
     
 class PCGradOptimizer:
-    def __init__(self, optimizer, model_parameters):
+    def __init__(self, optimizer, model_parameters, l2, l2_reg_lambda=0.0, shared_params_for_l2_reg=None):
         """
         PCGradオプティマイザの初期化
         :param optimizer: ラップするPyTorchオプティマイザのインスタンス (例: optim.Adam)
         :param model_parameters: モデルのすべてのパラメータのイテラブル (model.parameters())
+        :param l2_reg_lambda: L2正則化の強度。0.0の場合、L2正則化なし。
+        :param shared_params_for_l2_reg: L2正則化を適用する共有層のパラメータのリスト。
+                                         Noneの場合、optimizerに渡された全パラメータにL2正則化が適用される。
         """
         self.optimizer = optimizer
-        # モデルのすべてのパラメータをリストとして保持
-        # これにより、勾配の取得と設定を効率的に行う
-        self.model_parameters = list(model_parameters)
+        self.model_parameters = list(model_parameters) # モデルのすべてのパラメータ
+        self.l2 = l2
+        self.l2_reg_lambda = l2_reg_lambda
+
+        # L2正則化を適用するパラメータを特定
+        if shared_params_for_l2_reg is None:
+            self.l2_target_params = self.model_parameters # デフォルトは全パラメータ
+        else:
+            # shared_params_for_l2_reg が model_parameters の部分集合であることを確認
+            self.l2_target_params = list(shared_params_for_l2_reg)
+
+            for p in self.l2_target_params:
+                if p not in set(self.model_parameters):
+                    raise ValueError("l2_target_params must be a subset of model_parameters.")
+
+        # L2正則化対象のパラメータが self.model_parameters のどこにあるかを追跡するための辞書
+        # flat_grad_vec から l2_reg_grad を構築するために使用
+        self.param_to_idx_range = {}
+        current_idx = 0
+        for p in self.model_parameters:
+            self.param_to_idx_range[p] = (current_idx, current_idx + p.numel())
+            current_idx += p.numel()
 
     def zero_grad(self):
-        """
-        ラップされたオプティマイザのzero_gradメソッドを呼び出し、モデルの全パラメータの勾配をゼロにする
-        """
         self.optimizer.zero_grad()
 
     def _get_flat_grad(self, loss):
-        """
-        与えられた損失に対するモデルの共有パラメータの勾配を計算し、フラットなベクトルとして返すヘルパー関数。
-        計算後、パラメータの勾配はゼロにリセットされる。
-        :param loss: 計算対象の損失テンソル
-        :return: フラットな勾配ベクトル
-        """
-        # 勾配を計算し、グラフを保持する (複数回のbackward()呼び出しのため)
         loss.backward(retain_graph=True)
         
-        # 勾配をフラットなベクトルにまとめる
         flat_grad = []
         for p in self.model_parameters:
             if p.grad is not None:
-                # 勾配をコピーし、detach()して計算グラフから切り離す
                 flat_grad.append(p.grad.clone().detach().view(-1))
-                p.grad.zero_() # 次のbackward()のために勾配をゼロにリセット
+                p.grad.zero_() 
             else:
-                # 勾配がないパラメータがある場合、ゼロテンソルを追加
                 flat_grad.append(torch.zeros_like(p.view(-1)))
         return torch.cat(flat_grad)
 
     def _set_flat_grad(self, flat_grad_vec):
-        """
-        フラットな勾配ベクトルをモデルのパラメータの.grad属性に設定するヘルパー関数
-        :param flat_grad_vec: 設定するフラットな勾配ベクトル
-        """
         idx = 0
         for p in self.model_parameters:
             num_elements = p.numel()
-            # p.gradが存在しない場合は作成
             if p.grad is None:
                 p.grad = torch.zeros_like(p)
-            # フラットなベクトルから対応する部分をコピー
             p.grad.copy_(flat_grad_vec[idx : idx + num_elements].view(p.shape))
             idx += num_elements
 
     def pc_project(self, grad_list):
-        """
-        PCGradの勾配投影ロジックを適用する
-        :param grad_list: 各タスクのフラットな勾配ベクトルを含むリスト
-        :return: 投影によって調整された勾配ベクトルのリスト
-        """
         num_tasks = len(grad_list)
-        
-        # 勾配の衝突を解決
-        # 各タスクの勾配を他のすべてのタスクの勾配と比較し、競合を解消
         for i in range(num_tasks):
-            for j in range(i + 1, num_tasks): # 各ペアについて
+            for j in range(i + 1, num_tasks):
                 g_i = grad_list[i]
                 g_j = grad_list[j]
-
-                # 勾配の内積を計算
                 dot_product = torch.sum(g_i * g_j)
-
-                # 勾配が競合している場合 (内積が負)
                 if dot_product < 0:
-                    # g_iをg_jの直交補空間に投影
-                    # g_i_new = g_i - ((g_i . g_j) / ||g_j||^2) * g_j
                     norm_sq_j = torch.sum(g_j * g_j)
-                    if norm_sq_j > 1e-6: # ゼロ除算を避けるための小さな閾値
+                    if norm_sq_j > 1e-6:
                         grad_list[i] = g_i - (dot_product / norm_sq_j) * g_j
                     
-                    # g_jをg_iの直交補空間に投影
-                    # g_j_new = g_j - ((g_j . g_i) / ||g_i||^2) * g_i
                     norm_sq_i = torch.sum(g_i * g_i)
-                    if norm_sq_i > 1e-6: # ゼロ除算を避けるための小さな閾値
+                    if norm_sq_i > 1e-6:
                         grad_list[j] = g_j - (dot_product / norm_sq_i) * g_i
         return grad_list
 
     def step(self, losses):
-        """
-        PCGradによる勾配調整を行い、ラップされたオプティマイザのステップを実行する
-        :param losses: 各タスクの損失のリスト (例: [loss_task1, loss_task2])
-        """
-        # まず、モデルの全パラメータの勾配をゼロにする
         self.zero_grad()
-
-        # 各タスクの勾配を個別に計算し、リストに格納
-        per_task_flat_grads = []
-        for loss in losses.values():
-            # 各タスクの損失に対する共有パラメータの勾配を計算し、フラットなベクトルとして取得
-            # この関数内でp.gradはゼロにリセットされる
-            flat_grad = self._get_flat_grad(loss)
-            per_task_flat_grads.append(flat_grad)
-            
-        # PCGradの投影ロジックを適用し、調整された勾配のリストを取得
-        projected_flat_grads = self.pc_project(per_task_flat_grads)
-
-        # 投影された勾配を合計し、モデルのパラメータの.grad属性に設定
-        # 各タスクの調整済み勾配を合計する
-        summed_flat_grad = torch.sum(torch.stack(projected_flat_grads), dim=0)
         
-        # 合計された勾配をモデルの各パラメータの.grad属性に設定
+        per_task_flat_grads = []
+        for loss_value in losses.values(): # losses が辞書であることを想定
+            flat_grad = self._get_flat_grad(loss_value)
+            per_task_flat_grads.append(flat_grad)
+        
+        # PCGradの投影ロジックを適用
+        # この projected_flat_grads は、全パラメータに対する勾配ベクトル
+        projected_flat_grads = self.pc_project(per_task_flat_grads)
+        
+        # 投影された勾配を合計
+        summed_flat_grad = torch.sum(torch.stack(projected_flat_grads), dim=0)
+
+        if self.l2 == True:
+            # --- L2正則化の勾配を加算 ---
+            if self.l2_reg_lambda > 0:
+                l2_reg_grad_sum = torch.zeros_like(summed_flat_grad)
+                for p in self.l2_target_params:
+                    if p.grad is not None: # L2正則化の勾配は 2 * lambda * p.data
+                        # p.data.gradは各タスクの勾配計算でクリアされているため、ここで直接計算する
+                        l2_grad_for_p = 2 * self.l2_reg_lambda * p.data.view(-1)
+                        
+                        # このパラメータ p が summed_flat_grad のどの部分に対応するかを取得
+                        start_idx, end_idx = self.param_to_idx_range[p]
+                        l2_reg_grad_sum[start_idx:end_idx] += l2_grad_for_p
+                
+                # PCGradによって調整された勾配の合計にL2正則化の勾配を加算
+                summed_flat_grad += l2_reg_grad_sum
+
+        # 最終的な勾配をモデルのパラメータの.grad属性に設定
         self._set_flat_grad(summed_flat_grad)
-
-        # ラップされたオプティマイザのステップを実行し、パラメータを更新
+        
+        # ラップされたオプティマイザのステップを実行
         self.optimizer.step()
-
 
 def custom_nanmin(tensor):
     """
@@ -917,3 +911,38 @@ class CAGradOptimizer(optim.Optimizer):
                 if p.grad is not None:
                     # p.data = p.data - lr * p.grad
                     p.data.add_(p.grad, alpha=-group['lr'])
+
+# ==============================================================================
+# トレースノルム計算関数の定義
+# ==============================================================================
+'''
+def calculate_trace_norm(model):
+    """
+    モデルの共有層の重みのトレースノルムを計算する関数。
+    """
+    trace_norm = 0.0
+    # 共有畳み込み層
+    for layer in model.sharedconv:
+        if isinstance(layer, nn.Conv1d):
+            weight = layer.weight
+            weight_matrix = weight.view(weight.size(0), -1)
+            trace_norm += torch.linalg.svdvals(weight_matrix).sum()
+    # 共有全結合層
+    for layer in model.shared_fc:
+        if isinstance(layer, nn.Linear):
+            weight = layer.weight
+            trace_norm += torch.linalg.svdvals(weight).sum()
+    return trace_norm
+'''
+
+def calculate_trace_norm(model):
+    """
+    モデルの固有層（タスクごと）の重みのトレースノルムを計算する関数。
+    """
+    trace_norm = 0.0
+    for task_specific_block in model.outputs:
+        for layer in task_specific_block:
+            if isinstance(layer, nn.Linear):
+                weight = layer.weight
+                trace_norm += torch.linalg.svdvals(weight).sum()
+    return trace_norm

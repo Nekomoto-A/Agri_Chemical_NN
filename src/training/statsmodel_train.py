@@ -30,7 +30,7 @@ def statsmodel_train(X,Y,scalers,reg):
         models = {
         "RF": RandomForestClassifier(),
         "XGB": XGBClassifier(),
-        #"SVR": SVC()
+        "SVR": SVC()
         }
 
     # モデルの学習

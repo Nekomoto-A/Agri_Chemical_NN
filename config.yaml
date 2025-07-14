@@ -8,6 +8,7 @@ dataset.py:
   level: 7
   transformer: 'SS'
   feature_transformer: 'ILR'
+  augmentation: 'None'
 train.py:
   early_stopping: False
   patience: 5
@@ -16,15 +17,17 @@ train.py:
   epochs: 30
   vis_step: 5
   validation: True
-  lambda: 0.01
+  lambda: 0.1 
   learning_rate: [0.0001]
   weights: [0.7, 0.3]
   SUM_train_lim: 10
   personal_train_lim: 1
-  l2_shared: True
-  lambda_l2: 0.1
+  l2_shared: False
+  lambda_l2: 0.01
+  lambda_l1: 0.01
+  GradNorm_alpha: 1.0
 test.py:
-  loss_sum: 'Graph_weight'
+  loss_sum: 'FusedLasso'
   num_predictive_samples: 100
 fold_eval.py:
   k_fold: 5
@@ -45,6 +48,9 @@ fold_eval.py:
 main.py:
   reg_list: [
             ['pH','Available.P','EC','NH4.N','NO3.N','Exchangeable.K',
+            #['pH_rank','Available.P_rank','EC_rank','NH4.N_rank','NO3.N_rank','Exchangeable.K_rank',
               #'CEC','Humus',''
+              #'crop', 
+              #'pref'
             ]
-      ]
+  ]

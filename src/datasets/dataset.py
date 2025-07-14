@@ -13,6 +13,11 @@ from skbio.stats.composition import clr, multiplicative_replacement
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+from sdv.metadata.single_table import SingleTableMetadata # DataFrameからメタデータを自動で検出 
+from sdv.single_table import CTGANSynthesizer
+
+from sklearn.decomposition import PCA
+
 import yaml
 import os
 yaml_path = 'config.yaml'
@@ -112,15 +117,20 @@ class data_create:
                 chem_data[r] = np.select(conditions, choices, default='field')
             elif r == 'crop_ph':
                 chem_data[r] = np.where((chem_data['crop'] == 'jpea') | (chem_data['crop'] == 'Spin'), 'alkali', 'neutral')
-            elif r=='pHtype':
-                bins = [-np.inf, 6.0, 6.5, np.inf]
+            elif '_rank' in r:
+                #bins = [-np.inf, 6.0, 6.5, np.inf]
 
                 # Define the corresponding labels for each class
-                labels = ['弱酸性', '中性', '弱アルカリ性']
+                #labels = ['弱酸性', '中性', '弱アルカリ性']
 
                 # Add the 'pH_class' column to the DataFrame
-                chem_data[r] = pd.cut(chem_data['pH'], bins=bins, labels=labels, right=True)    
-                print(chem_data[r])                            
+                #chem_data[r] = pd.cut(chem_data['pH'], bins=bins, labels=labels, right=True)    
+                
+                d = r.replace('_rank', '')
+                labels = ['low', 'medium', 'high']
+                chem_data[r] = pd.qcut(chem_data[d], q=3, labels=labels)
+
+                #print(chem_data[r])                            
 
             ind = chem_data[chem_data[r].isna()].index
             asv_data = asv_data.drop(ind)
@@ -193,8 +203,36 @@ class data_create:
         if self.label_list != None:
             label_data = chem_data[self.label_list]
 
-def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = config['val_size'],transformer= config['transformer'],fold = None):
+def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = config['val_size'],transformer= config['transformer'],
+                          augmentation = config['augmentation'],
+                          fold = None):
     x_train_split,x_val,y_train_split,y_val = train_test_split(x_train,y_train,test_size = val_size,random_state=0)
+
+    #print(x_train_split)
+    #print(y_train_split)
+    
+    if augmentation == 'CTGAN':
+        x_columns = x_train_split.columns
+        #y_columns = y_train_split.columns
+        #pca = PCA(n_components=len(x_train_split))
+        #x_train_pca = pd.DataFrame(pca.fit_transform(np.array(x_train_split)),index = y_train_split.index)
+        #train = pd.concat([x_train_pca, y_train_split[reg_list]], axis=1)
+        train = pd.concat([x_train_split, y_train_split[reg_list]], axis=1)
+        #print(train.info())
+        metadata = SingleTableMetadata() 
+        metadata.detect_from_dataframe(data=train) # 作成されたメタデータの内容を確認 print("\n--- 自動検出されたメタデータ（辞書形式） ---") 
+        #print(metadata.to_dict())
+        # モデルの作成と訓練
+        ctgan = CTGANSynthesizer(metadata, epochs=50,verbose = True)
+        # 学習
+        ctgan.fit(train)
+        synthetic_data = ctgan.sample(len(train))
+        print(synthetic_data)
+
+        x_augmented = synthetic_data[x_columns]
+        y_augmented = synthetic_data[reg_list]
+        x_train_split = pd.concat([x_train_split, x_augmented], axis=0)
+        y_train_split = pd.concat([y_train_split, y_augmented], axis=0)
 
     if fold != None:
         train_feature_dir = os.path.join(fold, f'train_feature.csv')
@@ -238,6 +276,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
 
     for reg in reg_list:
         if np.issubdtype(y_train_split[reg].dtype, np.floating):
+            #print("SS")
             pp = StandardScaler()
             #pp = MinMaxScaler()
             #pp = PowerTransformer(method='yeo-johnson')
@@ -255,6 +294,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
                 y_val_pp = y_val[reg].values.reshape(-1, 1)
                 y_test_pp = y_test[reg].values.reshape(-1, 1)
 
+                #print(y_train_split_pp)
                 #scalers[reg] = pp  # スケーラーを保存
 
             #Y_train_tensor.append(torch.tensor(y_train_split_pp, dtype=torch.float32))
@@ -264,6 +304,9 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
             Y_val_tensor[reg] = torch.tensor(y_val_pp, dtype=torch.float32)
             Y_test_tensor[reg] = torch.tensor(y_test_pp, dtype=torch.float32)
         else:
+            y_train_split_pp = y_train_split[reg].values.reshape(-1, 1)
+            y_val_pp = y_val[reg].values.reshape(-1, 1)
+            y_test_pp = y_test[reg].values.reshape(-1, 1)
             #print(y_train_split[reg])
             #Y_train_tensor.append(torch.tensor(y_train_split[reg].values, dtype=torch.int64))
             #Y_val_tensor.append(torch.tensor(y_val[reg].values, dtype=torch.int64))
@@ -305,5 +348,6 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
         #np.fill_diagonal(binary_matrix, 1.0)
         #print(corr_matrix)
         #print(binary_matrix)
+
     return X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids
 

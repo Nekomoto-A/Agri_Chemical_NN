@@ -49,6 +49,16 @@ def test_MT(x_te,y_te,model,reg_list,scalers,output_dir):
                 plt.savefig(TP_dir)
                 plt.close()
 
+                hist_dir = os.path.join(result_dir, 'loss_hist.png')
+                plt.hist(true-output, bins=30, color='skyblue', edgecolor='black')  # bins=階級数
+                plt.title("Histogram of Normally Distributed Data")
+                plt.xlabel("MAE")
+                plt.ylabel("Frequency")
+                plt.grid(True)
+                #plt.show()
+                plt.savefig(hist_dir)
+                plt.close()
+
                 #r2 = r2_score(true,output)
                 corr_matrix = np.corrcoef(true.ravel(),output.ravel())
 
@@ -120,6 +130,16 @@ def test_MT_BNN(x_te,y_te,model,reg_list,scalers,output_dir,num_predictive_sampl
                 plt.xlabel('true_data')
                 plt.ylabel('predicted_data')
                 plt.savefig(TP_dir)
+                plt.close()
+
+                hist_dir = os.path.join(result_dir, 'mae_hist.png')
+                plt.hist(np.abs(true-output), bins=30, color='skyblue', edgecolor='black')  # bins=階級数
+                plt.title("Histogram of Normally Distributed Data")
+                plt.xlabel("MAE")
+                plt.ylabel("Frequency")
+                plt.grid(True)
+                #plt.show()
+                plt.savefig(hist_dir)
                 plt.close()
 
                 #r2 = r2_score(true,output)
@@ -253,6 +273,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
     for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
         print(f"Output {i+1} ({reg_list[i]}): R^2 Score = {r2:.3f}, MSE = {mse:.3f}")
 
+    '''
     for reg in reg_list:
         if 'CNN' in model_name:
             #print(test_ids)
@@ -271,7 +292,8 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
 
         predictions.setdefault(method, {}).setdefault(reg, []).append(predicts[reg])
         trues.setdefault(method, {}).setdefault(reg, []).append(true[reg])
-
+    '''
     write_result(r2_results, mse_results, columns_list = reg_list, csv_dir = csv_dir, method = method, ind = index)
+
 
     return predictions, trues, r2_results, mse_results, model_trained
