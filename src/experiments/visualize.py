@@ -71,6 +71,9 @@ def visualize_tsne(model, X, Y, reg_list, output_dir,file_name, model_name,scale
             #print(Y_single2)
             Y_single = np.concatenate([Y_single1,Y_single2])
 
+            if '_rank' in reg:
+                Y_single = np.argmax(Y_single)
+
             #print(Y_single)
             marker_map = {1: 'o', 0: 's'}
             # プロット

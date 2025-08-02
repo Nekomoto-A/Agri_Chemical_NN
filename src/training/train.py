@@ -123,7 +123,7 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                 model_parameters=model.parameters(), # モデル全体のパラメータ
                 l2 = l2_shared,
                 l2_reg_lambda=lambda_l2,
-                shared_params_for_l2_reg=model.get_shared_params() # 共有層のパラメータ
+                #shared_params_for_l2_reg=model.get_shared_params() # 共有層のパラメータ
             )
 
         elif loss_sum == 'CAgrad':
@@ -197,8 +197,10 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
             #personal_losses.append(MSLELoss())
             #personal_losses.append(nn.MSELoss())
             #print(reg)
-            personal_losses[reg] = nn.MSELoss()
-            #personal_losses[reg] = nn.SmoothL1Loss()
+            #personal_losses[reg] = nn.MSELoss()
+            personal_losses[reg] = nn.SmoothL1Loss()
+        elif '_rank' in reg:
+            personal_losses[reg] = nn.KLDivLoss(reduction='batchmean')
         else:
             #print(f"{reg}:label")
             personal_losses[reg] = nn.CrossEntropyLoss()
@@ -224,6 +226,8 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
         #torch.autograd.set_detect_anomaly(True)
         outputs,shared = model(x_tr)
         
+        #print(outputs['pH_rank'])
+        
         #train_losses = []
         train_losses = {}
         #for j in range(len(output_dim)):
@@ -233,13 +237,21 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
             #print(x_tr.shape)
             #print(y_tr[reg].shape)
 
-            if out>1:
+            if '_rank' in reg:
+                true_tr = y_tr[reg]
+                outputs[reg] = F.log_softmax(outputs[reg],dim = 1)
+                #print(y_tr[reg].shape)
+                #print(outputs[reg].shape)
+            elif out>1:
                 true_tr = y_tr[reg].ravel()
             else:
                 true_tr = y_tr[reg]
 
             #loss = personal_losses[reg](outputs[reg], y_tr[reg].ravel())
             #loss = personal_losses[reg](outputs[reg], y_tr[reg])
+            #print(reg)
+            #print(true_tr.shape)
+            #print(outputs[reg].shape)
             loss = personal_losses[reg](outputs[reg], true_tr)
             #print(f'{reg}:{loss}')
             train_loss_history.setdefault(reg, []).append(loss.item())
@@ -329,10 +341,11 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                 learning_loss = sum(train_losses.values())
                 train_loss = sum(train_losses.values())
             elif loss_sum == 'WeightedSUM':
-                train_loss = 0
-                weight_list = weights
-                for k,l in enumerate(train_losses):
-                    train_loss += weight_list[k] * l
+                learning_loss = 0
+                #weight_list = weights
+                for k,l in enumerate(train_losses.values()):
+                    learning_loss += weights[k] * l
+                train_loss = sum(train_losses.values())
             elif loss_sum == 'Normalized':
                 train_loss = loss_fn(train_losses)
             elif loss_sum == 'Uncertainlyweighted':
@@ -370,7 +383,6 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                 train_loss = sum(train_losses.values())
                 l_fused = calculate_fused_lasso_for_shared_layers(model = model, lambda_1 = lambda_l1, lambda_2 = lambda_l2)
                 learning_loss = train_loss + l_fused
-
             if l2_shared == True:
                 l2_loss = calculate_shared_l2_regularization(model = model,lambda_shared=lambda_l2)
                 learning_loss += l2_loss
@@ -394,11 +406,16 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
 
                 val_losses = []
                 #for j in range(len(output_dim)):
+                
                 for reg,out in zip(reg_list,output_dim):
-                    if out>1:
+                    if '_rank' in reg:
+                        true_val = y_val[reg]
+                        outputs[reg] = F.log_softmax(outputs[reg],dim = 1)
+                    elif out>1:
                         true_val = y_val[reg].ravel()
                     else:
                         true_val = y_val[reg]
+                    #print(f'reg:{output}')
                     loss = personal_losses[reg](outputs[reg], true_val)
 
                     val_loss_history.setdefault(reg, []).append(loss.item())
@@ -412,10 +429,11 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                     val_loss_history.setdefault('SUM', []).append(val_loss.item())
                     
             print(f"Epoch [{epoch+1}/{epochs}], "
-                  f"Learning Loss: {learning_loss.item():.4f}, "
+                  #f"Learning Loss: {learning_loss.item():.4f}, "
                 f"Train Loss: {train_loss.item():.4f}, "
                 f"Validation Loss: {val_loss.item():.4f}"
                 )
+            
             '''
             for n,name in enumerate(reg_list):
                 print(f'Train sigma_{name}:{train_sigmas[n].item()}',

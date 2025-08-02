@@ -13,9 +13,6 @@ from skbio.stats.composition import clr, multiplicative_replacement
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from sdv.metadata.single_table import SingleTableMetadata # DataFrameからメタデータを自動で検出 
-from sdv.single_table import CTGANSynthesizer
-
 from sklearn.decomposition import PCA
 
 import yaml
@@ -118,24 +115,21 @@ class data_create:
             elif r == 'crop_ph':
                 chem_data[r] = np.where((chem_data['crop'] == 'jpea') | (chem_data['crop'] == 'Spin'), 'alkali', 'neutral')
             elif '_rank' in r:
-                #bins = [-np.inf, 6.0, 6.5, np.inf]
-
-                # Define the corresponding labels for each class
-                #labels = ['弱酸性', '中性', '弱アルカリ性']
-
-                # Add the 'pH_class' column to the DataFrame
-                #chem_data[r] = pd.cut(chem_data['pH'], bins=bins, labels=labels, right=True)    
-                
                 d = r.replace('_rank', '')
-                labels = ['low', 'medium', 'high']
-                chem_data[r] = pd.qcut(chem_data[d], q=3, labels=labels)
+                #labels = ['low', 'medium', 'high']
 
-                #print(chem_data[r])                            
+                chem_data[r] = chem_data[d]
 
             ind = chem_data[chem_data[r].isna()].index
             asv_data = asv_data.drop(ind)
             chem_data = chem_data.drop(ind)
             
+                       
+
+            ind = chem_data[chem_data[r].isna()].index
+            asv_data = asv_data.drop(ind)
+            chem_data = chem_data.drop(ind)
+
             #if np.issubdtype(chem_data[r].dtype, np.floating):
             if pd.api.types.is_numeric_dtype(chem_data[r]):
                 if config['non_outlier'] == 'Q':
@@ -203,37 +197,48 @@ class data_create:
         if self.label_list != None:
             label_data = chem_data[self.label_list]
 
+def create_soft_labels_vectorized(values: torch.Tensor, thresholds: torch.Tensor, scale: float) -> torch.Tensor:
+    """
+    連続値のテンソルから、シグモイド関数を用いてソフトラベルを一括生成する。
+
+    Args:
+        values (torch.Tensor): 連続値の1次元テンソル (例: 年齢のリスト)
+        thresholds (torch.Tensor): クラス分けのしきい値のテンソル
+        scale (float): シグモイド関数の鋭さを制御するスケール
+
+    Returns:
+        torch.Tensor: ソフトラベルのテンソル (shape: [len(values), num_classes])
+    """
+    # 計算を容易にするため、しきい値の両端に-infと+infを追加
+    extended_thresholds = torch.cat([
+        torch.tensor([float('-inf')]),
+        thresholds,
+        torch.tensor([float('inf')])
+    ])
+
+    #print(values)
+    # 各値が、各しきい値を「超えている」確率をシグモイド関数で計算
+    # ブロードキャストを利用して一括計算 (values: [N, 1], extended_thresholds: [C+1]) -> [N, C+1]
+    p_above = torch.sigmoid((values.unsqueeze(1) - extended_thresholds) / scale)
+    #print(p_above)
+    #print(p_above)
+    # 各クラスの確率は「そのクラスの下限しきい値を超えている確率」-「上限しきい値を超えている確率」
+    # 例: P(class_i) = P(value > T_{i-1}) - P(value > T_i)
+    soft_labels = p_above[:, :-1] - p_above[:, 1:]
+    #print(soft_labels)
+    #print(soft_labels.sum(dim=1))
+    #print(soft_labels)
+    return soft_labels
+
 def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = config['val_size'],transformer= config['transformer'],
-                          augmentation = config['augmentation'],
+                          #augmentation = config['augmentation'],
+                          softlabel = config['softlabel'],
                           fold = None):
     x_train_split,x_val,y_train_split,y_val = train_test_split(x_train,y_train,test_size = val_size,random_state=0)
 
     #print(x_train_split)
     #print(y_train_split)
     
-    if augmentation == 'CTGAN':
-        x_columns = x_train_split.columns
-        #y_columns = y_train_split.columns
-        #pca = PCA(n_components=len(x_train_split))
-        #x_train_pca = pd.DataFrame(pca.fit_transform(np.array(x_train_split)),index = y_train_split.index)
-        #train = pd.concat([x_train_pca, y_train_split[reg_list]], axis=1)
-        train = pd.concat([x_train_split, y_train_split[reg_list]], axis=1)
-        #print(train.info())
-        metadata = SingleTableMetadata() 
-        metadata.detect_from_dataframe(data=train) # 作成されたメタデータの内容を確認 print("\n--- 自動検出されたメタデータ（辞書形式） ---") 
-        #print(metadata.to_dict())
-        # モデルの作成と訓練
-        ctgan = CTGANSynthesizer(metadata, epochs=50,verbose = True)
-        # 学習
-        ctgan.fit(train)
-        synthetic_data = ctgan.sample(len(train))
-        print(synthetic_data)
-
-        x_augmented = synthetic_data[x_columns]
-        y_augmented = synthetic_data[reg_list]
-        x_train_split = pd.concat([x_train_split, x_augmented], axis=0)
-        y_train_split = pd.concat([y_train_split, y_augmented], axis=0)
-
     if fold != None:
         train_feature_dir = os.path.join(fold, f'train_feature.csv')
         x_train_split.to_csv(train_feature_dir)
@@ -275,12 +280,43 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
     Y_train_tensor, Y_val_tensor, Y_test_tensor = {}, {}, {}
 
     for reg in reg_list:
-        if np.issubdtype(y_train_split[reg].dtype, np.floating):
+        if '_rank' in reg:
+            
+            #print(reg)
+            SCALE = 2.0
+            d = reg.replace('_rank', '')
+            y_train_split_pp = y_train_split[d].values.reshape(-1, 1)
+            y_val_pp = y_val[d].values.reshape(-1, 1)
+            y_test_pp = y_test[d].values.reshape(-1, 1)
+            #print(y_train_split[reg])
+            #Y_train_tensor.append(torch.tensor(y_train_split[reg].values, dtype=torch.int64))
+            #Y_val_tensor.append(torch.tensor(y_val[reg].values, dtype=torch.int64))
+            #Y_test_tensor.append(torch.tensor(y_test[reg].values, dtype=torch.int64))
+
+            #print(y_test_pp)
+            #Y_train_tensor[reg] = torch.tensor(y_train_split_pp, dtype=torch.float64)
+            #Y_val_tensor[reg] = torch.tensor(y_val_pp, dtype=torch.float64)
+            #Y_test_tensor[reg] = torch.tensor(y_test_pp, dtype=torch.float64)
+
+            Y_tr = torch.tensor(y_train_split_pp).ravel()
+            Y_v = torch.tensor(y_val_pp).ravel()
+            Y_te = torch.tensor(y_test_pp).ravel()
+
+            if d == "pH":
+                th = torch.tensor([5.5, 6.5])
+            #if d == "pH":
+            #    th = torch.tensor([20.0, 60.0])
+            Y_train_tensor[reg] = create_soft_labels_vectorized(Y_tr, th, SCALE)
+            Y_val_tensor[reg] = create_soft_labels_vectorized(Y_v, th, SCALE)
+            Y_test_tensor[reg] = create_soft_labels_vectorized(Y_te, th, SCALE)
+
+            #print(Y_test_tensor[reg])
+        elif np.issubdtype(y_train_split[reg].dtype, np.floating):
             #print("SS")
             pp = StandardScaler()
             #pp = MinMaxScaler()
             #pp = PowerTransformer(method='yeo-johnson')
-
+            
             if transformer == 'SS':
                 pp = pp.fit(y_train_split[reg].values.reshape(-1, 1))
                 y_train_split_pp = pp.transform(y_train_split[reg].values.reshape(-1, 1))
@@ -303,6 +339,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
             Y_train_tensor[reg] = torch.tensor(y_train_split_pp, dtype=torch.float32)
             Y_val_tensor[reg] = torch.tensor(y_val_pp, dtype=torch.float32)
             Y_test_tensor[reg] = torch.tensor(y_test_pp, dtype=torch.float32)
+
         else:
             y_train_split_pp = y_train_split[reg].values.reshape(-1, 1)
             y_val_pp = y_val[reg].values.reshape(-1, 1)
@@ -311,13 +348,15 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
             #Y_train_tensor.append(torch.tensor(y_train_split[reg].values, dtype=torch.int64))
             #Y_val_tensor.append(torch.tensor(y_val[reg].values, dtype=torch.int64))
             #Y_test_tensor.append(torch.tensor(y_test[reg].values, dtype=torch.int64))
+
             Y_train_tensor[reg] = torch.tensor(y_train_split_pp, dtype=torch.int64)
             Y_val_tensor[reg] = torch.tensor(y_val_pp, dtype=torch.int64)
             Y_test_tensor[reg] = torch.tensor(y_test_pp, dtype=torch.int64)
-
+    """
     data = []
     data_cov = []
     #data = {}
+
     if len(reg_list) >= 2:
         corr_dir = os.path.join(fold, f'corr.png')
         for i,reg in enumerate(reg_list):
@@ -348,6 +387,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
         #np.fill_diagonal(binary_matrix, 1.0)
         #print(corr_matrix)
         #print(binary_matrix)
+    """
 
     return X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids
 

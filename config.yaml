@@ -7,36 +7,41 @@ dataset.py:
   val_size: 0.2
   level: 7
   transformer: 'SS'
-  feature_transformer: 'ILR'
-  augmentation: 'None'
+  feature_transformer: 'CLR'
+  softlabel: True
 train.py:
   early_stopping: False
   patience: 5
   least_epoch: 0
   visualize: True
-  epochs: 30
+  epochs: 20
   vis_step: 5
   validation: True
-  lambda: 0.1 
+  lambda: 0.1
   learning_rate: [0.0001]
-  weights: [0.7, 0.3]
+  weights: [0.2, 0.1, 0.2, 0.2, 0.2, 0.1]
   SUM_train_lim: 10
   personal_train_lim: 1
   l2_shared: False
-  lambda_l2: 0.01
+  lambda_l2: 1.0
   lambda_l1: 0.01
   GradNorm_alpha: 1.0
+train_GP.py:
+  learning_rate: 0.1
+  epochs: 50
 test.py:
-  loss_sum: 'FusedLasso'
+  loss_sum: 'SUM'
+  num_predictive_samples: 100
+test_GP.py:
   num_predictive_samples: 100
 fold_eval.py:
   k_fold: 5
-  model_name: 'CNN'
-  result_dir: 'result'
+  model_name: 'GP'
+  result_dir: 'result_GP'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
-  comp_method: 'SUM'
+  comp_method: None
   exclude_ids: [
     '041_20_Sait_Carr', '042_20_Sait_Eggp', '043_20_Sait_Carr', '044_20_Sait_Broc',
     '045_20_Sait_Broc', '046_20_Sait_Burd', '047_20_Sait_Burd', '048_20_Sait_Yama',
@@ -49,8 +54,10 @@ main.py:
   reg_list: [
             ['pH','Available.P','EC','NH4.N','NO3.N','Exchangeable.K',
             #['pH_rank','Available.P_rank','EC_rank','NH4.N_rank','NO3.N_rank','Exchangeable.K_rank',
+            #['pH','pH_rank'
               #'CEC','Humus',''
               #'crop', 
               #'pref'
             ]
   ]
+

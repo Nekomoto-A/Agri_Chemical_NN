@@ -229,6 +229,7 @@ class PCGradOptimizer:
         # 投影された勾配を合計
         summed_flat_grad = torch.sum(torch.stack(projected_flat_grads), dim=0)
 
+        '''
         if self.l2 == True:
             # --- L2正則化の勾配を加算 ---
             if self.l2_reg_lambda > 0:
@@ -244,6 +245,7 @@ class PCGradOptimizer:
                 
                 # PCGradによって調整された勾配の合計にL2正則化の勾配を加算
                 summed_flat_grad += l2_reg_grad_sum
+                '''
 
         # 最終的な勾配をモデルのパラメータの.grad属性に設定
         self._set_flat_grad(summed_flat_grad)
@@ -668,7 +670,7 @@ def calculate_network_lasso_loss(model, correlation_matrix_tensor, lambda_lasso)
 
 # --- GradNorm の実装 ---
 class GradNorm:
-    def __init__(self, tasks, alpha=2.0, device='cpu'):
+    def __init__(self, tasks, alpha=5.0, device='cpu'):
         self.tasks = tasks  # タスク名のリスト (e.g., ['task1', 'task2'])
         self.num_tasks = len(tasks)
         self.alpha = alpha

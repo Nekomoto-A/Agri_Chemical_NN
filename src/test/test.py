@@ -28,7 +28,26 @@ def test_MT(x_te,y_te,model,reg_list,scalers,output_dir):
         #print(outputs)
         # 各出力の予測結果と実際の値をリストに格納
         for i,reg in enumerate(reg_list):
-            if torch.is_floating_point(y_te[reg]) == True:
+            if '_rank' in reg:
+                #print(outputs[reg])
+                output = torch.argmax(outputs[reg], dim=1).numpy()
+                true = torch.argmax(y_te[reg], dim=1).numpy()
+                
+                #print()
+                print(output)
+                print(true)
+
+                predicts[reg] = output
+                trues[reg] = true
+
+                r2 = accuracy_score(true,output)
+                #print(r2)
+                r2_scores.append(r2)
+                mse = f1_score(true,output, average='macro')
+                #print(mse)
+                mse_scores.append(mse)
+
+            elif torch.is_floating_point(y_te[reg]) == True:
                 if reg in scalers:
                     output = scalers[reg].inverse_transform(outputs[reg].numpy())
                     true = scalers[reg].inverse_transform(y_te[reg].numpy())
@@ -73,7 +92,7 @@ def test_MT(x_te,y_te,model,reg_list,scalers,output_dir):
             else:
                 output = torch.argmax(outputs[reg], dim=-1).numpy()
                 true = y_te[reg].numpy()
-
+                
                 predicts[reg] = output
                 trues[reg] = true
 
@@ -170,6 +189,10 @@ def test_MT_BNN(x_te,y_te,model,reg_list,scalers,output_dir,num_predictive_sampl
     return predicts, trues, r2_scores, mse_scores
 
 from src.training.train import training_MT,training_MT_BNN
+from src.training.train_GP import training_MT_GP
+from src.test.test_GP import test_MT_GP
+
+import gpytorch
 
 from src.models.MT_CNN import MTCNNModel
 from src.models.MT_CNN_Attention import MTCNNModel_Attention
@@ -180,6 +203,8 @@ from src.models.MT_CNN_SA import MTCNNModel_SA
 from src.models.MT_CNN_Di import MTCNNModel_Di
 from src.models.MT_BNN import MTBNNModel
 from src.models.MT_BNN_MG import MTBNNModel_MG
+from src.models.MT_GP import MultitaskGPModel
+
 import numpy as np
 import os
 import pandas as pd
@@ -214,16 +239,17 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
     output_dims = []
     #print(Y_train)
     for reg in reg_list:
-        if reg == 'pHtype':
+        all = torch.cat((Y_train[reg],Y_val[reg], Y_test[reg]), dim=0)
+        if '_rank' in reg:
+            #print(f'{reg}')
+            #print(Y_test[reg])
+            output_dims.append(3)
+        elif torch.is_floating_point(all) == True:
             output_dims.append(1)
         else:
-            all = torch.cat((Y_train[reg],Y_val[reg], Y_test[reg]), dim=0)
-            if torch.is_floating_point(all) == True:
-                output_dims.append(1)
-            else:
-                #print(torch.unique(all))
-                output_dims.append(len(torch.unique(all)))
-        #output_dims = np.ones(len(reg_list), dtype="int16")
+            #print(torch.unique(all))
+            output_dims.append(len(torch.unique(all)))
+    #output_dims = np.ones(len(reg_list), dtype="int16")
 
     if model_name == 'CNN':
         model = MTCNNModel(input_dim = input_dim,output_dims = output_dims,reg_list=reg_list)
@@ -243,7 +269,18 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         model = MTBNNModel(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
     elif model_name == 'BNN_MG':
         model = MTBNNModel_MG(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
+    elif model_name == 'GP':
+        if len(reg_list) > 1:
+            likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(num_tasks=len(reg_list))
+            y_train = torch.empty(len(X_train),len(reg_list))
+            for i,reg in enumerate(reg_list):
+                y_train[:,i] = Y_train[reg].view(-1)
+        else:
+            likelihood = gpytorch.likelihoods.GaussianLikelihood()
+            y_train = Y_train[reg_list[0]].view(-1)
+        #print(y_train)
 
+        model = MultitaskGPModel(train_x = X_train, train_y = y_train, likelihood = likelihood, num_tasks = len(reg_list), input_shape = input_dim)
 
     if 'BNN' in model_name:
         model_trained = training_MT_BNN(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model,
@@ -255,6 +292,15 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                     loss_sum = loss_sum
                                     )
         predicts, true, r2_results, mse_results = test_MT_BNN(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir)
+
+    elif 'GP' in model_name:
+        model_trained,likelihood_trained  = training_MT_GP(x_tr = X_train, y_tr = y_train, model = model,likelihood = likelihood, 
+                                                   reg_list = reg_list
+                                                   ) 
+
+        predicts, true, r2_results, mse_results = test_MT_GP(x_te = X_test,y_te = Y_test,model = model_trained,
+                                                             reg_list = reg_list,scalers = scalers,likelihood = likelihood_trained
+                                                             )
 
     else:
         #optimizer = optim.Adam(model.parameters(), lr=0.001)
@@ -273,7 +319,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
     for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
         print(f"Output {i+1} ({reg_list[i]}): R^2 Score = {r2:.3f}, MSE = {mse:.3f}")
 
-    '''
+
     for reg in reg_list:
         if 'CNN' in model_name:
             #print(test_ids)
@@ -290,10 +336,10 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
             plt.savefig(out)
             plt.close()
 
+
         predictions.setdefault(method, {}).setdefault(reg, []).append(predicts[reg])
         trues.setdefault(method, {}).setdefault(reg, []).append(true[reg])
-    '''
+    
     write_result(r2_results, mse_results, columns_list = reg_list, csv_dir = csv_dir, method = method, ind = index)
-
 
     return predictions, trues, r2_results, mse_results, model_trained
