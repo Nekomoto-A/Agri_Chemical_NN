@@ -1,6 +1,6 @@
 from src.datasets.dataset import data_create,transform_after_split
 
-from sklearn.model_selection import KFold,LeaveOneOut
+from sklearn.model_selection import KFold,LeaveOneOut, StratifiedKFold
 import os
 from src.test.test import train_and_test,write_result
 from src.test.statsmodel_test import stats_models_result
@@ -56,10 +56,8 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
     if k == 'LOOCV':
         kf = LeaveOneOut()
     else:
-        kf = KFold(n_splits=k, shuffle=True, random_state=42)
-
-    
-
+        #kf = KFold(n_splits=k, shuffle=True, random_state=42)
+        kf = StratifiedKFold(n_splits=k, shuffle=True, random_state=42)
     predictions = {}
     trues = {}
 
@@ -70,10 +68,13 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
 
     scores = {}
 
-    for fold, (train_index, test_index) in enumerate(kf.split(X, Y)):
+    for fold, (train_index, test_index) in enumerate(kf.split(X, Y['prefandcrop'])):
         index = [f'fold{fold+1}']
         X_train, X_test = X.iloc[train_index], X.iloc[test_index]
         Y_train, Y_test = Y.iloc[train_index], Y.iloc[test_index]
+
+        print(f'train:{Y_train['prefandcrop'].unique()}')
+        print(f'test:{Y_test['prefandcrop'].unique()}')
         
         fold_dir = os.path.join(sub_dir, index[0])
         os.makedirs(fold_dir,exist_ok=True)
@@ -81,13 +82,16 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
         vis_dir_main = os.path.join(fold_dir, method)
         os.makedirs(vis_dir_main,exist_ok=True)
 
-        X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers,_,_,test_ids = transform_after_split(X_train,X_test,Y_train,Y_test, reg_list = reg_list,fold = fold_dir)
+        X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids,label_train_tensor,label_test_tensor,label_val_tensor = transform_after_split(X_train,X_test,Y_train,Y_test, reg_list = reg_list,fold = fold_dir)
         
         print(X_train_tensor.shape)
         predictions, trues, r2_results, mse_results,model_trained = train_and_test(
             X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor, 
             scalers, predictions, trues, input_dim, method, index , reg_list, csv_dir,
-            vis_dir = vis_dir_main, model_name = model_name, test_ids = test_ids
+            vis_dir = vis_dir_main, model_name = model_name, test_ids = test_ids,
+            labels_train=label_train_tensor,
+            labels_val=label_val_tensor,
+            labels_test=label_test_tensor,
             )
         for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
             #print(r2_results)
@@ -108,7 +112,10 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
                 index , reg_list, csv_dir,
                 vis_dir = vis_dir_comp, 
                 model_name = model_name, test_ids = test_ids,
-                loss_sum = comp_method
+                loss_sum = comp_method,
+                labels_train=label_train_tensor,
+                labels_val=label_val_tensor,
+                labels_test=label_test_tensor,
                 )
             
             #print(r2_results)
@@ -133,14 +140,21 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
         os.makedirs(vis_dir_st,exist_ok=True)
 
         for i,r in enumerate(reg_list):
-            Y_train_single, Y_val_single, Y_test_single ={r:Y_train_tensor[r]}, {r:Y_val_tensor[r]}, {r:Y_test_tensor[r]}
+            Y_train_single, Y_test_single ={r:Y_train_tensor[r]}, {r:Y_test_tensor[r]}
+            if Y_val_tensor:
+                Y_val_single = {r:Y_val_tensor[r]}
+            else:
+                Y_val_single = {}
             reg = [r]
             print(X_train_tensor.shape)
 
             predictions, trues, r2_result, mse_result, model_trained_st = train_and_test(
             X_train = X_train_tensor, X_val = X_val_tensor, X_test = X_test_tensor, Y_train = Y_train_single, Y_val = Y_val_single, Y_test = Y_test_single, 
             scalers = scalers, predictions = predictions, trues = trues, input_dim = input_dim, method = method_st, index = index , reg_list = reg, csv_dir = csv_dir, 
-            vis_dir = vis_dir_st, model_name = model_name,test_ids = test_ids
+            vis_dir = vis_dir_st, model_name = model_name,test_ids = test_ids,
+            labels_train=label_train_tensor,
+            labels_val=label_val_tensor,
+            labels_test=label_test_tensor,
             )
             
             #pprint.pprint(predictions)

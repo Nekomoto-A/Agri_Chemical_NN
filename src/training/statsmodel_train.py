@@ -4,6 +4,7 @@ from xgboost import XGBRegressor,XGBClassifier
 from sklearn.datasets import make_regression
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LinearRegression
 import numpy as np
 
 def statsmodel_train(X,Y,scalers,reg):
@@ -24,7 +25,8 @@ def statsmodel_train(X,Y,scalers,reg):
         models = {
             "RF": RandomForestRegressor(),
             "XGB": XGBRegressor(),
-            "SVR": SVR()
+            "SVR": SVR(),
+            "LR": LinearRegression()
         }
     else:
         models = {

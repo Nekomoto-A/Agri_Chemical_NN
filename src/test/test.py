@@ -192,6 +192,9 @@ from src.training.train import training_MT,training_MT_BNN
 from src.training.train_GP import training_MT_GP
 from src.test.test_GP import test_MT_GP
 
+from src.training.train_HBM import training_MT_HBM
+from src.test.test_HBM import test_MT_HBM
+
 import gpytorch
 
 from src.models.MT_CNN import MTCNNModel
@@ -201,13 +204,17 @@ from src.models.MT_CNN_catph import MTCNN_catph
 from src.models.MT_CNN_soft import MTCNN_SPS
 from src.models.MT_CNN_SA import MTCNNModel_SA
 from src.models.MT_CNN_Di import MTCNNModel_Di
-from src.models.MT_BNN import MTBNNModel
 from src.models.MT_BNN_MG import MTBNNModel_MG
 from src.models.MT_GP import MultitaskGPModel
+from src.models.HBM import MultitaskModel
 
 import numpy as np
 import os
 import pandas as pd
+
+import pyro
+import pyro.distributions as dist
+from pyro.infer import MCMC, NUTS, Predictive
 
 def write_result(r2_results, mse_results, columns_list, csv_dir, method, ind):
     index_tuples = list(zip(method, ind))
@@ -234,12 +241,19 @@ def write_result(r2_results, mse_results, columns_list, csv_dir, method, ind):
 
 def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predictions, trues, 
                   input_dim, method, index, reg_list, csv_dir, vis_dir, model_name, test_ids, 
+                  labels_train = None,
+                  labels_val = None,
+                  labels_test = None,
                   loss_sum = config['loss_sum']):
 
     output_dims = []
     #print(Y_train)
     for reg in reg_list:
-        all = torch.cat((Y_train[reg],Y_val[reg], Y_test[reg]), dim=0)
+        if not Y_val:
+            all = torch.cat((Y_train[reg], Y_test[reg]), dim=0)
+        else:
+            all = torch.cat((Y_train[reg],Y_val[reg], Y_test[reg]), dim=0)
+
         if '_rank' in reg:
             #print(f'{reg}')
             #print(Y_test[reg])
@@ -265,23 +279,45 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         model = MTCNNModel_SA(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
     elif model_name == 'CNN_Di':
         model = MTCNNModel_Di(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
-    elif model_name == 'BNN':
-        model = MTBNNModel(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
     elif model_name == 'BNN_MG':
         model = MTBNNModel_MG(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
     elif model_name == 'GP':
         if len(reg_list) > 1:
             likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(num_tasks=len(reg_list))
+            #likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(
+            #        num_tasks=len(reg_list),
+            #        noise_constraint=gpytorch.constraints.GreaterThan(1e-4) # ノイズが1e-4より小さくならないようにする
+            #    ).double()
             y_train = torch.empty(len(X_train),len(reg_list))
             for i,reg in enumerate(reg_list):
                 y_train[:,i] = Y_train[reg].view(-1)
         else:
             likelihood = gpytorch.likelihoods.GaussianLikelihood()
+            #likelihood = gpytorch.likelihoods.GaussianLikelihood(
+            #    noise_constraint=gpytorch.constraints.GreaterThan(1e-4) # ノイズが1e-4より小さくならないようにする
+            #        ).double()
             y_train = Y_train[reg_list[0]].view(-1)
         #print(y_train)
 
-        model = MultitaskGPModel(train_x = X_train, train_y = y_train, likelihood = likelihood, num_tasks = len(reg_list), input_shape = input_dim)
+        model = MultitaskGPModel(train_x = X_train, train_y = y_train, likelihood = likelihood, num_tasks = len(reg_list))
+    elif model_name == 'HBM':
+        #print(labels_train)
+        location_train = labels_train['prefandcrop']
+        location_test = labels_test['prefandcrop']
 
+        X_train = X_train.to(torch.float32)
+        X_test = X_test.to(torch.float32)
+        y_train = torch.empty(len(X_train),len(reg_list))
+        for reg in reg_list:
+            Y_train[reg] = Y_train[reg].to(torch.float32)
+            Y_test[reg] = Y_test[reg].to(torch.float32)
+        for i,reg in enumerate(reg_list):
+            y_train[:,i] = Y_train[reg].view(-1).to(torch.float32)
+
+        #model =MT_HBM(x = X_train, location_idx = location_idx, num_locations = num_locations,num_tasks = len(reg_list))
+        model = MultitaskModel(task_names=reg_list, num_features = input_dim)
+
+        #nuts_kernel = NUTS(MT_HBM, jit_compile=True)
     if 'BNN' in model_name:
         model_trained = training_MT_BNN(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model,
                                     #optimizer = optimizer, 
@@ -301,7 +337,15 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         predicts, true, r2_results, mse_results = test_MT_GP(x_te = X_test,y_te = Y_test,model = model_trained,
                                                              reg_list = reg_list,scalers = scalers,likelihood = likelihood_trained
                                                              )
+        
+    elif 'BM' in model_name:
+        model_trained, method_bm = training_MT_HBM(x_tr = X_train, y_tr = y_train, model = model, location_indices = location_train,#output_dim, 
+                   reg_list = reg_list, #output_dir, model_name, likelihood, #optimizer, 
+                   output_dir=vis_dir
+                    )
 
+        predicts, true, r2_results, mse_results = test_MT_HBM(x_te = X_test, y_te = Y_test, loc_idx_test = location_test, model = model, trained_model = model_trained, 
+                                                              reg_list = reg_list, scalers = scalers,output_dir = vis_dir, method_bm =method_bm)
     else:
         #optimizer = optim.Adam(model.parameters(), lr=0.001)
         model_trained = training_MT(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model,
@@ -335,7 +379,6 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
             #plt.tight_layout()
             plt.savefig(out)
             plt.close()
-
 
         predictions.setdefault(method, {}).setdefault(reg, []).append(predicts[reg])
         trues.setdefault(method, {}).setdefault(reg, []).append(true[reg])

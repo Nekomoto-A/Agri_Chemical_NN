@@ -9,6 +9,7 @@ import numpy as np
 import seaborn as sns
 import pandas as pd
 
+
 import os
 import yaml
 yaml_path = 'config.yaml'
@@ -131,8 +132,9 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
             optimizer = optimizers.CAGradOptimizer(model.parameters(), lr=lr, c=0.5)
 
         elif loss_sum == 'MGDA':
-            optimizer_single = optim.Adam(model.parameters(), lr=lr)
-            mgda_solver = optimizers.MGDA(optimizer_single)
+            optimizer = optim.Adam(model.parameters(), lr=lr)
+            #mgda_solver = optimizers.MGDA(optimizer_single)
+
         elif loss_sum =='GradNorm':
             # GradNorm のインスタンス化
             grad_norm = optimizers.GradNorm(tasks=reg_list, alpha=alpha)
@@ -298,19 +300,31 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
         elif loss_sum == 'MGDA':
             if len(reg_list)==1:
                 train_loss = train_losses[reg_list[0]]
-                optimizer_single.zero_grad()
+                optimizer.zero_grad()
                 train_loss.backward()
-                optimizer_single.step()
+                optimizer.step()
             else:
+                optimizer.zero_grad()
                 # MGDAを適用してタスクの重みを計算
                 # model.parameters() はすべてのパラメータのジェネレータ
-                weights = mgda_solver.solve(train_losses, list(model.parameters()))
+                shared_grads = {
+                        task_name: torch.autograd.grad(loss, shared, retain_graph=True)[0]
+                        for task_name, loss in train_losses.items()
+                    }
+                #weights = mgda_solver.solve(train_losses, list(model.parameters()))
 
                 # 計算された重みを使って各タスクの勾配を調整し、最適化ステップを実行
                 # mgda_solver.get_weighted_grads() は、モデルのパラメータの .grad 属性を直接上書きします。
-                mgda_solver.get_weighted_grads(weights, list(model.parameters()))
-                
-                optimizer_single.step()
+                #mgda_solver.get_weighted_grads(weights, list(model.parameters()))
+                min_norm_sq, task_weights = optimizers.find_min_norm_element(shared_grads)
+                total_loss_mgda = sum(weight * loss for weight, loss in zip(task_weights, train_losses.values()))
+                #print(f"\n重み付けされた合計損失: {total_loss_mgda.item():.4f}")
+                #optimizer_single.step()
+                total_loss_mgda.backward()
+                #print("\n合計損失に基づいて逆伝播を実行しました。")
+
+                # 3-5. パラメータの更新
+                optimizer.step()
                 train_loss = sum(train_losses.values())
                                 
         elif loss_sum =='GradNorm':

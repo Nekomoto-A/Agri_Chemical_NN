@@ -56,7 +56,7 @@ def ilr_transform(data_array):
     return ilr_data
 
 class data_create:
-    def __init__(self,path_asv,path_chem,reg_list,exclude_ids, label_list = None, feature_transformer = config['feature_transformer']):
+    def __init__(self,path_asv,path_chem,reg_list,exclude_ids, label_list = None, feature_transformer = config['feature_transformer'], label_data = config['labels']):
         self.asv_data = pd.read_csv(path_asv)#.drop('index',axis = 1)
         #self.chem_data = pd.read_excel(path_chem)
         self.chem_data = pd.read_excel(path_chem)
@@ -65,6 +65,7 @@ class data_create:
         self.exclude_ids = exclude_ids
         self.feature_transformer = feature_transformer
         self.label_list = label_list
+        self.label_data = label_data
     def __iter__(self):
         #self.chem_data.columns = [col.replace('.', '_') for col in self.chem_data.columns]
         if config['level'] != 'asv':
@@ -124,11 +125,9 @@ class data_create:
             asv_data = asv_data.drop(ind)
             chem_data = chem_data.drop(ind)
             
-                       
-
-            ind = chem_data[chem_data[r].isna()].index
-            asv_data = asv_data.drop(ind)
-            chem_data = chem_data.drop(ind)
+            #ind = chem_data[chem_data[r].isna()].index
+            #asv_data = asv_data.drop(ind)
+            #chem_data = chem_data.drop(ind)
 
             #if np.issubdtype(chem_data[r].dtype, np.floating):
             if pd.api.types.is_numeric_dtype(chem_data[r]):
@@ -190,12 +189,23 @@ class data_create:
             #asv_array = multiplicative_replacement(asv_data.values)
             asv_array = asv_data.where(asv_data != 0, asv_data + 1e-100).values
             asv_feature = pd.DataFrame(asv_array, columns=asv_data.columns, index=asv_data.index)
+
+        if self.label_data != None:
+            for l in self.label_data:
+                if l == 'prefandcrop':
+                    chem_data[l] = chem_data['pref'].astype(str) + '_' + chem_data['crop'].astype(str)    
+                le = LabelEncoder()
+                chem_data[l] = le.fit_transform(chem_data[l])
+                label_encoders[l] = le  # 後でデコードするために保存
+                label_map = dict(zip(le.classes_, le.transform(le.classes_)))
+                print(f"{l} → 数値 のマッピング:", label_map)
+
         yield asv_feature
         yield chem_data
         yield label_encoders
-        
-        if self.label_list != None:
-            label_data = chem_data[self.label_list]
+
+        #if self.label_list != None:
+        #    label_data = chem_data[self.label_list]
 
 def create_soft_labels_vectorized(values: torch.Tensor, thresholds: torch.Tensor, scale: float) -> torch.Tensor:
     """
@@ -233,9 +243,15 @@ def create_soft_labels_vectorized(values: torch.Tensor, thresholds: torch.Tensor
 def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = config['val_size'],transformer= config['transformer'],
                           #augmentation = config['augmentation'],
                           softlabel = config['softlabel'],
-                          fold = None):
-    x_train_split,x_val,y_train_split,y_val = train_test_split(x_train,y_train,test_size = val_size,random_state=0)
-
+                          labels = config['labels'],
+                          fold = None
+                          ):
+    
+    if isinstance(val_size, (int, float)):
+        x_train_split,x_val,y_train_split,y_val = train_test_split(x_train,y_train,test_size = val_size,random_state=0)
+    else:
+        x_train_split = x_train
+        y_train_split = y_train
     #print(x_train_split)
     #print(y_train_split)
     
@@ -245,18 +261,19 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
         train_target_dir = os.path.join(fold, f'train_chem.csv')
         y_train_split.to_csv(train_target_dir)
 
-        val_feature_dir = os.path.join(fold, f'val_feature.csv')
-        x_val.to_csv(val_feature_dir)
-        val_target_dir = os.path.join(fold, f'val_chem.csv')
-        y_val.to_csv(val_target_dir)
-
         test_feature_dir = os.path.join(fold, f'test_feature.csv')
         x_test.to_csv(test_feature_dir)
         test_target_dir = os.path.join(fold, f'test_chem.csv')
         y_test.to_csv(test_target_dir)
+        
+        if isinstance(val_size, (int, float)):
+            val_feature_dir = os.path.join(fold, f'val_feature.csv')
+            x_val.to_csv(val_feature_dir)
+            val_target_dir = os.path.join(fold, f'val_chem.csv')
+            y_val.to_csv(val_target_dir)
 
     print('学習データ数:',len(x_train_split))
-    print('検証データ数:',len(x_val))
+    #print('検証データ数:',len(x_val))
     print('テストデータ数:',len(x_test))
 
     #x_train_split_clr,mean = clr_transform(x_train_split.astype(float))
@@ -268,25 +285,32 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
     #x_test_clr = x_test_clr.to_numpy()
 
     train_ids = y_train_split['crop-id']
-    val_ids = y_val['crop-id']
+
     test_ids = y_test['crop-id']
     
     X_train_tensor = torch.tensor(x_train_split.to_numpy(), dtype=torch.float32)
-    X_val_tensor = torch.tensor(x_val.to_numpy(), dtype=torch.float32)
     X_test_tensor = torch.tensor(x_test.to_numpy(), dtype=torch.float32)
 
+    if isinstance(val_size, (int, float)):
+        X_val_tensor = torch.tensor(x_val.to_numpy(), dtype=torch.float32)
+        val_ids = y_val['crop-id']
+    else:
+        X_val_tensor = torch.tensor([])
+        val_ids = torch.tensor([])
+    
     scalers = {}
     #Y_train_tensor, Y_val_tensor, Y_test_tensor = [], [], []
     Y_train_tensor, Y_val_tensor, Y_test_tensor = {}, {}, {}
+    label_train_tensor, label_val_tensor, label_test_tensor = {}, {}, {}
 
     for reg in reg_list:
         if '_rank' in reg:
-            
             #print(reg)
             SCALE = 2.0
             d = reg.replace('_rank', '')
             y_train_split_pp = y_train_split[d].values.reshape(-1, 1)
-            y_val_pp = y_val[d].values.reshape(-1, 1)
+            if isinstance(val_size, (int, float)):
+                y_val_pp = y_val[d].values.reshape(-1, 1)
             y_test_pp = y_test[d].values.reshape(-1, 1)
             #print(y_train_split[reg])
             #Y_train_tensor.append(torch.tensor(y_train_split[reg].values, dtype=torch.int64))
@@ -299,7 +323,8 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
             #Y_test_tensor[reg] = torch.tensor(y_test_pp, dtype=torch.float64)
 
             Y_tr = torch.tensor(y_train_split_pp).ravel()
-            Y_v = torch.tensor(y_val_pp).ravel()
+            if isinstance(val_size, (int, float)):
+                Y_v = torch.tensor(y_val_pp).ravel()
             Y_te = torch.tensor(y_test_pp).ravel()
 
             if d == "pH":
@@ -307,7 +332,8 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
             #if d == "pH":
             #    th = torch.tensor([20.0, 60.0])
             Y_train_tensor[reg] = create_soft_labels_vectorized(Y_tr, th, SCALE)
-            Y_val_tensor[reg] = create_soft_labels_vectorized(Y_v, th, SCALE)
+            if isinstance(val_size, (int, float)):
+                Y_val_tensor[reg] = create_soft_labels_vectorized(Y_v, th, SCALE)
             Y_test_tensor[reg] = create_soft_labels_vectorized(Y_te, th, SCALE)
 
             #print(Y_test_tensor[reg])
@@ -320,14 +346,16 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
             if transformer == 'SS':
                 pp = pp.fit(y_train_split[reg].values.reshape(-1, 1))
                 y_train_split_pp = pp.transform(y_train_split[reg].values.reshape(-1, 1))
-                y_val_pp = pp.transform(y_val[reg].values.reshape(-1, 1))
+                if isinstance(val_size, (int, float)):
+                    y_val_pp = pp.transform(y_val[reg].values.reshape(-1, 1))
                 y_test_pp = pp.transform(y_test[reg].values.reshape(-1, 1))
 
                 scalers[reg] = pp  # スケーラーを保存
             else:
                 #pp = pp.fit(y_train_split[reg].values.reshape(-1, 1))
                 y_train_split_pp = y_train_split[reg].values.reshape(-1, 1)
-                y_val_pp = y_val[reg].values.reshape(-1, 1)
+                if isinstance(val_size, (int, float)):
+                    y_val_pp = y_val[reg].values.reshape(-1, 1)
                 y_test_pp = y_test[reg].values.reshape(-1, 1)
 
                 #print(y_train_split_pp)
@@ -337,12 +365,14 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
             #Y_val_tensor.append(torch.tensor(y_val_pp, dtype=torch.float32))
             #Y_test_tensor.append(torch.tensor(y_test_pp, dtype=torch.float32))
             Y_train_tensor[reg] = torch.tensor(y_train_split_pp, dtype=torch.float32)
-            Y_val_tensor[reg] = torch.tensor(y_val_pp, dtype=torch.float32)
+            if isinstance(val_size, (int, float)):
+                Y_val_tensor[reg] = torch.tensor(y_val_pp, dtype=torch.float32)
             Y_test_tensor[reg] = torch.tensor(y_test_pp, dtype=torch.float32)
 
         else:
             y_train_split_pp = y_train_split[reg].values.reshape(-1, 1)
-            y_val_pp = y_val[reg].values.reshape(-1, 1)
+            if val_size != None:
+                y_val_pp = y_val[reg].values.reshape(-1, 1)
             y_test_pp = y_test[reg].values.reshape(-1, 1)
             #print(y_train_split[reg])
             #Y_train_tensor.append(torch.tensor(y_train_split[reg].values, dtype=torch.int64))
@@ -350,8 +380,18 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
             #Y_test_tensor.append(torch.tensor(y_test[reg].values, dtype=torch.int64))
 
             Y_train_tensor[reg] = torch.tensor(y_train_split_pp, dtype=torch.int64)
-            Y_val_tensor[reg] = torch.tensor(y_val_pp, dtype=torch.int64)
+            if isinstance(val_size, (int, float)):
+                Y_val_tensor[reg] = torch.tensor(y_val_pp, dtype=torch.int64)
             Y_test_tensor[reg] = torch.tensor(y_test_pp, dtype=torch.int64)
+    
+    if labels != None:
+        for l in labels:
+            label_train_tensor[l] = torch.tensor(y_train_split[l].values.reshape(-1), dtype=torch.int64)
+            label_test_tensor[l] = torch.tensor(y_test[l].values.reshape(-1), dtype=torch.int64)
+            if isinstance(val_size, (int, float)):
+                label_val_tensor[l] = torch.tensor(y_val[l].values.reshape(-1), dtype=torch.int64)
+            #print(label_train_tensor)
+
     """
     data = []
     data_cov = []
@@ -388,6 +428,4 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
         #print(corr_matrix)
         #print(binary_matrix)
     """
-
-    return X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids
-
+    return X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids,label_train_tensor,label_test_tensor,label_val_tensor

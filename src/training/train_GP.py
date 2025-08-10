@@ -45,6 +45,8 @@ def training_MT_GP(x_tr, y_tr,model, likelihood, #output_dim,
     #model = MultitaskGPModel(train_x = x_tr, train_y = y_train, likelihood = likelihood, num_tasks = len(reg_list), input_shape = iuput_dim)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    #optimizer = torch.optim.LBFGS(model.parameters(), lr=1, max_iter=50)
+    #optimizer = torch.optim.LBFGS(model.parameters(), lr=lr)
     if len(reg_list) > 1:
         #likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(num_tasks=len(reg_list))
         mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
@@ -54,6 +56,14 @@ def training_MT_GP(x_tr, y_tr,model, likelihood, #output_dim,
     
     model.train()
     likelihood.train()
+
+    # L-BFGSは、損失の計算と勾配の計算をクロージャーとして渡す必要があります
+    #def closure():
+    #    optimizer.zero_grad() # 勾配をリセット
+    #    output = model(x_tr) # 順伝播
+    #    loss = -mll(output, y_tr) # 損失を計算
+    #    loss.backward() # 勾配を計算
+    #    return loss
 
     for i in range(epochs):
         optimizer.zero_grad()
@@ -69,7 +79,11 @@ def training_MT_GP(x_tr, y_tr,model, likelihood, #output_dim,
         loss = -mll(output, y_tr) # 損失は負の周辺尤度
 
         loss.backward()
-
+        # optimizer.stepにクロージャを渡してパラメータを更新します。
+        #with gpytorch.settings.cholesky_jitter(1e-6):
+        #    loss = optimizer.step(closure)
+        #print(f"Iteration {i+1}/{training_iterations} - Loss: {loss.item():.3f}")
+        
         with torch.no_grad(), gpytorch.settings.fast_pred_var():
             train_loss = 0
             observed_pred = likelihood(model(x_tr))
@@ -84,9 +98,9 @@ def training_MT_GP(x_tr, y_tr,model, likelihood, #output_dim,
                     true = y_tr.numpy().reshape(-1, 1)
 
                 train_loss += mean_absolute_error(true,output)
-
-        print(f"Iteration {i+1}/{epochs} - Loss: {loss.item():.3f} - outloss: {train_loss:.3f}")
-        optimizer.step()
+        
+        #print(f"Iteration {i+1}/{epochs} - Loss: {loss.item():.3f} - outloss: {train_loss:.3f}")
+        print(f"Iteration {i+1}/{epochs} - Loss: {loss.item():.3f}")
+        #optimizer.step()
     
     return model, likelihood
-

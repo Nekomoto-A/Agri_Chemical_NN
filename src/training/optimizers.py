@@ -8,6 +8,7 @@ import torch.nn.functional as F
 import numpy as np
 import seaborn as sns
 import pandas as pd
+from scipy.optimize import minimize
 
 import os
 
@@ -948,3 +949,41 @@ def calculate_trace_norm(model):
                 weight = layer.weight
                 trace_norm += torch.linalg.svdvals(weight).sum()
     return trace_norm
+
+def find_min_norm_element(grads):
+    """
+    複数の勾配ベクトル(grads)が作る凸包内の最小ノルムの点を見つける。
+
+    引数:
+        grads (dict): タスク名をキー、勾配テンソルを値とする辞書。
+
+    戻り値:
+        gamma (float): 最小ノルムの値の2乗。
+        weights (np.array): 各タスクの最適な重み。
+    """
+    # グラードを行ベクトルとして行列にまとめる
+    grad_vectors = [g.flatten() for g in grads.values()]
+    G = torch.stack(grad_vectors, dim=0).cpu().numpy() # (タスク数, パラメータ数)
+
+    # 二次計画問題の目的関数: min 0.5 * || G^T * w ||^2
+    def objective_function(weights):
+        # weights: (タスク数,)
+        # G: (タスク数, パラメータ数)
+        # G^T * weights: (パラメータ数,)
+        return 0.5 * np.dot(weights, G.dot(G.T)).dot(weights)
+
+    # 制約条件と境界
+    num_tasks = len(grads)
+    constraints = ({'type': 'eq', 'fun': lambda w: np.sum(w) - 1.0}) # 重みの合計は1
+    bounds = tuple((0.0, 1.0) for _ in range(num_tasks))            # 各重みは0以上1以下
+
+    # 初期値
+    initial_weights = np.ones(num_tasks) / num_tasks
+
+    # 最適化の実行
+    sol = minimize(objective_function, initial_weights, bounds=bounds, constraints=constraints)
+    
+    weights = sol.x
+    min_norm_sq = sol.fun
+    
+    return min_norm_sq, weights

@@ -67,6 +67,7 @@ class MTCNNModel(nn.Module):
         return outputs, shared_features#, self.log_sigma_sqs  # リストとして出力
 
 
+    '''
     # 畳み込み層の重みに対する総和ゼロ制約のペナルティを計算するメソッド
     def calculate_sum_zero_penalty(self):
         penalty = 0.0
@@ -94,4 +95,4 @@ class MTCNNModel(nn.Module):
             # この例では、nn.Linear(64, out_dim) が最後の層
             task_weights.append(output_layer[2].weight) # output_layer[0]はLinear(self.hidden_dim, 64), output_layer[1]はReLU, output_layer[2]はLinear(64, out_dim)
         return task_weights
-
+        '''
