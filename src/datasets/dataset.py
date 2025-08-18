@@ -240,10 +240,14 @@ def create_soft_labels_vectorized(values: torch.Tensor, thresholds: torch.Tensor
     #print(soft_labels)
     return soft_labels
 
+from src.datasets.feature_selection import shap_feature_selection
+
+
 def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = config['val_size'],transformer= config['transformer'],
                           #augmentation = config['augmentation'],
                           softlabel = config['softlabel'],
                           labels = config['labels'],
+                          feature_selection = config['feature_selection'],
                           fold = None
                           ):
     
@@ -254,8 +258,23 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
         y_train_split = y_train
     #print(x_train_split)
     #print(y_train_split)
+
+    if feature_selection == 'shap':
+        # SHAPを用いた特徴選択
+        for reg in reg_list:
+            if fold is not None:
+                shap_dir = os.path.join(fold, f'shap_{reg}.csv')
+            else:
+                shap_dir = None
+            selected_features, _, _ = shap_feature_selection(x_train_split, y_train_split[reg], 
+                                                            num_features=None, random_state=42,
+                                                            output_csv_path = shap_dir)
+        #x_train_split = x_train_split[selected_features]
+        #x_test = x_test[selected_features]
+        #if isinstance(val_size, (int, float)):
+        #    x_val = x_val[selected_features]
     
-    if fold != None:
+    if fold is not None:
         train_feature_dir = os.path.join(fold, f'train_feature.csv')
         x_train_split.to_csv(train_feature_dir)
         train_target_dir = os.path.join(fold, f'train_chem.csv')

@@ -10,6 +10,7 @@ dataset.py:
   feature_transformer: 'ILR'
   softlabel: True
   labels: ['prefandcrop']
+  feature_selection: 'shap'
 train.py:
   early_stopping: False
   patience: 5
