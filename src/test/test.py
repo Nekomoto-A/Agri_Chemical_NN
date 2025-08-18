@@ -59,7 +59,7 @@ def test_MT(x_te,y_te,model,reg_list,scalers,output_dir):
                 trues[reg] = true
                 
                 result_dir = os.path.join(output_dir, reg)
-                os.makedirs(output_dir,exist_ok=True)
+                os.makedirs(result_dir,exist_ok=True)
                 TP_dir = os.path.join(result_dir, 'true_predict.png')
                 plt.figure()
                 plt.scatter(true,output)

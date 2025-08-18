@@ -46,7 +46,7 @@ test_HBM.py:
   num_samples_for_vi_pred: 10000
 fold_eval.py:
   k_fold: 5
-  model_name: 'HBM'
+  model_name: 'CNN'
   result_dir: 'result'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'

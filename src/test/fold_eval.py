@@ -73,8 +73,8 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
         X_train, X_test = X.iloc[train_index], X.iloc[test_index]
         Y_train, Y_test = Y.iloc[train_index], Y.iloc[test_index]
 
-        print(f'train:{Y_train['prefandcrop'].unique()}')
-        print(f'test:{Y_test['prefandcrop'].unique()}')
+        #print(f'train:{Y_train['prefandcrop'].unique()}')
+        #print(f'test:{Y_test['prefandcrop'].unique()}')
         
         fold_dir = os.path.join(sub_dir, index[0])
         os.makedirs(fold_dir,exist_ok=True)
@@ -93,14 +93,14 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
             labels_val=label_val_tensor,
             labels_test=label_test_tensor,
             )
+        
         for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
             #print(r2_results)
             t = reg_list[i]
             scores.setdefault('R2', {}).setdefault(method, {}).setdefault(t, []).append(r2)
             scores.setdefault('MSE', {}).setdefault(method, {}).setdefault(t, []).append(mse)
         
-
-        if comp_method != None:
+        if comp_method:
             vis_dir_comp = os.path.join(fold_dir, method_comp)
             os.makedirs(vis_dir_comp,exist_ok=True)
 
