@@ -189,8 +189,8 @@ class data_create:
             #asv_array = multiplicative_replacement(asv_data.values)
             asv_array = asv_data.where(asv_data != 0, asv_data + 1e-100).values
             asv_feature = pd.DataFrame(asv_array, columns=asv_data.columns, index=asv_data.index)
-
-        if self.label_data != None:
+        '''
+        if self.label_data is not None:
             for l in self.label_data:
                 if l == 'prefandcrop':
                     chem_data[l] = chem_data['pref'].astype(str) + '_' + chem_data['crop'].astype(str)    
@@ -199,10 +199,11 @@ class data_create:
                 label_encoders[l] = le  # 後でデコードするために保存
                 label_map = dict(zip(le.classes_, le.transform(le.classes_)))
                 print(f"{l} → 数値 のマッピング:", label_map)
-
+            yield label_encoders
+        '''
         yield asv_feature
         yield chem_data
-        yield label_encoders
+        
 
         #if self.label_list != None:
         #    label_data = chem_data[self.label_list]
@@ -241,13 +242,15 @@ def create_soft_labels_vectorized(values: torch.Tensor, thresholds: torch.Tensor
     return soft_labels
 
 from src.datasets.feature_selection import shap_feature_selection
-
+from src.datasets.data_augumentation import augment_with_ctgan
 
 def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = config['val_size'],transformer= config['transformer'],
                           #augmentation = config['augmentation'],
                           softlabel = config['softlabel'],
                           labels = config['labels'],
                           feature_selection = config['feature_selection'],
+                          num_selected_features = config['num_selected_features'],
+                          data_augumentation = config['data_augumentation'],
                           fold = None
                           ):
     
@@ -258,7 +261,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
         y_train_split = y_train
     #print(x_train_split)
     #print(y_train_split)
-
+    print(x_train_split.shape)
     if feature_selection == 'shap':
         # SHAPを用いた特徴選択
         for reg in reg_list:
@@ -267,13 +270,15 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
             else:
                 shap_dir = None
             selected_features, _, _ = shap_feature_selection(x_train_split, y_train_split[reg], 
-                                                            num_features=None, random_state=42,
+                                                            num_features=num_selected_features, random_state=42,
                                                             output_csv_path = shap_dir)
-        #x_train_split = x_train_split[selected_features]
-        #x_test = x_test[selected_features]
-        #if isinstance(val_size, (int, float)):
-        #    x_val = x_val[selected_features]
-    
+        x_train_split = x_train_split[selected_features]
+        x_test = x_test[selected_features]
+        if isinstance(val_size, (int, float)):
+            x_val = x_val[selected_features]
+        print(f"選択された特徴量数: {len(selected_features)}")
+        #print(f"学習データ:{x_train_split}")
+    print(x_train_split.shape)
     if fold is not None:
         train_feature_dir = os.path.join(fold, f'train_feature.csv')
         x_train_split.to_csv(train_feature_dir)
@@ -295,6 +300,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
     #print('検証データ数:',len(x_val))
     print('テストデータ数:',len(x_test))
 
+    #X_columns = x_train_split.columns.to_list()
     #x_train_split_clr,mean = clr_transform(x_train_split.astype(float))
     #x_val_clr,_ = clr_transform(x_val.astype(float),mean)
     #x_test_clr,_ = clr_transform(x_test.astype(float),mean)
@@ -306,6 +312,9 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
     train_ids = y_train_split['crop-id']
 
     test_ids = y_test['crop-id']
+
+    if data_augumentation == 'ctgan':
+        x_train_split, y_train_split = augment_with_ctgan(x_train_split, y_train_split, reg_list, n_samples=100, epochs=300)
     
     X_train_tensor = torch.tensor(x_train_split.to_numpy(), dtype=torch.float32)
     X_test_tensor = torch.tensor(x_test.to_numpy(), dtype=torch.float32)
@@ -402,8 +411,8 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
             if isinstance(val_size, (int, float)):
                 Y_val_tensor[reg] = torch.tensor(y_val_pp, dtype=torch.int64)
             Y_test_tensor[reg] = torch.tensor(y_test_pp, dtype=torch.int64)
-    
-    if labels != None:
+    '''
+    if labels is not None:
         for l in labels:
             label_train_tensor[l] = torch.tensor(y_train_split[l].values.reshape(-1), dtype=torch.int64)
             label_test_tensor[l] = torch.tensor(y_test[l].values.reshape(-1), dtype=torch.int64)
@@ -411,7 +420,9 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
                 label_val_tensor[l] = torch.tensor(y_val[l].values.reshape(-1), dtype=torch.int64)
             #print(label_train_tensor)
 
-    """
+    #print(Y_train_tensor)
+    #print(Y_test_tensor)
+
     data = []
     data_cov = []
     #data = {}
@@ -446,5 +457,5 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
         #np.fill_diagonal(binary_matrix, 1.0)
         #print(corr_matrix)
         #print(binary_matrix)
-    """
+    '''
     return X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids,label_train_tensor,label_test_tensor,label_val_tensor

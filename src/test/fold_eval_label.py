@@ -38,7 +38,7 @@ def fold_evaluate(reg_list, label_list,
 
     X,Y,label_encoders = data_create(feature_path, target_path, reg_list,exclude_ids,label_list)
 
-    input_dim = X.shape[1]
+    #input_dim = X.shape[1]
     method = 'MT'
     method_st = 'ST'
     kf = KFold(n_splits=k, shuffle=True, random_state=42)
@@ -67,6 +67,9 @@ def fold_evaluate(reg_list, label_list,
         vis_dir = os.path.join(fold_dir, method)
         os.makedirs(vis_dir,exist_ok=True)
 
+        input_dim = X_train_tensor.shape[1]
+        #print(f"Fold {fold+1} / {k} - 学習データの形状: {X_train_tensor.shape}, テストデータの形状: {X_test_tensor.shape}")
+        #print(input_dim)
         #print(X_train_tensor.shape)
         predictions, trues, r2_results, mse_results,model_trained = train_and_test(
             X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor, 

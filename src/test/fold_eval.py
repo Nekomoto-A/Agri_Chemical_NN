@@ -34,7 +34,7 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
     if os.path.exists(csv_dir):
         os.remove(csv_dir)
 
-    X,Y,_ = data_create(feature_path, target_path, reg_list,exclude_ids)
+    X,Y = data_create(feature_path, target_path, reg_list, exclude_ids)
     
     for reg in reg_list:
         #os.makedirs(output_dir,exist_ok=True)
@@ -48,7 +48,7 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
             plt.savefig(hist_dir)
             plt.close()
 
-    input_dim = X.shape[1]
+    #input_dim = X.shape[1]
     method = 'MT'
     method_comp = f'MT_{comp_method}'
     method_st = 'ST'
@@ -56,8 +56,8 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
     if k == 'LOOCV':
         kf = LeaveOneOut()
     else:
-        #kf = KFold(n_splits=k, shuffle=True, random_state=42)
-        kf = StratifiedKFold(n_splits=k, shuffle=True, random_state=42)
+        kf = KFold(n_splits=k, shuffle=True, random_state=42)
+        #kf = StratifiedKFold(n_splits=k, shuffle=True, random_state=42)
     predictions = {}
     trues = {}
 
@@ -68,7 +68,8 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
 
     scores = {}
 
-    for fold, (train_index, test_index) in enumerate(kf.split(X, Y['prefandcrop'])):
+    #for fold, (train_index, test_index) in enumerate(kf.split(X, Y['prefandcrop'])):
+    for fold, (train_index, test_index) in enumerate(kf.split(X)):
         index = [f'fold{fold+1}']
         X_train, X_test = X.iloc[train_index], X.iloc[test_index]
         Y_train, Y_test = Y.iloc[train_index], Y.iloc[test_index]
@@ -84,7 +85,8 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
 
         X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids,label_train_tensor,label_test_tensor,label_val_tensor = transform_after_split(X_train,X_test,Y_train,Y_test, reg_list = reg_list,fold = fold_dir)
         
-        print(X_train_tensor.shape)
+        input_dim = X_train_tensor.shape[1]
+        #print(X_train_tensor.shape)
         predictions, trues, r2_results, mse_results,model_trained = train_and_test(
             X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor, 
             scalers, predictions, trues, input_dim, method, index , reg_list, csv_dir,
