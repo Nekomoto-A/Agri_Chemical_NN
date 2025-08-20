@@ -55,7 +55,7 @@ def training_MT_HBM(x_tr, y_tr, location_indices,#output_dim,
         mcmc.run(x_tr, y_tr)
         
         #print("--- MCMCサンプリング完了 ---\n")
-        mcmc.summary(prob=0.9)
+        #mcmc.summary(prob=0.9)
 
         learned_model = mcmc
 

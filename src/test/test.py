@@ -200,7 +200,7 @@ import gpytorch
 from src.models.MT_CNN import MTCNNModel
 from src.models.MT_CNN_Attention import MTCNNModel_Attention
 from src.models.MT_CNN_catph import MTCNN_catph
-#from src.models.MT_NN import MTNNModel
+from src.models.MT_NN import MTNNModel
 from src.models.MT_CNN_soft import MTCNN_SPS
 from src.models.MT_CNN_SA import MTCNNModel_SA
 from src.models.MT_CNN_Di import MTCNNModel_Di
@@ -271,6 +271,8 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
     #    model = MTNNModel(input_dim = input_dim,output_dims = output_dims, hidden_layers=[128, 64, 64])
     elif model_name == 'CNN_catph':
         model = MTCNN_catph(input_dim = input_dim,reg_list=reg_list)
+    elif model_name == 'NN':
+        model = MTNNModel(input_dim = input_dim, output_dims = output_dims, reg_list=reg_list)
     elif model_name == 'CNN_soft':
         model = MTCNN_SPS(input_dim = input_dim,output_dims = output_dims,reg_list=reg_list)
     elif model_name == 'CNN_attention':

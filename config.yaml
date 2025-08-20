@@ -10,12 +10,13 @@ dataset.py:
   feature_transformer: 'ILR'
   softlabel: True
   labels: ['prefandcrop']
+  feature_selection: 'filter'
 train.py:
   early_stopping: False
   patience: 5
   least_epoch: 0
-  visualize: False
-  epochs: 60
+  visualize: True
+  epochs: 50
   vis_step: 5
   validation: True
   lambda: 0.1
@@ -38,7 +39,7 @@ train_HBM.py:
   learning_rate_vi: 0.001
   num_steps_vi: 3000
 test.py:
-  loss_sum: 'MGDA'
+  loss_sum: 'PCgrad'
   num_predictive_samples: 100
 test_GP.py:
   num_predictive_samples: 1000
@@ -51,7 +52,7 @@ fold_eval.py:
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
-  comp_method: 'SUM'
+  comp_method: None
   exclude_ids: [
     '041_20_Sait_Carr', '042_20_Sait_Eggp', '043_20_Sait_Carr', '044_20_Sait_Broc',
     '045_20_Sait_Broc', '046_20_Sait_Burd', '047_20_Sait_Burd', '048_20_Sait_Yama',
@@ -62,7 +63,8 @@ fold_eval.py:
   target_path: 'data/raw/chem_data.xlsx'
 main.py:
   reg_list: [
-            ['pH','Available.P','EC','NH4.N','NO3.N','Exchangeable.K',
+            ['pH','Available.P','EC','NH4.N',
+              'NO3.N','Exchangeable.K',
             #['pH','Available.P',
             #['pH_rank','Available.P_rank','EC_rank','NH4.N_rank','NO3.N_rank','Exchangeable.K_rank',
             #['pH','pH_rank'

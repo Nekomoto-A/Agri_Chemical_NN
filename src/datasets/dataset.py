@@ -244,6 +244,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
                           #augmentation = config['augmentation'],
                           softlabel = config['softlabel'],
                           labels = config['labels'],
+                          feature_selection = config['feature_selection'],
                           fold = None
                           ):
     
@@ -252,8 +253,12 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
     else:
         x_train_split = x_train
         y_train_split = y_train
-    #print(x_train_split)
+    print(x_train_split)
     #print(y_train_split)
+
+    #if feature_selection == 'filter':
+
+
     
     if fold != None:
         train_feature_dir = os.path.join(fold, f'train_feature.csv')

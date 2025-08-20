@@ -4,6 +4,7 @@ from sklearn.model_selection import KFold,LeaveOneOut, StratifiedKFold
 import os
 from src.test.test import train_and_test,write_result
 from src.test.statsmodel_test import stats_models_result
+from src.test.mt_statsmodel_test import mt_stats_models_result
 from src.experiments.visualize import reduce_feature
 import matplotlib.pyplot as plt
 import numpy as np
@@ -49,7 +50,7 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
             plt.close()
 
     input_dim = X.shape[1]
-    method = 'MT'
+    method_main = 'MT'
     method_comp = f'MT_{comp_method}'
     method_st = 'ST'
 
@@ -79,15 +80,23 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
         fold_dir = os.path.join(sub_dir, index[0])
         os.makedirs(fold_dir,exist_ok=True)
         
-        vis_dir_main = os.path.join(fold_dir, method)
+        vis_dir_main = os.path.join(fold_dir, method_main)
         os.makedirs(vis_dir_main,exist_ok=True)
 
         X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids,label_train_tensor,label_test_tensor,label_val_tensor = transform_after_split(X_train,X_test,Y_train,Y_test, reg_list = reg_list,fold = fold_dir)
         
         print(X_train_tensor.shape)
+        #print(Y_train_tensor.values.shape)
+
+        #for i,r in enumerate(reg_list):
+        #    print(X_train_tensor.shape)
+        #    print(Y_train_tensor[r].shape)
+        #    print(Y_val_tensor[r].shape)
+        #    print(Y_test_tensor[r].shape)
+
         predictions, trues, r2_results, mse_results,model_trained = train_and_test(
             X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor, 
-            scalers, predictions, trues, input_dim, method, index , reg_list, csv_dir,
+            scalers, predictions, trues, input_dim, method_main, index , reg_list, csv_dir,
             vis_dir = vis_dir_main, model_name = model_name, test_ids = test_ids,
             labels_train=label_train_tensor,
             labels_val=label_val_tensor,
@@ -96,13 +105,19 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
         for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
             #print(r2_results)
             t = reg_list[i]
-            scores.setdefault('R2', {}).setdefault(method, {}).setdefault(t, []).append(r2)
-            scores.setdefault('MSE', {}).setdefault(method, {}).setdefault(t, []).append(mse)
+            scores.setdefault('R2', {}).setdefault(method_main, {}).setdefault(t, []).append(r2)
+            scores.setdefault('MSE', {}).setdefault(method_main, {}).setdefault(t, []).append(mse)
         
-
         if comp_method != None:
             vis_dir_comp = os.path.join(fold_dir, method_comp)
             os.makedirs(vis_dir_comp,exist_ok=True)
+
+            #for i,r in enumerate(reg_list):
+            #    print(X_train_tensor.shape)
+            #    print(Y_train_tensor[r].shape)
+            #    print(Y_val_tensor[r].shape)
+            #    print(Y_test_tensor[r].shape)
+
 
             predictions, trues, r2_results, mse_results,model_trained_comp = train_and_test(
                 X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor, scalers, 
@@ -136,9 +151,34 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
                 scores.setdefault('R2', {}).setdefault(method_comp, {}).setdefault(t, []).append(r2)
                 scores.setdefault('MSE', {}).setdefault(method_comp, {}).setdefault(t, []).append(mse)
 
+        #for i,r in enumerate(reg_list):
+        #    print(X_train_tensor.shape)
+        #    print(Y_train_tensor[r].shape)
+        #    print(Y_val_tensor[r].shape)
+        #    print(Y_test_tensor[r].shape)
+
+
+        mt_stats_scores = mt_stats_models_result(X_train = X_train_tensor, Y_train = Y_train_tensor, 
+                                    X_test = X_test_tensor, Y_test = Y_test_tensor, scalers = scalers, reg = reg_list, 
+                                    result_dir = csv_dir, index = index)
+        
+        for metrics, dict in mt_stats_scores.items():
+            for method_name, regs in dict.items():
+                for reg_name, value in regs.items():
+                    scores.setdefault(metrics, {}).setdefault(method_name, {}).setdefault(reg_name, []).append(value[0])
+
         vis_dir_st = os.path.join(fold_dir, method_st)
         os.makedirs(vis_dir_st,exist_ok=True)
 
+        #scores.setdefault('R2', {}).setdefault(method_st, {}).setdefault(r, []).append(r2_result[0])
+        #scores.setdefault('MSE', {}).setdefault(method_st, {}).setdefault(r, []).append(mse_result[0])
+
+        for i,r in enumerate(reg_list):
+            print(X_train_tensor.shape)
+            print(Y_train_tensor[r].shape)
+            print(Y_val_tensor[r].shape)
+            print(Y_test_tensor[r].shape)
+        
         for i,r in enumerate(reg_list):
             Y_train_single, Y_test_single ={r:Y_train_tensor[r]}, {r:Y_test_tensor[r]}
             if Y_val_tensor:
@@ -147,6 +187,9 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
                 Y_val_single = {}
             reg = [r]
             print(X_train_tensor.shape)
+            print(Y_train_single[r].shape)
+            print(Y_val_single[r].shape)
+            print(Y_test_single[r].shape)
 
             predictions, trues, r2_result, mse_result, model_trained_st = train_and_test(
             X_train = X_train_tensor, X_val = X_val_tensor, X_test = X_test_tensor, Y_train = Y_train_single, Y_val = Y_val_single, Y_test = Y_test_single, 
@@ -180,6 +223,7 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
                 for method_name, regs in dict.items():
                     for reg_name, value in regs.items():
                         scores.setdefault(metrics, {}).setdefault(method_name, {}).setdefault(reg_name, []).append(value[0])
+
 
     for method, regs in predictions.items():
         for reg, values in regs.items():
@@ -263,9 +307,9 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
                 avg_std.setdefault(metrics, {}).setdefault(method_name, {})[target] = result
     
     if comp_method != None:
-        method_order = [method,method_comp, method_st]  # 先に固定するキー
+        method_order = [method_main,method_comp, method_st]  # 先に固定するキー
     else:
-        method_order = [method, method_st]  # 先に固定するキー
+        method_order = [method_main, method_st]  # 先に固定するキー
     # "MT" -> "ST" -> その他 の順にソートする関数
     def sort_methods(method_dict):
         # "MT", "ST" を最優先し、それ以外をアルファベット順で並べる
@@ -275,7 +319,7 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
     sorted_avg_std = {metric: sort_methods(methods) for metric, methods in avg_std.items()}
 
     #pprint.pprint(sorted_avg_std)
-    pprint.pprint(avg_std)
+    pprint.pprint(sorted_avg_std)
 
     with open(final_dir, mode='w', newline='') as file:
         writer = csv.writer(file)
