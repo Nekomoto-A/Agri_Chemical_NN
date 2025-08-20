@@ -317,6 +317,11 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         #model =MT_HBM(x = X_train, location_idx = location_idx, num_locations = num_locations,num_tasks = len(reg_list))
         model = MultitaskModel(task_names=reg_list, num_features = input_dim)
 
+    print('学習データ数:',len(X_train))
+    if X_val is not None:
+        print('検証データ数:',len(X_val))
+    print('テストデータ数:',len(X_test))
+
         #nuts_kernel = NUTS(MT_HBM, jit_compile=True)
     if 'BNN' in model_name:
         model_trained = training_MT_BNN(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model,

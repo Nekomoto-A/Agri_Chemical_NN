@@ -296,10 +296,6 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
             val_target_dir = os.path.join(fold, f'val_chem.csv')
             y_val.to_csv(val_target_dir)
 
-    print('学習データ数:',len(x_train_split))
-    #print('検証データ数:',len(x_val))
-    print('テストデータ数:',len(x_test))
-
     #X_columns = x_train_split.columns.to_list()
     #x_train_split_clr,mean = clr_transform(x_train_split.astype(float))
     #x_val_clr,_ = clr_transform(x_val.astype(float),mean)
@@ -314,7 +310,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
     test_ids = y_test['crop-id']
 
     if data_augumentation == 'ctgan':
-        x_train_split, y_train_split = augment_with_ctgan(x_train_split, y_train_split, reg_list, n_samples=100, epochs=300)
+        x_train_split, y_train_split = augment_with_ctgan(x_train_split, y_train_split, reg_list, n_samples=1000, epochs=300, output_dir = fold)
     
     X_train_tensor = torch.tensor(x_train_split.to_numpy(), dtype=torch.float32)
     X_test_tensor = torch.tensor(x_test.to_numpy(), dtype=torch.float32)

@@ -2,8 +2,12 @@ from ctgan import CTGAN
 import pandas as pd
 import numpy as np
 
+from sklearn.manifold import TSNE
+import matplotlib.pyplot as plt
+import os
+
 # 提供された関数
-def augment_with_ctgan(X, y, reg_list, n_samples=1000, epochs=10):
+def augment_with_ctgan(X, y, reg_list,output_dir, n_samples=1000, epochs=10):
     """
     CTGANを使用して表形式データを拡張する関数。
 
@@ -17,8 +21,36 @@ def augment_with_ctgan(X, y, reg_list, n_samples=1000, epochs=10):
     Returns:
         tuple: (合成された特徴量, 合成されたターゲット) のタプル。
     """
+
+    tsne = TSNE(n_components=2, random_state=42, perplexity=30, n_iter=1000)
+    X_embedded = tsne.fit_transform(X.values)
+    # ==== 結果をデータフレームにまとめる ====
+    df_embedded = pd.DataFrame(X_embedded, columns=["tsne1", "tsne2"])
+    
+    result_dir = os.path.join(output_dir, 'DA')
+    os.makedirs(result_dir, exist_ok=True)
+    for reg in reg_list:
+        ba = os.path.join(result_dir, f'{reg}_before_augument.png')
+        
+        df_embedded["target"] = y[reg].values
+        plt.figure(figsize=(8,6))
+        sc = plt.scatter(
+            df_embedded["tsne1"], 
+            df_embedded["tsne2"], 
+            c=df_embedded["target"], 
+            cmap="viridis", 
+            alpha=0.8
+        )
+        plt.colorbar(sc, label="target")
+        plt.xlabel("t-SNE 1")
+        plt.ylabel("t-SNE 2")
+        #plt.title("t-SNE visualization (colored by target)")
+        plt.tight_layout()
+        plt.savefig(ba)
+        plt.close()
+
     # 特徴量とターゲットを結合して1つのデータフレームにする
-    df = pd.concat([X, y], axis=1)
+    df = pd.concat([X, y[reg_list]], axis=1)
     
     # CTGANモデルのインスタンスを作成し、学習させる
     # verbose=True にすると学習の進捗が表示されます
@@ -29,11 +61,40 @@ def augment_with_ctgan(X, y, reg_list, n_samples=1000, epochs=10):
     synthetic_df = ctgan.sample(n_samples)
 
     # 生成されたデータから特徴量とターゲットを分離する
-    synthetic_features = synthetic_df[X.columns]
-    synthetic_targets = synthetic_df[reg_list]
+    synthetic_features = pd.concat([X,synthetic_df[X.columns]])
+    synthetic_targets = pd.concat([y[reg_list],synthetic_df[reg_list]])
     
     print(f"Generated {len(synthetic_features)} synthetic samples.")
+    
+
+    tsne = TSNE(n_components=2, random_state=42, perplexity=30, n_iter=1000)
+    X_augmented_embedded = tsne.fit_transform(synthetic_features.values)
+    # ==== 結果をデータフレームにまとめる ====
+    df_augmented_embedded = pd.DataFrame(X_augmented_embedded, columns=["tsne1", "tsne2"])
+    for reg in reg_list:
+        aa = os.path.join(result_dir, f'{reg}_after_augument.png')
+        
+        df_augmented_embedded["target"] = synthetic_targets[reg].values
+        plt.figure(figsize=(8,6))
+        sc = plt.scatter(
+            df_augmented_embedded["tsne1"], 
+            df_augmented_embedded["tsne2"], 
+            c=df_augmented_embedded["target"], 
+            cmap="viridis", 
+            alpha=0.8
+        )
+        plt.colorbar(sc, label="target")
+        plt.xlabel("t-SNE 1")
+        plt.ylabel("t-SNE 2")
+        #plt.title("t-SNE visualization (colored by target)")
+        plt.tight_layout()
+        plt.savefig(aa)
+        plt.close()
+    
     return synthetic_features, synthetic_targets
+
+
+
 
 def main():
     """

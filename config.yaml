@@ -12,13 +12,13 @@ dataset.py:
   labels: None
   feature_selection: 'shap'
   num_selected_features: 100
-  data_augumentation: None
+  data_augumentation: ctgan
 train.py:
   early_stopping: False
   patience: 5
   least_epoch: 0
   visualize: True
-  epochs: 20
+  epochs: 100
   vis_step: 5
   validation: True
   lambda: 0.1
