@@ -251,6 +251,9 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
                           feature_selection = config['feature_selection'],
                           num_selected_features = config['num_selected_features'],
                           data_augumentation = config['data_augumentation'],
+                          num_augumentation = config['num_augumentation'],
+                          data_vis = config['data_vis'],
+                          num_epochs = config['num_epochs'],
                           fold = None
                           ):
     
@@ -264,14 +267,12 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
     print(x_train_split.shape)
     if feature_selection == 'shap':
         # SHAPを用いた特徴選択
-        for reg in reg_list:
-            if fold is not None:
-                shap_dir = os.path.join(fold, f'shap_{reg}.csv')
-            else:
-                shap_dir = None
-            selected_features, _, _ = shap_feature_selection(x_train_split, y_train_split[reg], 
-                                                            num_features=num_selected_features, random_state=42,
-                                                            output_csv_path = shap_dir)
+        #for reg in reg_list:
+        selected_features, _, _ = shap_feature_selection(x_train_split, y_train_split[reg_list], 
+                                                        num_features=num_selected_features, random_state=42,
+                                                        output_csv_path = fold,
+                                                        reg_list = reg_list, output_dir = fold, data_vis = data_vis,
+                                                        )
         x_train_split = x_train_split[selected_features]
         x_test = x_test[selected_features]
         if isinstance(val_size, (int, float)):
@@ -310,7 +311,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
     test_ids = y_test['crop-id']
 
     if data_augumentation == 'ctgan':
-        x_train_split, y_train_split = augment_with_ctgan(x_train_split, y_train_split, reg_list, n_samples=1000, epochs=300, output_dir = fold)
+        x_train_split, y_train_split = augment_with_ctgan(x_train_split, y_train_split, reg_list, n_samples=num_augumentation, epochs=num_epochs, output_dir = fold,data_vis = data_vis)
     
     X_train_tensor = torch.tensor(x_train_split.to_numpy(), dtype=torch.float32)
     X_test_tensor = torch.tensor(x_test.to_numpy(), dtype=torch.float32)

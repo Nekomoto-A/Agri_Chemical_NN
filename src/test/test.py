@@ -368,7 +368,6 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
     for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
         print(f"Output {i+1} ({reg_list[i]}): R^2 Score = {r2:.3f}, MSE = {mse:.3f}")
 
-
     for reg in reg_list:
         if 'CNN' in model_name:
             #print(test_ids)

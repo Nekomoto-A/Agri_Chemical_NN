@@ -102,7 +102,7 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
             scores.setdefault('R2', {}).setdefault(method, {}).setdefault(t, []).append(r2)
             scores.setdefault('MSE', {}).setdefault(method, {}).setdefault(t, []).append(mse)
         
-        if comp_method:
+        if comp_method is not None:
             vis_dir_comp = os.path.join(fold_dir, method_comp)
             os.makedirs(vis_dir_comp,exist_ok=True)
 
@@ -137,6 +137,8 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
                 t = reg_list[i]
                 scores.setdefault('R2', {}).setdefault(method_comp, {}).setdefault(t, []).append(r2)
                 scores.setdefault('MSE', {}).setdefault(method_comp, {}).setdefault(t, []).append(mse)
+        else:
+            pass
 
         vis_dir_st = os.path.join(fold_dir, method_st)
         os.makedirs(vis_dir_st,exist_ok=True)
