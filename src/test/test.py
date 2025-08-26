@@ -5,6 +5,9 @@ from torch.utils.data import DataLoader
 from sklearn.metrics import accuracy_score, r2_score, mean_squared_error, f1_score, mean_absolute_error
 import matplotlib.pyplot as plt
 from src.experiments.visualize import visualize_tsne
+import shap
+import pandas as pd
+import numpy as np
 
 import yaml
 import os
@@ -13,7 +16,71 @@ script_name = os.path.basename(__file__)
 with open(yaml_path, "r") as file:
     config = yaml.safe_load(file)[script_name]
 
-def test_MT(x_te,y_te,model,reg_list,scalers,output_dir):
+class SpecificTaskModel(nn.Module):
+    def __init__(self, original_model, task_name):
+        super().__init__()
+        self.original_model = original_model
+        self.task_name = task_name
+
+    def forward(self, x):
+        # 元のモデルは (出力辞書, 共有特徴量) のタプルを返す
+        outputs_dict, _ = self.original_model(x)
+        # 目的のタスクの出力だけを返す
+        return outputs_dict[self.task_name]
+
+# 1. 現在のタスク用のラッパー関数を定義
+def test_shap(x_tr, x_te,model,reg_list, features, output_dir):
+    background_data = x_tr[torch.randperm(x_tr.size(0))[:100]]
+    feature_importance_dict = {}
+
+    for reg in reg_list:
+        #def model_wrapper(x):
+        #    outputs_dict, _ = model(x)
+        #    return outputs_dict[reg]
+        #explainer = shap.DeepExplainer(model_wrapper, background_data)
+        task_model = SpecificTaskModel(model, reg)
+        explainer = shap.DeepExplainer(task_model, background_data)
+        shap_values = explainer.shap_values(x_te)
+        mean_abs_shap = np.abs(shap_values).mean(axis=0).flatten()
+        feature_importance_dict[reg] = mean_abs_shap
+
+        # 1. サマリープロット（バー形式）を保存
+        # 新しい図の描画準備
+        save_path_bar = os.path.join(output_dir, f'shap_summary_bar_{reg}.png')
+        x_te_numpy = x_te.cpu().numpy()
+
+        # 1. サマリープロット（バー形式）を保存
+        plt.figure()
+        plt.title(f'Feature Importance for {reg} (Bar)')
+        # x_te の代わりに変換した x_te_numpy を渡す
+        shap.summary_plot(shap_values, x_te_numpy, feature_names=features, plot_type="bar", show=False)
+        plt.savefig(save_path_bar, bbox_inches='tight')
+        plt.close()
+        print(f"  - サマリープロット（バー）を {save_path_bar} に保存しました。")
+
+    shap_df = pd.DataFrame(feature_importance_dict, index=features)
+    # (前回のコードで shap_df が作成済みであることを前提とします)
+
+    # 保存するExcelファイルの名前を設定
+    excel_filename = 'shap_importance_sorted_by_task.xlsx'
+    result_dir = os.path.join(output_dir, excel_filename)
+
+    # ExcelWriterを使用して、複数のシートに書き込みを行う
+    with pd.ExcelWriter(result_dir, engine='openpyxl') as writer:
+        # データフレームのカラム（各タスク名）でループ処理
+        for task_name in shap_df.columns:
+            print(f"シート '{task_name}' を作成し、データを書き込んでいます...")
+            
+            # 該当タスクの列を選択し、値の大きい順（降順）にソートする
+            # [[task_name]] のように二重括弧で囲むことで、結果をDataFrameとして保持
+            sorted_df_for_task = shap_df[[task_name]].sort_values(by=task_name, ascending=False)
+            
+            # ソートしたデータフレームを、タスク名をシート名にしてExcelファイルに書き込む
+            # index=Trueはデフォルトですが、特徴量名を行名として残すために明示しています
+            sorted_df_for_task.to_excel(writer, sheet_name=task_name, index=True)
+    return feature_importance_dict
+
+def test_MT(x_te,y_te,model,reg_list,scalers,output_dir, features, shap_eval = config['shap_eval']):
     model.eval()  # モデルを評価モードに
     # 出力ごとの予測と実際のデータをリストに格納
     r2_scores = []
@@ -240,11 +307,11 @@ def write_result(r2_results, mse_results, columns_list, csv_dir, method, ind):
     aligned_data.to_csv(csv_dir, mode="a", header=not os.path.exists(csv_dir), index=True, encoding="utf-8")
 
 def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predictions, trues, 
-                  input_dim, method, index, reg_list, csv_dir, vis_dir, model_name, test_ids, 
+                  input_dim, method, index, reg_list, csv_dir, vis_dir, model_name, test_ids, features,
                   labels_train = None,
                   labels_val = None,
                   labels_test = None,
-                  loss_sum = config['loss_sum']):
+                  loss_sum = config['loss_sum'], shap_eval = config['shap_eval']):
 
     output_dims = []
     #print(Y_train)
@@ -361,7 +428,11 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                     model_name = model_name,
                                     loss_sum = loss_sum
                                     )
-        predicts, true, r2_results, mse_results = test_MT(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir)
+        predicts, true, r2_results, mse_results = test_MT(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir, features = features)
+        if shap_eval == True:
+            model_trained.eval()
+            #with torch.no_grad():
+            shaps = test_shap(X_train,X_test, model_trained,reg_list, features, vis_dir)
     #visualize_tsne(model = model_trained, model_name = model_name , X = X_test, Y = Y_test, reg_list = reg_list, output_dir = vis_dir, file_name = 'test.png')
 
     # --- 4. 結果を表示

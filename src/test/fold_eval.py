@@ -80,65 +80,56 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
         fold_dir = os.path.join(sub_dir, index[0])
         os.makedirs(fold_dir,exist_ok=True)
         
-        vis_dir_main = os.path.join(fold_dir, method)
-        os.makedirs(vis_dir_main,exist_ok=True)
-
-        X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids,label_train_tensor,label_test_tensor,label_val_tensor = transform_after_split(X_train,X_test,Y_train,Y_test, reg_list = reg_list,fold = fold_dir)
-        
+        X_train_tensor, X_val_tensor, X_test_tensor,features, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids,label_train_tensor,label_test_tensor,label_val_tensor = transform_after_split(X_train,X_test,Y_train,Y_test, reg_list = reg_list,fold = fold_dir)
         input_dim = X_train_tensor.shape[1]
-        #print(X_train_tensor.shape)
-        predictions, trues, r2_results, mse_results,model_trained = train_and_test(
-            X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor, 
-            scalers, predictions, trues, input_dim, method, index , reg_list, csv_dir,
-            vis_dir = vis_dir_main, model_name = model_name, test_ids = test_ids,
-            labels_train=label_train_tensor,
-            labels_val=label_val_tensor,
-            labels_test=label_test_tensor,
-            )
-        
-        for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
-            #print(r2_results)
-            t = reg_list[i]
-            scores.setdefault('R2', {}).setdefault(method, {}).setdefault(t, []).append(r2)
-            scores.setdefault('MSE', {}).setdefault(method, {}).setdefault(t, []).append(mse)
-        
-        if comp_method is not None:
-            vis_dir_comp = os.path.join(fold_dir, method_comp)
-            os.makedirs(vis_dir_comp,exist_ok=True)
 
-            predictions, trues, r2_results, mse_results,model_trained_comp = train_and_test(
-                X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor, scalers, 
-                predictions, trues, 
-                input_dim, 
-                method_comp, 
-                index , reg_list, csv_dir,
-                vis_dir = vis_dir_comp, 
-                model_name = model_name, test_ids = test_ids,
-                loss_sum = comp_method,
+        if len(reg_list) > 1:
+            vis_dir_main = os.path.join(fold_dir, method)
+            os.makedirs(vis_dir_main,exist_ok=True)
+            
+            #print(X_train_tensor.shape)
+            predictions, trues, r2_results, mse_results,model_trained = train_and_test(
+                X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor, 
+                scalers, predictions, trues, input_dim, method, index , reg_list, csv_dir,
+                vis_dir = vis_dir_main, model_name = model_name, test_ids = test_ids, features= features,
                 labels_train=label_train_tensor,
                 labels_val=label_val_tensor,
                 labels_test=label_test_tensor,
                 )
             
-            #print(r2_results)
-            
-            '''
-            if model_name == 'CNN' or model_name == 'CNN_catph':
-                reduced_features = model_trained.sharedconv(X_test_tensor.unsqueeze(1)).detach().numpy()
-            elif model_name == 'NN':
-                reduced_features = model_trained.sharedfc(X_test_tensor).detach().numpy()
-
-            reduced_features = reduced_features.reshape(reduced_features.shape[0], -1)
-            reduced.setdefault(method_st, {}).setdefault('all', []).append(reduced_features)
-            '''
-
             for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
                 #print(r2_results)
                 t = reg_list[i]
-                scores.setdefault('R2', {}).setdefault(method_comp, {}).setdefault(t, []).append(r2)
-                scores.setdefault('MSE', {}).setdefault(method_comp, {}).setdefault(t, []).append(mse)
-        else:
-            pass
+                scores.setdefault('R2', {}).setdefault(method, {}).setdefault(t, []).append(r2)
+                scores.setdefault('MSE', {}).setdefault(method, {}).setdefault(t, []).append(mse)
+            
+            if comp_method is not None:
+                vis_dir_comp = os.path.join(fold_dir, method_comp)
+                os.makedirs(vis_dir_comp,exist_ok=True)
+
+                predictions, trues, r2_results, mse_results,model_trained_comp = train_and_test(
+                    X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor, scalers, 
+                    predictions, trues, 
+                    input_dim, 
+                    method_comp, 
+                    index , reg_list, csv_dir,
+                    vis_dir = vis_dir_comp, 
+                    model_name = model_name, test_ids = test_ids, features = features,
+                    loss_sum = comp_method,
+                    labels_train=label_train_tensor,
+                    labels_val=label_val_tensor,
+                    labels_test=label_test_tensor,
+                    )
+                
+                #print(r2_results)
+                
+                for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
+                    #print(r2_results)
+                    t = reg_list[i]
+                    scores.setdefault('R2', {}).setdefault(method_comp, {}).setdefault(t, []).append(r2)
+                    scores.setdefault('MSE', {}).setdefault(method_comp, {}).setdefault(t, []).append(mse)
+            else:
+                pass
 
         vis_dir_st = os.path.join(fold_dir, method_st)
         os.makedirs(vis_dir_st,exist_ok=True)
@@ -155,7 +146,7 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
             predictions, trues, r2_result, mse_result, model_trained_st = train_and_test(
             X_train = X_train_tensor, X_val = X_val_tensor, X_test = X_test_tensor, Y_train = Y_train_single, Y_val = Y_val_single, Y_test = Y_test_single, 
             scalers = scalers, predictions = predictions, trues = trues, input_dim = input_dim, method = method_st, index = index , reg_list = reg, csv_dir = csv_dir, 
-            vis_dir = vis_dir_st, model_name = model_name,test_ids = test_ids,
+            vis_dir = vis_dir_st, model_name = model_name,test_ids = test_ids, features = features,
             labels_train=label_train_tensor,
             labels_val=label_val_tensor,
             labels_test=label_test_tensor,
@@ -266,17 +257,17 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
                 result = f'{avg}±{std}'
                 avg_std.setdefault(metrics, {}).setdefault(method_name, {})[target] = result
     
-    if comp_method != None:
-        method_order = [method,method_comp, method_st]  # 先に固定するキー
-    else:
-        method_order = [method, method_st]  # 先に固定するキー
+    #if comp_method != None:
+    #    method_order = [method,method_comp, method_st]  # 先に固定するキー
+    #else:
+    #    method_order = [method, method_st]  # 先に固定するキー
     # "MT" -> "ST" -> その他 の順にソートする関数
-    def sort_methods(method_dict):
+    #def sort_methods(method_dict):
         # "MT", "ST" を最優先し、それ以外をアルファベット順で並べる
-        sorted_keys = method_order + sorted(set(method_dict.keys()) - set(method_order))
-        return collections.OrderedDict((key, method_dict[key]) for key in sorted_keys)
+    #    sorted_keys = method_order + sorted(set(method_dict.keys()) - set(method_order))
+    #    return collections.OrderedDict((key, method_dict[key]) for key in sorted_keys)
     
-    sorted_avg_std = {metric: sort_methods(methods) for metric, methods in avg_std.items()}
+    #sorted_avg_std = {metric: sort_methods(methods) for metric, methods in avg_std.items()}
 
     #pprint.pprint(sorted_avg_std)
     pprint.pprint(avg_std)
@@ -289,7 +280,8 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
         writer.writerow(header)
 
         # データの書き込み
-        for metric, models in sorted_avg_std.items():
+        #for metric, models in sorted_avg_std.items():
+        for metric, models in avg_std.items():
             for model, values in models.items():
                 row = [metric, model] + [values[col] for col in reg_list]
                 writer.writerow(row)

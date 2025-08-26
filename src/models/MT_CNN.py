@@ -17,7 +17,7 @@ class MTCNNModel(nn.Module):
             self.sharedconv.add_module(f"conv{i+1}", nn.Conv1d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding))
             self.sharedconv.add_module(f"batchnorm{i+1}", nn.BatchNorm1d(out_channels))
             self.sharedconv.add_module(f"relu{i+1}", nn.ReLU())
-            self.sharedconv.add_module(f"dropout{i+1}", nn.Dropout(0.2))
+            #self.sharedconv.add_module(f"dropout{i+1}", nn.Dropout(0.2))
             #self.sharedconv.add_module(f"dropout{i+1}", nn.Dropout2d(0.2))
             self.sharedconv.add_module(f"maxpool{i+1}", nn.MaxPool1d(kernel_size=2))
             in_channels = out_channels  # 次の層の入力チャネル数は現在の出力チャネル数

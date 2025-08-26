@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, TensorDataset, Dataset
 from src.experiments.visualize import visualize_tsne
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
@@ -89,6 +89,30 @@ def calculate_fused_lasso_for_shared_layers(model, lambda_1, lambda_2):
 
     return l1_penalty + fusion_penalty
 
+class CustomDataset(Dataset):
+    """
+    入力データ(X)と辞書型のターゲット(y)を扱うためのカスタムデータセット。
+    """
+    def __init__(self, X, y):
+        self.X = X
+        self.y = y
+        # y辞書のキー（タスク名）を取得
+        self.reg_list = list(y.keys())
+
+    def __len__(self):
+        # データセットの全長を返す
+        return len(self.X)
+
+    def __getitem__(self, idx):
+        # 指定されたインデックスのデータを取得
+        
+        # Xからデータを取得
+        x_data = self.X[idx]
+        
+        # yの各キーからデータを取得し、新しい辞書を作成
+        y_data = {key: self.y[key][idx] for key in self.reg_list}
+        
+        return x_data, y_data
 
 def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, model_name,loss_sum, #optimizer, 
                 scalers,
@@ -98,7 +122,8 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                 visualize = config['visualize'], val = config['validation'], lambda_norm = config['lambda'],least_epoch = config['least_epoch'],
                 lr=config['learning_rate'],weights = config['weights'],vis_step = config['vis_step'],SUM_train_lim = config['SUM_train_lim'],personal_train_lim = config['personal_train_lim'],
                 l2_shared = config['l2_shared'],lambda_l2 = config['lambda_l2'], lambda_l1 = config['lambda_l1'], 
-                alpha = config['GradNorm_alpha']
+                alpha = config['GradNorm_alpha'],
+                batch_size = config['batch_size']
                 ):
 
     if len(lr) == 1:
@@ -217,6 +242,18 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
     if loss_sum == 'Graph_weight':
         correlation_matrix_tensor = optimizers.create_correlation_matrix(y_tr)
 
+    #y_tr_tensor = torch.vstack([y_tr[reg] for reg in reg_list]).T
+    #y_val_tensor = torch.vstack([y_val[reg] for reg in reg_list]).T
+    
+    #train_dataset = TensorDataset(x_tr, y_tr_tensor)
+    train_dataset = CustomDataset(x_tr, y_tr)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+
+    # 検証用 (シャッフルは必須ではない)
+    #val_dataset = TensorDataset(x_val, y_val_tensor)
+    val_dataset = CustomDataset(x_val, y_val)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    
     for epoch in range(epochs):
         if visualize == True:
             if epoch == 0:
@@ -224,228 +261,212 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                 visualize_tsne(model = model, model_name = model_name,scalers = scalers, X = x_tr, Y = y_tr, reg_list = reg_list, output_dir = output_dir, file_name = vis_name,
                                #X2 = x_val,Y2 = y_val
                                )
-        model.train()
-        #torch.autograd.set_detect_anomaly(True)
-        outputs,shared = model(x_tr)
-        
-        #print(outputs['pH_rank'])
-        
-        #train_losses = []
-        train_losses = {}
-        #for j in range(len(output_dim)):
-        for reg,out in zip(reg_list,output_dim):
-            #print(outputs[reg].dtype)  # 例: torch.Size([32, 3])
-            #print(y_tr[reg].ravel().dtype)
-            #print(x_tr.shape)
-            #print(y_tr[reg].shape)
 
-            if '_rank' in reg:
-                true_tr = y_tr[reg]
-                outputs[reg] = F.log_softmax(outputs[reg],dim = 1)
-                #print(y_tr[reg].shape)
-                #print(outputs[reg].shape)
-            elif out>1:
-                true_tr = y_tr[reg].ravel()
-            else:
-                true_tr = y_tr[reg]
+        running_train_losses = {key: 0.0 for key in ['SUM'] + reg_list}
+        for x_batch, y_batch in train_loader:
+            model.train()
+            outputs,shared = model(x_batch)
+            train_losses = {}
+            #for j in range(len(output_dim)):
+            for i,reg in enumerate(reg_list):
+                true_tr = y_batch[reg]
+                loss = personal_losses[reg](outputs[reg], true_tr)
+                #print(f'{reg}:{loss}')
+                #train_losses.append(loss)
+                train_losses[reg] = loss
+                #train_loss_history.setdefault(reg, []).append(loss.item())
+                running_train_losses[reg] += loss.item()
+                running_train_losses['SUM'] += loss.item()
 
-            #loss = personal_losses[reg](outputs[reg], y_tr[reg].ravel())
-            #loss = personal_losses[reg](outputs[reg], y_tr[reg])
-            #print(reg)
-            #print(true_tr.shape)
-            #print(outputs[reg].shape)
-            loss = personal_losses[reg](outputs[reg], true_tr)
-            #print(f'{reg}:{loss}')
-            train_loss_history.setdefault(reg, []).append(loss.item())
+            if loss_sum == 'PCgrad' or loss_sum == 'PCgrad_initial_weight':
+                if len(reg_list)==1:
+                    train_loss = train_losses[reg]
+                    learning_loss = train_loss
+                    if l2_shared == True:
+                        l2_loss = calculate_shared_l2_regularization(model = model,lambda_shared=lambda_l2)
+                        learning_loss += l2_loss
+                    base_optimizer.zero_grad()
+                    learning_loss.backward()
+                    base_optimizer.step()
+                else:
+                    if loss_sum == 'PCgrad_initial_weight':
+                        #print(y_tr)
+                        initial_loss_weights = optimizers.calculate_initial_loss_weights_by_correlation(true_targets= y_tr,reg_list=reg_list)
 
-            #train_losses.append(loss)
-            train_losses[reg] = loss
-        
-        if loss_sum == 'PCgrad' or loss_sum == 'PCgrad_initial_weight':
-            if len(reg_list)==1:
-                train_loss = train_losses[reg]
+                        weighted_train_losses = []
+                        for n, raw_loss in enumerate(train_losses):
+                            # initial_loss_weights[n] は既にPyTorchテンソルなので、そのまま乗算できます
+                            # ここで新しいテンソルが作成され、元のraw_train_lossesは変更されない
+                            weighted_train_losses.append(initial_loss_weights[n] * raw_loss)
+                    
+                        # PCGradOptimizerのstepメソッドに重み付けされた損失のリストを渡す
+                        optimizer.step(weighted_train_losses) # 修正点: ここで新しいリストを渡す
+                        # 表示用の総損失
+                        train_loss = sum(weighted_train_losses) # 表示用に合計する
+                        learning_loss = train_loss
+                    else:
+                        # PCGradOptimizerのstepメソッドに重み付けされた損失のリストを渡す
+                        optimizer.step(train_losses) # 修正点: ここで新しいリストを渡す
+                        # 表示用の総損失
+                        train_loss = sum(train_losses.values()) # 表示用に合計する
+                        learning_loss = train_loss
+            elif loss_sum == 'CAgrad':
+                optimizer.step(train_losses)
+                train_loss = sum(train_losses.values())
                 learning_loss = train_loss
+            elif loss_sum == 'MGDA':
+                if len(reg_list)==1:
+                    train_loss = train_losses[reg_list[0]]
+                    optimizer.zero_grad()
+                    train_loss.backward()
+                    optimizer.step()
+                else:
+                    optimizer.zero_grad()
+                    # MGDAを適用してタスクの重みを計算
+                    # model.parameters() はすべてのパラメータのジェネレータ
+                    shared_grads = {
+                            task_name: torch.autograd.grad(loss, shared, retain_graph=True)[0]
+                            for task_name, loss in train_losses.items()
+                        }
+                    #weights = mgda_solver.solve(train_losses, list(model.parameters()))
+
+                    # 計算された重みを使って各タスクの勾配を調整し、最適化ステップを実行
+                    # mgda_solver.get_weighted_grads() は、モデルのパラメータの .grad 属性を直接上書きします。
+                    #mgda_solver.get_weighted_grads(weights, list(model.parameters()))
+                    min_norm_sq, task_weights = optimizers.find_min_norm_element(shared_grads)
+                    total_loss_mgda = sum(weight * loss for weight, loss in zip(task_weights, train_losses.values()))
+                    #print(f"\n重み付けされた合計損失: {total_loss_mgda.item():.4f}")
+                    #optimizer_single.step()
+                    total_loss_mgda.backward()
+                    #print("\n合計損失に基づいて逆伝播を実行しました。")
+
+                    # 3-5. パラメータの更新
+                    optimizer.step()
+                    train_loss = sum(train_losses.values())
+                                    
+            elif loss_sum =='GradNorm':
+                # GradNorm の損失重み更新
+                # モデルのオプティマイザを渡すことで、その学習率をloss_weightsの更新に利用できる
+                current_loss_weights = grad_norm.update_loss_weights(train_losses, optimizer)
+                
+                # 全体の加重損失計算
+                learning_loss = sum(current_loss_weights[i] * train_losses[reg_list[i]] for i in range(len(reg_list)))
+
                 if l2_shared == True:
                     l2_loss = calculate_shared_l2_regularization(model = model,lambda_shared=lambda_l2)
                     learning_loss += l2_loss
-                base_optimizer.zero_grad()
+
+                # バックワードパスと最適化 (モデルパラメータの更新)
+                optimizer.zero_grad()
                 learning_loss.backward()
-                base_optimizer.step()
-            else:
-                if loss_sum == 'PCgrad_initial_weight':
-                    #print(y_tr)
-                    initial_loss_weights = optimizers.calculate_initial_loss_weights_by_correlation(true_targets= y_tr,reg_list=reg_list)
-
-                    weighted_train_losses = []
-                    for n, raw_loss in enumerate(train_losses):
-                        # initial_loss_weights[n] は既にPyTorchテンソルなので、そのまま乗算できます
-                        # ここで新しいテンソルが作成され、元のraw_train_lossesは変更されない
-                        weighted_train_losses.append(initial_loss_weights[n] * raw_loss)
-                
-                    # PCGradOptimizerのstepメソッドに重み付けされた損失のリストを渡す
-                    optimizer.step(weighted_train_losses) # 修正点: ここで新しいリストを渡す
-                    # 表示用の総損失
-                    train_loss = sum(weighted_train_losses) # 表示用に合計する
-                    learning_loss = train_loss
-                else:
-                    # PCGradOptimizerのstepメソッドに重み付けされた損失のリストを渡す
-                    optimizer.step(train_losses) # 修正点: ここで新しいリストを渡す
-                    # 表示用の総損失
-                    train_loss = sum(train_losses.values()) # 表示用に合計する
-                    learning_loss = train_loss
-        elif loss_sum == 'CAgrad':
-            optimizer.step(train_losses)
-            train_loss = sum(train_losses.values())
-            learning_loss = train_loss
-        elif loss_sum == 'MGDA':
-            if len(reg_list)==1:
-                train_loss = train_losses[reg_list[0]]
-                optimizer.zero_grad()
-                train_loss.backward()
                 optimizer.step()
+
+                train_loss = sum(train_losses.values())
+
             else:
+                if len(reg_list)==1:
+                    learning_loss = train_losses[reg_list[0]]
+                    train_loss = learning_loss
+
+                elif loss_sum == 'SUM':
+                    learning_loss = sum(train_losses.values())
+                    train_loss = sum(train_losses.values())
+                elif loss_sum == 'WeightedSUM':
+                    learning_loss = 0
+                    #weight_list = weights
+                    for k,l in enumerate(train_losses.values()):
+                        learning_loss += weights[k] * l
+                    train_loss = sum(train_losses.values())
+                elif loss_sum == 'Normalized':
+                    train_loss = loss_fn(train_losses)
+                elif loss_sum == 'Uncertainlyweighted':
+                    train_loss = sum(train_losses.values())
+                    learning_loss = loss_fn(train_losses)
+                elif loss_sum == 'Graph_weight':
+                    train_loss = sum(train_losses.values())
+                    #train_loss += lambda_norm * np.abs(train_losses[0].item()-train_losses[1].item())**2
+                    # ネットワークLasso正則化項の計算
+
+                    lasso_loss = optimizers.calculate_network_lasso_loss(model, correlation_matrix_tensor, lambda_norm)
+
+                    #総損失にLasso項を加算
+                    learning_loss = train_loss + lasso_loss
+
+                    #reg_loss = model.calculate_sum_zero_penalty()
+                    #train_loss += reg_loss
+
+                elif loss_sum == 'LearnableTaskWeighted':
+                    train_loss = sum(train_losses.values())
+                    learning_loss = loss_fn(train_losses)
+                elif loss_sum == 'ZeroSUM':
+                    reg_loss = model.calculate_sum_zero_penalty()
+                    train_loss = sum(train_losses)
+                    learning_loss = train_loss + lambda_norm * reg_loss
+                elif loss_sum == 'TraceNorm':
+                    train_loss = sum(train_losses.values())
+                    reg_loss = optimizers.calculate_trace_norm(model)
+                    learning_loss = train_loss + lambda_norm * reg_loss
+                elif loss_sum == 'ElasticNet':
+                    train_loss = sum(train_losses.values())
+                    l_elastic = calculate_shared_elastic_net(model = model, lambda_l1 = lambda_l1, lambda_l2 = lambda_l2)
+                    learning_loss = train_loss + l_elastic
+                elif loss_sum == 'FusedLasso':
+                    train_loss = sum(train_losses.values())
+                    l_fused = calculate_fused_lasso_for_shared_layers(model = model, lambda_1 = lambda_l1, lambda_2 = lambda_l2)
+                    learning_loss = train_loss + l_fused
+                if l2_shared == True:
+                    l2_loss = calculate_shared_l2_regularization(model = model,lambda_shared=lambda_l2)
+                    learning_loss += l2_loss
+
                 optimizer.zero_grad()
-                # MGDAを適用してタスクの重みを計算
-                # model.parameters() はすべてのパラメータのジェネレータ
-                shared_grads = {
-                        task_name: torch.autograd.grad(loss, shared, retain_graph=True)[0]
-                        for task_name, loss in train_losses.items()
-                    }
-                #weights = mgda_solver.solve(train_losses, list(model.parameters()))
-
-                # 計算された重みを使って各タスクの勾配を調整し、最適化ステップを実行
-                # mgda_solver.get_weighted_grads() は、モデルのパラメータの .grad 属性を直接上書きします。
-                #mgda_solver.get_weighted_grads(weights, list(model.parameters()))
-                min_norm_sq, task_weights = optimizers.find_min_norm_element(shared_grads)
-                total_loss_mgda = sum(weight * loss for weight, loss in zip(task_weights, train_losses.values()))
-                #print(f"\n重み付けされた合計損失: {total_loss_mgda.item():.4f}")
-                #optimizer_single.step()
-                total_loss_mgda.backward()
-                #print("\n合計損失に基づいて逆伝播を実行しました。")
-
-                # 3-5. パラメータの更新
+                #print(f"learning_loss:{learning_loss}")
+                #print(f"train_loss:{train_loss}")
+                learning_loss.backward()
                 optimizer.step()
-                train_loss = sum(train_losses.values())
-                                
-        elif loss_sum =='GradNorm':
-            # GradNorm の損失重み更新
-            # モデルのオプティマイザを渡すことで、その学習率をloss_weightsの更新に利用できる
-            current_loss_weights = grad_norm.update_loss_weights(train_losses, optimizer)
-            
-            # 全体の加重損失計算
-            learning_loss = sum(current_loss_weights[i] * train_losses[reg_list[i]] for i in range(len(reg_list)))
+                #if scheduler != None:
+                #scheduler.step()
 
-            if l2_shared == True:
-                l2_loss = calculate_shared_l2_regularization(model = model,lambda_shared=lambda_l2)
-                learning_loss += l2_loss
-
-            # バックワードパスと最適化 (モデルパラメータの更新)
-            optimizer.zero_grad()
-            learning_loss.backward()
-            optimizer.step()
-
-            train_loss = sum(train_losses.values())
-
-        else:
-            if len(reg_list)==1:
-                learning_loss = train_losses[reg_list[0]]
-                train_loss = learning_loss
-
-            elif loss_sum == 'SUM':
-                learning_loss = sum(train_losses.values())
-                train_loss = sum(train_losses.values())
-            elif loss_sum == 'WeightedSUM':
-                learning_loss = 0
-                #weight_list = weights
-                for k,l in enumerate(train_losses.values()):
-                    learning_loss += weights[k] * l
-                train_loss = sum(train_losses.values())
-            elif loss_sum == 'Normalized':
-                train_loss = loss_fn(train_losses)
-            elif loss_sum == 'Uncertainlyweighted':
-                train_loss = sum(train_losses.values())
-                learning_loss = loss_fn(train_losses)
-            elif loss_sum == 'Graph_weight':
-                train_loss = sum(train_losses.values())
-                #train_loss += lambda_norm * np.abs(train_losses[0].item()-train_losses[1].item())**2
-                 # ネットワークLasso正則化項の計算
-
-                lasso_loss = optimizers.calculate_network_lasso_loss(model, correlation_matrix_tensor, lambda_norm)
-
-                #総損失にLasso項を加算
-                learning_loss = train_loss + lasso_loss
-
-                #reg_loss = model.calculate_sum_zero_penalty()
-                #train_loss += reg_loss
-
-            elif loss_sum == 'LearnableTaskWeighted':
-                train_loss = sum(train_losses.values())
-                learning_loss = loss_fn(train_losses)
-            elif loss_sum == 'ZeroSUM':
-                reg_loss = model.calculate_sum_zero_penalty()
-                train_loss = sum(train_losses)
-                learning_loss = train_loss + lambda_norm * reg_loss
-            elif loss_sum == 'TraceNorm':
-                train_loss = sum(train_losses.values())
-                reg_loss = optimizers.calculate_trace_norm(model)
-                learning_loss = train_loss + lambda_norm * reg_loss
-            elif loss_sum == 'ElasticNet':
-                train_loss = sum(train_losses.values())
-                l_elastic = calculate_shared_elastic_net(model = model, lambda_l1 = lambda_l1, lambda_l2 = lambda_l2)
-                learning_loss = train_loss + l_elastic
-            elif loss_sum == 'FusedLasso':
-                train_loss = sum(train_losses.values())
-                l_fused = calculate_fused_lasso_for_shared_layers(model = model, lambda_1 = lambda_l1, lambda_2 = lambda_l2)
-                learning_loss = train_loss + l_fused
-            if l2_shared == True:
-                l2_loss = calculate_shared_l2_regularization(model = model,lambda_shared=lambda_l2)
-                learning_loss += l2_loss
-
-            optimizer.zero_grad()
-            #print(f"learning_loss:{learning_loss}")
-            #print(f"train_loss:{train_loss}")
-            learning_loss.backward()
-            optimizer.step()
-            #if scheduler != None:
-            #scheduler.step()
+        for reg in reg_list:
+            if reg not in train_loss_history:
+                train_loss_history[reg] = []
+            #train_loss_history[reg].append(train_losses[reg].item())
+            train_loss_history.setdefault(reg, []).append(running_train_losses[reg] / len(train_loader))
+        epoch_train_loss = running_train_losses['SUM'] / len(train_loader)   
         if len(reg_list)>1:
-            train_loss_history.setdefault('SUM', []).append(train_loss.item())
-
+            #train_loss_history.setdefault('SUM', []).append(train_loss.item())
+            train_loss_history.setdefault('SUM', []).append(epoch_train_loss)
+        
         if val == True:
             # モデルを評価モードに設定（検証データ用）
             model.eval()
-            val_loss = 0
+            running_val_losses = {key: 0.0 for key in ['SUM'] + reg_list}
+            #val_loss = 0
             with torch.no_grad():
-                outputs,_ = model(x_val)
-
-                val_losses = []
-                #for j in range(len(output_dim)):
-                
-                for reg,out in zip(reg_list,output_dim):
-                    if '_rank' in reg:
-                        true_val = y_val[reg]
-                        outputs[reg] = F.log_softmax(outputs[reg],dim = 1)
-                    elif out>1:
-                        true_val = y_val[reg].ravel()
-                    else:
-                        true_val = y_val[reg]
-                    #print(f'reg:{output}')
-                    loss = personal_losses[reg](outputs[reg], true_val)
-
-                    val_loss_history.setdefault(reg, []).append(loss.item())
+                for x_val_batch, y_val_batch in val_loader:
+                    outputs,_ = model(x_val_batch)
+                    val_losses = []
+                    #for j in range(len(output_dim)):
                     
-                    val_losses.append(loss)
+                    for reg,out in zip(reg_list,output_dim):
+                        true_val = y_val_batch[reg]
+                        #print(f'reg:{output}')
+                        loss = personal_losses[reg](outputs[reg], true_val)
 
-                if len(reg_list)==1:
-                    val_loss = val_losses[0]
-                else:
+                        #val_loss_history.setdefault(reg, []).append(loss.item())
+                        running_val_losses[reg] += loss.item()
+                        running_val_losses['SUM'] += loss.item()
+                        val_losses.append(loss)
                     val_loss = sum(val_losses)
-                    val_loss_history.setdefault('SUM', []).append(val_loss.item())
-                    
+            
+            epoch_val_loss = running_val_losses['SUM'] / len(val_loader)
+            for reg in reg_list:
+                val_loss_history.setdefault(reg, []).append(running_val_losses[reg] / len(val_loader))
+            if len(reg_list)>1:
+                val_loss_history.setdefault('SUM', []).append(epoch_val_loss)    
             print(f"Epoch [{epoch+1}/{epochs}], "
                   #f"Learning Loss: {learning_loss.item():.4f}, "
-                f"Train Loss: {train_loss.item():.4f}, "
-                f"Validation Loss: {val_loss.item():.4f}"
+                f"Train Loss: {epoch_train_loss:.4f}, "
+                f"Validation Loss: {epoch_val_loss:.4f}"
                 )
             
             '''

@@ -241,8 +241,8 @@ def create_soft_labels_vectorized(values: torch.Tensor, thresholds: torch.Tensor
     #print(soft_labels)
     return soft_labels
 
-from src.datasets.feature_selection import shap_feature_selection
-from src.datasets.data_augumentation import augment_with_ctgan
+from src.datasets.feature_selection import shap_feature_selection, mutual_info_feature_selection
+from src.datasets.data_augumentation import augment_with_ctgan, augment_with_smoter, augment_with_gaussian_copula
 
 def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = config['val_size'],transformer= config['transformer'],
                           #augmentation = config['augmentation'],
@@ -254,6 +254,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
                           num_augumentation = config['num_augumentation'],
                           data_vis = config['data_vis'],
                           num_epochs = config['num_epochs'],
+                          batch_size = config['batch_size'],
                           fold = None
                           ):
     
@@ -279,6 +280,23 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
             x_val = x_val[selected_features]
         print(f"選択された特徴量数: {len(selected_features)}")
         #print(f"学習データ:{x_train_split}")
+    elif feature_selection == 'mi':
+        # SHAPを用いた特徴選択
+        #for reg in reg_list:
+        selected_features, _, _ = mutual_info_feature_selection(x_train_split, y_train_split[reg_list], 
+                                                        num_features=num_selected_features, random_state=42,
+                                                        output_csv_path = fold,
+                                                        reg_list = reg_list, output_dir = fold, data_vis = data_vis,
+                                                        )
+        x_train_split = x_train_split[selected_features]
+        x_test = x_test[selected_features]
+        if isinstance(val_size, (int, float)):
+            x_val = x_val[selected_features]
+        print(f"選択された特徴量数: {len(selected_features)}")
+        #print(f"学習データ:{x_train_split}")
+    else:
+        selected_features = x_train_split.columns#.to_list()
+
     print(x_train_split.shape)
     if fold is not None:
         train_feature_dir = os.path.join(fold, f'train_feature.csv')
@@ -311,8 +329,13 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
     test_ids = y_test['crop-id']
 
     if data_augumentation == 'ctgan':
-        x_train_split, y_train_split = augment_with_ctgan(x_train_split, y_train_split, reg_list, n_samples=num_augumentation, epochs=num_epochs, output_dir = fold,data_vis = data_vis)
-    
+        #x_train_split, y_train_split = augment_with_ctgan(x_train_split, y_train_split, reg_list, labels = labels,n_samples=num_augumentation, epochs=num_epochs, output_dir = fold,data_vis = data_vis)
+        x_train_split, y_train_split = augment_with_ctgan(x_train_split, y_train_split, reg_list, labels = labels, epochs=num_epochs,batch_size = batch_size, output_dir = fold,data_vis = data_vis)
+    elif data_augumentation == 'smoter':
+        x_train_split, y_train_split = augment_with_smoter(x_train_split, y_train_split, reg_list, output_dir = fold, data_vis = data_vis, k_neighbors=5, random_state=42)
+    elif data_augumentation == 'gaussian_copula':
+        x_train_split, y_train_split = augment_with_gaussian_copula(x_train_split, y_train_split, reg_list, output_dir = fold, data_vis = data_vis, num_synthetic_samples = num_augumentation)
+
     X_train_tensor = torch.tensor(x_train_split.to_numpy(), dtype=torch.float32)
     X_test_tensor = torch.tensor(x_test.to_numpy(), dtype=torch.float32)
 
@@ -455,4 +478,4 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = conf
         #print(corr_matrix)
         #print(binary_matrix)
     '''
-    return X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids,label_train_tensor,label_test_tensor,label_val_tensor
+    return X_train_tensor, X_val_tensor, X_test_tensor,selected_features, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids,label_train_tensor,label_test_tensor,label_val_tensor
