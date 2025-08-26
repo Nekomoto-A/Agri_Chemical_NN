@@ -1,4 +1,5 @@
-from src.test.fold_eval import fold_evaluate
+#from src.test.fold_eval import fold_evaluate
+from src.test.fold_eval import loop_evaluate
 import yaml
 import os
 yaml_path = 'config.yaml'
@@ -15,12 +16,13 @@ def main():
     reg_list = config['reg_list']
     if any(isinstance(i, list) for i in reg_list) == False:
         reg_list = [s.replace('.', '_') for s in reg_list]
-        fold_evaluate(reg_list = reg_list)
+        #fold_evaluate(reg_list = reg_list)
+        loop_evaluate(reg_list = reg_list)
     else:
         for reg in reg_list:
             reg = [s.replace('.', '_') for s in reg]
-            #print(reg)
-            fold_evaluate(reg_list = reg)
+            #fold_evaluate(reg_list = reg)
+            loop_evaluate(reg_list = reg)
 
 if __name__ == '__main__':
     main()
