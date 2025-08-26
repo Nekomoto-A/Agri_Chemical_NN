@@ -19,11 +19,51 @@ script_name = os.path.basename(__file__)
 with open(yaml_path, "r") as file:
     config = yaml.safe_load(file)[script_name]
 
+
+def calculate_and_save_correlations(df, target_data, output_dir, reg_list):
+    """
+    DataFrameの全カラムとターゲットデータの相関係数を計算し、
+    ソートしてCSVファイルに保存する関数。
+
+    Args:
+        df (pd.DataFrame): 対象のDataFrame（数値データのみが対象となります）。
+        target_data (pd.Series): 相関を計算したい基準となるデータ。
+        output_filename (str): 保存するCSVファイル名。
+    """
+    
+    for reg in reg_list:
+        correlations = df.corrwith(target_data[reg])
+
+        # 2. 結果をDataFrameに変換
+        #    .to_frame()でSeriesをDataFrameに変換し、列名を指定
+        correlation_df = correlations.to_frame(name='correlation_coefficient')
+
+        # 3. 相関係数（correlation_coefficient列）の値で降順にソート
+        sorted_correlation_df = correlation_df.sort_values(by='correlation_coefficient', ascending=False)
+        
+        # 4. 結果をCSVファイルとして保存
+        #    index=Trueとすることで、インデックス（元のカラム名）もCSVに保存されます。
+        output_filename = os.path.join(output_dir, f'correlation_with_{reg}.csv')
+        sorted_correlation_df.to_csv(output_filename, index=True)
+
+        print(f"'{output_filename}' という名前でCSVファイルを保存しました。")
+        print("\n--- 保存されたデータ (上位5件) ---")
+        print(sorted_correlation_df.head())
+        print("---------------------------------")
+
+
 def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path = config['target_path'], exclude_ids = config['exclude_ids'],
                   k = config['k_fold'], output_dir = config['result_dir'], csv_path = config['result_fold'], 
                   final_output = config['result_average'], model_name = config['model_name'], reduced_feature_path = config['reduced_feature'],
-                  comp_method = config['comp_method']
+                  comp_method = config['comp_method'], corr_calc = config['carr_calc'], feature_selection_all = config['feature_selection_all'], 
+                  selection_ratio = config['selection_ratio'],
+                  fsdir = config['feature_selection_dir'],
+                  feature_selection = config['feature_selection'],
+                  num_features_to_select = config['num_selected_features']
                   ):
+    #if feature_selection_all:
+    #    output_dir = os.path.join(fsdir, output_dir)
+
     os.makedirs(output_dir,exist_ok=True)
     sub_dir = os.path.join(output_dir, f'{reg_list}')
     os.makedirs(sub_dir,exist_ok=True)
@@ -36,6 +76,9 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
 
     X,Y = data_create(feature_path, target_path, reg_list, exclude_ids)
     
+    if corr_calc:
+        calculate_and_save_correlations(X, Y, output_dir, reg_list)
+
     for reg in reg_list:
         #os.makedirs(output_dir,exist_ok=True)
         hist_dir = os.path.join(sub_dir, f'{reg}.png')
@@ -68,6 +111,7 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
 
     scores = {}
 
+
     #for fold, (train_index, test_index) in enumerate(kf.split(X, Y['prefandcrop'])):
     for fold, (train_index, test_index) in enumerate(kf.split(X)):
         index = [f'fold{fold+1}']
@@ -80,7 +124,9 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
         fold_dir = os.path.join(sub_dir, index[0])
         os.makedirs(fold_dir,exist_ok=True)
         
-        X_train_tensor, X_val_tensor, X_test_tensor,features, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids,label_train_tensor,label_test_tensor,label_val_tensor = transform_after_split(X_train,X_test,Y_train,Y_test, reg_list = reg_list,fold = fold_dir)
+        X_train_tensor, X_val_tensor, X_test_tensor,features, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids,label_train_tensor,label_test_tensor,label_val_tensor = transform_after_split(X_train,X_test,Y_train,Y_test, reg_list = reg_list,fold = fold_dir,
+                                                                                                                                                                                                                              feature_selection = feature_selection,
+                                                                                                                                                                                                                              num_selected_features = num_features_to_select)
         input_dim = X_train_tensor.shape[1]
 
         if len(reg_list) > 1:
@@ -242,6 +288,8 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
     
     # 平均値を格納する辞書
     avg_std = {}
+    avg_dict = {}
+    std_dict = {}
     metrics_norm = {}
     for metrics,models in scores.items():
         #met = []
@@ -253,9 +301,12 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
         for method_name,regs in models.items():
             for target,values in regs.items():
                 avg = f'{np.average(values):.3f}'
+                avg_dict.setdefault(metrics, {}).setdefault(method_name, {})[target] = np.average(values)
                 std = f'{np.std(values):.3f}'
+                std_dict.setdefault(metrics, {}).setdefault(method_name, {})[target] = np.std(values)
                 result = f'{avg}±{std}'
                 avg_std.setdefault(metrics, {}).setdefault(method_name, {})[target] = result
+
     
     #if comp_method != None:
     #    method_order = [method,method_comp, method_st]  # 先に固定するキー
@@ -287,3 +338,95 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
                 writer.writerow(row)
 
     print(f"CSVファイル '{final_output}' を作成しました。")
+
+    return avg_dict, std_dict
+
+def loop_evaluate(reg_list, feature_selection_all = config['feature_selection_all'], 
+                  output_dir = config['result_dir'],
+                  start_features = config['start_features'], 
+                  selection_ratio = config['selection_ratio'],
+                  end_features = config['end_features'],fsdir = config['feature_selection_dir'],):
+    if feature_selection_all:
+        os.makedirs(fsdir, exist_ok=True)
+        # ステップ1: 評価結果を保存するための辞書を準備
+        results_avg = {}
+        results_std = {}
+        feature_numbers = range(start_features, end_features + 1, selection_ratio)
+
+        # 特徴量数を変えながら評価を実行し、結果を保存
+        print("モデルの評価を開始します...")
+        for number in feature_numbers:
+            output_name = f'{number}_features'
+            output_dir = os.path.join(fsdir, output_name)
+            print(f"特徴量 {number} 個で評価中...")
+            # fold_evaluate関数が選択する特徴量数を引数に取ると仮定します
+            avg_dict, std_dict = fold_evaluate(reg_list=reg_list, num_features_to_select=number, output_dir=output_dir)
+            results_avg[number] = avg_dict
+            results_std[number] = std_dict
+        print("モデルの評価が完了しました。")
+
+        # ステップ2: グラフの描画と保存 (メトリクスごとにファイルを分ける)
+        print("グラフの作成を開始します...")
+
+        # グラフを保存するためのフォルダを作成
+        #output_dir = "performance_graphs_by_metric"
+        
+
+        # 評価結果の辞書構造から、メトリクス名、モデル名、予測対象名を取得
+        first_feature_num = next(iter(results_avg))
+        first_avg_dict = results_avg[first_feature_num]
+
+        metric_names = list(first_avg_dict.keys())
+        model_names = list(first_avg_dict[metric_names[0]].keys())
+        target_names = list(first_avg_dict[metric_names[0]][model_names[0]].keys())
+
+        # x軸のデータ（特徴量数）
+        feature_counts = sorted(results_avg.keys())
+
+        # メトリクスごとにグラフを作成
+        for metric in metric_names:
+            # 新しい図（Figure）を作成
+            plt.figure(figsize=(12, 8))
+            
+            # グラフのタイトルと軸ラベルを設定
+            plt.title(f'評価指標「{metric}」のモデル別比較', fontsize=16)
+            plt.xlabel('特徴量の数', fontsize=12)
+            plt.ylabel(metric, fontsize=12)
+
+            # モデルごとに折れ線グラフを描画
+            for model in model_names:
+                # 予測対象ごとに線をプロット
+                for target in target_names:
+                    # y軸のデータ（平均値と標準偏差）を抽出
+                    y_avg = [results_avg[num][metric][model][target] for num in feature_counts]
+                    y_std = [results_std[num][metric][model][target] for num in feature_counts]
+                    
+                    y_avg = np.array(y_avg)
+                    y_std = np.array(y_std)
+                    
+                    # 凡例用のラベルを作成（モデル名と予測対象名を組み合わせる）
+                    label_text = f'{model} ({target})'
+                    
+                    # 平均値の折れ線グラフをプロット
+                    line, = plt.plot(feature_counts, y_avg, marker='o', linestyle='-', label=label_text)
+                    
+                    # 標準偏差の範囲を半透明のエリアとして描画
+                    plt.fill_between(feature_counts, y_avg - y_std, y_avg + y_std, alpha=0.2, color=line.get_color())
+
+            # グラフの装飾
+            plt.legend(title='モデル (予測対象)')
+            plt.grid(True)
+            
+            # レイアウトを自動調整
+            plt.tight_layout()
+            
+            # ファイルとして保存
+            save_path = os.path.join(fsdir, f'performance_{metric}.png')
+            plt.savefig(save_path)
+            plt.close()  # メモリを解放するために図を閉じます
+
+        print(f"グラフが '{fsdir}' フォルダに保存されました。")
+                    
+    else:
+        _, _ = fold_evaluate(reg_list = reg_list)
+    

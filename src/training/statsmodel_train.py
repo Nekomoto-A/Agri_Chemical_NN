@@ -25,7 +25,7 @@ def statsmodel_train(X,Y,scalers,reg):
         models = {
             "RF": RandomForestRegressor(),
             "XGB": XGBRegressor(),
-            "SVR": SVR(),
+            #"SVR": SVR(),
             "LR": LinearRegression()
         }
     else:

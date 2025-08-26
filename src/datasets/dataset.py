@@ -244,12 +244,12 @@ def create_soft_labels_vectorized(values: torch.Tensor, thresholds: torch.Tensor
 from src.datasets.feature_selection import shap_feature_selection, mutual_info_feature_selection
 from src.datasets.data_augumentation import augment_with_ctgan, augment_with_smoter, augment_with_gaussian_copula
 
-def transform_after_split(x_train,x_test,y_train,y_test,reg_list,val_size = config['val_size'],transformer= config['transformer'],
+def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
+                          feature_selection,num_selected_features,
+                          val_size = config['val_size'],transformer= config['transformer'],
                           #augmentation = config['augmentation'],
                           softlabel = config['softlabel'],
                           labels = config['labels'],
-                          feature_selection = config['feature_selection'],
-                          num_selected_features = config['num_selected_features'],
                           data_augumentation = config['data_augumentation'],
                           num_augumentation = config['num_augumentation'],
                           data_vis = config['data_vis'],

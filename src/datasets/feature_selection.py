@@ -65,6 +65,14 @@ def shap_feature_selection(X, y, reg_list, output_dir, data_vis = None, num_feat
         explainer = shap.TreeExplainer(model)
         # マルチタスクの場合、shap_valuesは各タスクのSHAP値(numpy配列)を要素とするリストになります。
         shap_values = explainer.shap_values(X)
+        
+        output_dir_shap = os.path.join(output_dir, f'shap_summary_{reg}.png')
+        # summary_plot (beeswarm) を表示
+        shap.summary_plot(shap_values, X, show=False)
+        plt.savefig(output_dir_shap, dpi=150, bbox_inches='tight')
+        # 3. 現在のプロットを閉じる（メモリを解放するため）
+        plt.close()
+
         mean_abs_shap_per_task = np.abs(shap_values).mean(axis=0)        
         mean_abs_shap[reg] = mean_abs_shap_per_task
         #print(mean_abs_shap[reg].shape)
