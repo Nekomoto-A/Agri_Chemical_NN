@@ -365,6 +365,77 @@ def loop_evaluate(reg_list, feature_selection_all = config['feature_selection_al
             results_std[number] = std_dict
         print("モデルの評価が完了しました。")
 
+        # ステップ2: グラフの描画と保存 (予測対象ごとにファイルを分ける)
+        print("グラフの作成を開始します...")
+
+        # グラフを保存するためのフォルダを作成
+        output_dir = "performance_graphs_by_target"
+        os.makedirs(output_dir, exist_ok=True)
+
+        # 評価結果の辞書構造から、メトリクス名、モデル名、予測対象名を取得
+        first_feature_num = next(iter(results_avg))
+        first_avg_dict = results_avg[first_feature_num]
+
+        metric_names = list(first_avg_dict.keys())
+        model_names = list(first_avg_dict[metric_names[0]].keys())
+        target_names = list(first_avg_dict[metric_names[0]][model_names[0]].keys())
+
+        # x軸のデータ（特徴量数）
+        feature_counts = sorted(results_avg.keys())
+
+        # 予測対象 (target) ごとにグラフを作成
+        for target in target_names:
+            # メトリクスの数だけ縦にサブプロットを作成
+            fig, axes = plt.subplots(len(metric_names), 1, figsize=(12, 10), sharex=True)
+            
+            # サブプロットが1つの場合に備えて、リスト形式に統一
+            if len(metric_names) == 1:
+                axes = [axes]
+            
+            # グラフ全体のタイトル
+            fig.suptitle(f'予測対象「{target}」のモデル性能比較', fontsize=16)
+
+            # 各メトリクスについてサブプロットを描画
+            for i, metric in enumerate(metric_names):
+                ax = axes[i]
+                
+                # モデルごとに折れ線グラフを描画
+                for model in model_names:
+                    # y軸のデータ（平均値と標準偏差）を抽出
+                    y_avg = [results_avg[num][metric][model][target] for num in feature_counts]
+                    y_std = [results_std[num][metric][model][target] for num in feature_counts]
+                    
+                    y_avg = np.array(y_avg)
+                    y_std = np.array(y_std)
+                    
+                    # 凡例にはモデル名を表示
+                    label_text = model
+                    
+                    # 平均値の折れ線グラフをプロット
+                    line, = ax.plot(feature_counts, y_avg, marker='o', linestyle='-', label=label_text)
+                    
+                    # 標準偏差の範囲を半透明のエリアとして描画
+                    ax.fill_between(feature_counts, y_avg - y_std, y_avg + y_std, alpha=0.2, color=line.get_color())
+                
+                # サブプロットの装飾
+                ax.set_ylabel(metric, fontsize=12)
+                ax.legend(title='モデル')
+                ax.grid(True)
+
+            # 共通のx軸ラベル
+            axes[-1].set_xlabel('特徴量の数', fontsize=12)
+            
+            # レイアウトを調整して、タイトルとプロットが重ならないようにする
+            plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+            
+            # ファイルとして保存
+            save_path = os.path.join(fsdir, f'performance_{target}.png')
+            plt.savefig(save_path)
+            plt.close(fig)  # メモリを解放するために図を閉じる
+
+        print(f"グラフが '{fsdir}' フォルダに保存されました。")
+
+        '''
         # ステップ2: グラフの描画と保存 (メトリクスごとにファイルを分ける)
         print("グラフの作成を開始します...")
 
@@ -389,8 +460,8 @@ def loop_evaluate(reg_list, feature_selection_all = config['feature_selection_al
             plt.figure(figsize=(12, 8))
             
             # グラフのタイトルと軸ラベルを設定
-            plt.title(f'評価指標「{metric}」のモデル別比較', fontsize=16)
-            plt.xlabel('特徴量の数', fontsize=12)
+            plt.title(f'{metric}', fontsize=16)
+            plt.xlabel('num_features', fontsize=12)
             plt.ylabel(metric, fontsize=12)
 
             # モデルごとに折れ線グラフを描画
@@ -414,18 +485,20 @@ def loop_evaluate(reg_list, feature_selection_all = config['feature_selection_al
                     plt.fill_between(feature_counts, y_avg - y_std, y_avg + y_std, alpha=0.2, color=line.get_color())
 
             # グラフの装飾
-            plt.legend(title='モデル (予測対象)')
+            #plt.legend(title='モデル (予測対象)')
+            plt.legend(title='model (target)', bbox_to_anchor=(1.05, 1), loc='upper left')
             plt.grid(True)
             
             # レイアウトを自動調整
             plt.tight_layout()
             
             # ファイルとして保存
-            save_path = os.path.join(fsdir, f'performance_{metric}.png')
+            save_path = os.path.join(fsdir, f'performance_{metric}_{start_features}~{end_features}.png')
             plt.savefig(save_path)
             plt.close()  # メモリを解放するために図を閉じます
 
         print(f"グラフが '{fsdir}' フォルダに保存されました。")
+        '''
                     
     else:
         _, _ = fold_evaluate(reg_list = reg_list)
