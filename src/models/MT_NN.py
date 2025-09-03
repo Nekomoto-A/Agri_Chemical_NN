@@ -2,70 +2,59 @@ import torch
 import torch.nn as nn
 import os
 
-class MTCNNModel(nn.Module):
-    def __init__(self, input_dim, output_dims, reg_list,raw_thresholds = [], conv_layers=[(64,3,1,1)], hidden_dim=128):
-        super(MTCNNModel, self).__init__()
-        self.input_sizes = input_dim
+import torch
+import torch.nn as nn
+
+class MTNNModel(nn.Module):
+    def __init__(self, input_dim, output_dims, reg_list, hidden_dim=128, fc_layers=[(256, nn.ReLU())]):
+        super(MTNNModel, self).__init__()
+        
+        self.input_dim = input_dim
         self.hidden_dim = hidden_dim
         self.reg_list = reg_list
-        #self.raw_thresholds = nn.Parameter(torch.randn(3 - 1))
-        # 畳み込み層を指定された層数とパラメータで作成
-        self.sharedconv = nn.Sequential()
-        in_channels = 1  # 最初の入力チャネル数
 
-        for i, (out_channels, kernel_size, stride, padding) in enumerate(conv_layers):
-            self.sharedconv.add_module(f"conv{i+1}", nn.Conv1d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding))
-            self.sharedconv.add_module(f"batchnorm{i+1}", nn.BatchNorm1d(out_channels))
-            self.sharedconv.add_module(f"relu{i+1}", nn.ReLU())
-            #self.sharedconv.add_module(f"dropout{i+1}", nn.Dropout(0.2))
-            self.sharedconv.add_module(f"maxpool{i+1}", nn.MaxPool1d(kernel_size=2))
-            in_channels = out_channels  # 次の層の入力チャネル数は現在の出力チャネル数
-
-        # ダミーの入力を使って全結合層の入力サイズを計算
-        with torch.no_grad():
-            dummy_input = torch.zeros(1, 1, input_dim)  # (バッチサイズ, チャネル数, シーケンス長)
-            conv_output = self.sharedconv(dummy_input)  # 畳み込みを通した結果
-            total_features = conv_output.numel()  # 出力の全要素数
-
-        self.shared_fc = nn.Sequential(
-                    nn.Linear(total_features, self.hidden_dim),
-                    #nn.Dropout(0.2),
-                    nn.ReLU()
-                    #nn.Dropout(0.2) # ドロップアウトはオプション
-                )
+        # 共有の全結合層を作成
+        self.shared_fc = nn.Sequential()
+        in_features = input_dim
+        for i, (out_features, activation) in enumerate(fc_layers):
+            self.shared_fc.add_module(f"fc_layer{i+1}", nn.Linear(in_features, out_features))
+            self.shared_fc.add_module(f"batchnorm{i+1}", nn.BatchNorm1d(out_features))
+            self.shared_fc.add_module(f"activation{i+1}", activation)
+            in_features = out_features
         
+        # 共有の隠れ層（元の shared_fc に相当）
+        self.shared_fc_hidden = nn.Sequential(
+            nn.Linear(in_features, self.hidden_dim),
+            nn.ReLU()
+        )
+        
+        # 各出力層を作成
         self.outputs = nn.ModuleList([ 
             nn.Sequential(
-                #ChannelAttention1D(total_features),
-                #nn.Linear(total_features, self.hidden_dim),
-                #nn.ReLU(),
                 nn.Linear(self.hidden_dim, 64),
                 nn.ReLU(),
-                #nn.Dropout(0.2),
-                #nn.Linear(64, 32),
-                #nn.ReLU(),
-                nn.Linear(64, out_dim),
-                #nn.ReLU()
-                #nn.Softplus() 
+                nn.Linear(64, out_dim)
             ) for out_dim in output_dims
         ])
 
     def forward(self, x):
-        x = x.unsqueeze(1)  # (バッチサイズ, チャネル数=1, シーケンス長)
-        x = self.sharedconv(x)
-        x = x.view(x.size(0), -1)  # フラット化
-        #x = self.sharedfc(x)
+        # 入力はすでにフラット化されたベクトルを想定
+        # x.unsqueeze(1) や x.view(...) は不要
+        
+        # 共有の全結合層を適用
         shared_features = self.shared_fc(x)
+        
+        # 共有の隠れ層を適用
+        shared_features = self.shared_fc_hidden(shared_features)
 
-        #outputs = []
         outputs = {}
-        #  各出力層を適用
-        for (reg, output_layer) in zip(self.reg_list,self.outputs):
-            #outputs.append(output_layer(shared_features))
+        # 各出力層を適用
+        for (reg, output_layer) in zip(self.reg_list, self.outputs):
             outputs[reg] = output_layer(shared_features)
-        return outputs, shared_features#, self.log_sigma_sqs  # リストとして出力
+            
+        return outputs, shared_features
 
-
+    '''
     # 畳み込み層の重みに対する総和ゼロ制約のペナルティを計算するメソッド
     def calculate_sum_zero_penalty(self):
         penalty = 0.0
@@ -93,4 +82,4 @@ class MTCNNModel(nn.Module):
             # この例では、nn.Linear(64, out_dim) が最後の層
             task_weights.append(output_layer[2].weight) # output_layer[0]はLinear(self.hidden_dim, 64), output_layer[1]はReLU, output_layer[2]はLinear(64, out_dim)
         return task_weights
-
+    '''

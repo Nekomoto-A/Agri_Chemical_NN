@@ -242,7 +242,7 @@ def create_soft_labels_vectorized(values: torch.Tensor, thresholds: torch.Tensor
     return soft_labels
 
 from src.datasets.feature_selection import shap_feature_selection, mutual_info_feature_selection
-from src.datasets.data_augumentation import augment_with_ctgan, augment_with_smoter, augment_with_gaussian_copula
+from src.datasets.data_augumentation import augment_with_ctgan, augment_with_smoter, augment_with_gaussian_copula, augment_with_copulagan
 
 def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
                           feature_selection,num_selected_features,
@@ -255,6 +255,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
                           data_vis = config['data_vis'],
                           num_epochs = config['num_epochs'],
                           batch_size = config['batch_size'],
+                          n_trials = config['n_trials'],
                           fold = None
                           ):
     
@@ -294,6 +295,18 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
             x_val = x_val[selected_features]
         print(f"選択された特徴量数: {len(selected_features)}")
         #print(f"学習データ:{x_train_split}")
+    elif feature_selection == 'borutashap':
+        from src.datasets.feature_selection import boruta_shap_feature_selection
+        selected_features, _, _ = boruta_shap_feature_selection(x_train_split, y_train_split[reg_list], 
+                                                        random_state=42,
+                                                        output_csv_path = fold,
+                                                        reg_list = reg_list, output_dir = fold, data_vis = data_vis,
+                                                        n_trials=n_trials, 
+                                                        )
+        x_train_split = x_train_split[selected_features]
+        x_test = x_test[selected_features]
+        if isinstance(val_size, (int, float)):
+            x_val = x_val[selected_features]
     else:
         selected_features = x_train_split.columns#.to_list()
 
@@ -335,7 +348,9 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
         x_train_split, y_train_split = augment_with_smoter(x_train_split, y_train_split, reg_list, output_dir = fold, data_vis = data_vis, k_neighbors=5, random_state=42)
     elif data_augumentation == 'gaussian_copula':
         x_train_split, y_train_split = augment_with_gaussian_copula(x_train_split, y_train_split, reg_list, output_dir = fold, data_vis = data_vis, num_synthetic_samples = num_augumentation)
-
+    elif data_augumentation == 'copulagan':
+        x_train_split, y_train_split = augment_with_copulagan(X = x_train_split, y = y_train_split, reg_list = reg_list, output_dir = fold, data_vis = data_vis, num_to_generate = num_augumentation)
+        
     X_train_tensor = torch.tensor(x_train_split.to_numpy(), dtype=torch.float32)
     X_test_tensor = torch.tensor(x_test.to_numpy(), dtype=torch.float32)
 

@@ -146,8 +146,8 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
             for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
                 #print(r2_results)
                 t = reg_list[i]
-                scores.setdefault('R2', {}).setdefault(method, {}).setdefault(t, []).append(r2)
-                scores.setdefault('MSE', {}).setdefault(method, {}).setdefault(t, []).append(mse)
+                scores.setdefault('R', {}).setdefault(method, {}).setdefault(t, []).append(r2)
+                scores.setdefault('MAE', {}).setdefault(method, {}).setdefault(t, []).append(mse)
             
             if comp_method is not None:
                 vis_dir_comp = os.path.join(fold_dir, method_comp)
@@ -172,8 +172,8 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
                 for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
                     #print(r2_results)
                     t = reg_list[i]
-                    scores.setdefault('R2', {}).setdefault(method_comp, {}).setdefault(t, []).append(r2)
-                    scores.setdefault('MSE', {}).setdefault(method_comp, {}).setdefault(t, []).append(mse)
+                    scores.setdefault('R', {}).setdefault(method_comp, {}).setdefault(t, []).append(r2)
+                    scores.setdefault('MAE', {}).setdefault(method_comp, {}).setdefault(t, []).append(mse)
             else:
                 pass
 
@@ -210,8 +210,8 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
             reduced.setdefault(method_st, {}).setdefault(r, []).append(reduced_features)
             """
 
-            scores.setdefault('R2', {}).setdefault(method_st, {}).setdefault(r, []).append(r2_result[0])
-            scores.setdefault('MSE', {}).setdefault(method_st, {}).setdefault(r, []).append(mse_result[0])
+            scores.setdefault('R', {}).setdefault(method_st, {}).setdefault(r, []).append(r2_result[0])
+            scores.setdefault('MAE', {}).setdefault(method_st, {}).setdefault(r, []).append(mse_result[0])
 
             stats_scores = stats_models_result(X_train = X_train_tensor, Y_train = Y_train_single, 
                                         X_test = X_test_tensor, Y_test = Y_test_single, scalers = scalers, reg = r, 
@@ -429,7 +429,7 @@ def loop_evaluate(reg_list, feature_selection_all = config['feature_selection_al
             plt.tight_layout(rect=[0, 0.03, 1, 0.95])
             
             # ファイルとして保存
-            save_path = os.path.join(fsdir, f'performance_{target}.png')
+            save_path = os.path.join(fsdir, f'performance_{target}_{start_features}~{end_features}.png')
             plt.savefig(save_path)
             plt.close(fig)  # メモリを解放するために図を閉じる
 

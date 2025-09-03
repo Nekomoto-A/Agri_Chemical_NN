@@ -53,7 +53,8 @@ def test_shap(x_tr, x_te,model,reg_list, features, output_dir):
         plt.figure()
         plt.title(f'Feature Importance for {reg} (Bar)')
         # x_te の代わりに変換した x_te_numpy を渡す
-        shap.summary_plot(shap_values, x_te_numpy, feature_names=features, plot_type="bar", show=False)
+        #shap.summary_plot(shap_values, x_te_numpy, feature_names=features, plot_type="bar", show=False)
+        shap.summary_plot(shap_values[0], x_te_numpy, feature_names=features, plot_type="bar", show=False)
         plt.savefig(save_path_bar, bbox_inches='tight')
         plt.close()
         print(f"  - サマリープロット（バー）を {save_path_bar} に保存しました。")
@@ -267,7 +268,7 @@ import gpytorch
 from src.models.MT_CNN import MTCNNModel
 from src.models.MT_CNN_Attention import MTCNNModel_Attention
 from src.models.MT_CNN_catph import MTCNN_catph
-#from src.models.MT_NN import MTNNModel
+from src.models.MT_NN import MTNNModel
 from src.models.MT_CNN_soft import MTCNN_SPS
 from src.models.MT_CNN_SA import MTCNNModel_SA
 from src.models.MT_CNN_Di import MTCNNModel_Di
@@ -348,6 +349,8 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         model = MTCNNModel_Di(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
     elif model_name == 'BNN_MG':
         model = MTBNNModel_MG(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
+    elif model_name == 'NN':
+        model = MTNNModel(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
     elif model_name == 'GP':
         if len(reg_list) > 1:
             likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(num_tasks=len(reg_list))
@@ -418,6 +421,11 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
 
         predicts, true, r2_results, mse_results = test_MT_HBM(x_te = X_test, y_te = Y_test, loc_idx_test = location_test, model = model, trained_model = model_trained, 
                                                               reg_list = reg_list, scalers = scalers,output_dir = vis_dir, method_bm =method_bm)
+    elif 'SEM' in model_name:
+        from src.training.train_SEM import train_pls_sem
+        model_trained = train_pls_sem(X_train,Y_train, reg_list, features)
+        from src.test.test_SEM import test_pls_sem
+        predicts, true, r2_results, mse_results = test_pls_sem(X_test,Y_test,model_trained,reg_list,features,scalers,output_dir=vis_dir)
     else:
         #optimizer = optim.Adam(model.parameters(), lr=0.001)
         model_trained = training_MT(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model,

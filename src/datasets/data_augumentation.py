@@ -503,3 +503,255 @@ def augment_with_gaussian_copula(X, y, target_col, output_dir, data_vis, num_syn
     print("\nGaussianCopulaSynthesizer process finished.")
     
     return X_resampled, y_resampled
+
+import os
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
+from sdv.metadata import SingleTableMetadata
+from sdv.single_table import CopulaGANSynthesizer # CTGANSynthesizerから変更
+from sdv.sampling import Condition
+from itertools import product
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
+
+def augment_with_copulagan(X, y, reg_list, output_dir, data_vis, num_to_generate, labels=None):
+    """
+    CopulaGANを使用して表形式データを拡張し、t-SNEで可視化する関数。
+    - yの連続値を3クラスに分類し、学習データに加えます。
+    - labelsとyのクラスの全組み合わせでデータ数が均等になるように条件付き生成を行います。
+    - yとlabelsの両方で色分けしたt-SNEプロットを保存します。
+    拡張後のプロットでは、元のデータを〇、生成データを△で表示します。
+
+    Args:
+        X (pd.DataFrame): 特徴量のデータフレーム。
+        y (pd.DataFrame): ターゲット変数とラベルを含むデータフレーム。
+        reg_list (list): ターゲット変数の列名のリスト。
+        output_dir (str): 結果を保存するディレクトリのパス。
+        data_vis (str): 可視化結果を保存するサブディレクトリ名。
+        labels (list, optional): 条件付けに使用するカテゴリカルな列名のリスト。Defaults to None.
+
+    Returns:
+        tuple: (拡張後の特徴量, 拡張後のターゲット) のタプル。
+    """
+    # labelsがNoneの場合に空リストを割り当てて、後の処理を簡潔にする
+    if labels is None:
+        labels = []
+
+    result_dir = os.path.join(output_dir, data_vis)
+    os.makedirs(result_dir, exist_ok=True)
+
+    # =================================================================
+    # 1. 拡張前のデータをt-SNEで可視化
+    # =================================================================
+    print("Visualizing data before augmentation...")
+    tsne_before = TSNE(n_components=2, random_state=42, perplexity=min(30, len(X)-1))
+    X_embedded = tsne_before.fit_transform(X.values)
+    df_embedded = pd.DataFrame(X_embedded, columns=["tsne1", "tsne2"])
+
+    # --- ターゲット変数(y)で可視化 ---
+    for reg in reg_list:
+        ba_path = os.path.join(result_dir, f'{reg}_before_augument.png')
+        df_embedded["target"] = y[reg].values
+        plt.figure(figsize=(8, 6))
+        sc = plt.scatter(
+            df_embedded["tsne1"], df_embedded["tsne2"],
+            c=df_embedded["target"], cmap="viridis", alpha=0.8
+        )
+        plt.colorbar(sc, label="target")
+        plt.xlabel("t-SNE 1")
+        plt.ylabel("t-SNE 2")
+        plt.title(f"t-SNE before Augmentation (target: {reg})")
+        plt.tight_layout()
+        plt.savefig(ba_path)
+        plt.close()
+
+    # --- ラベル(labels)で可視化 ---
+    for label in labels:
+        ba_path = os.path.join(result_dir, f'{label}_before_augument.png')
+        df_embedded["target"] = y[label].values
+        unique_labels = df_embedded["target"].unique()
+        colors = plt.cm.get_cmap('tab10', len(unique_labels))
+
+        plt.figure(figsize=(8, 6))
+        for i, val in enumerate(unique_labels):
+            subset = df_embedded[df_embedded["target"] == val]
+            plt.scatter(
+                subset["tsne1"], subset["tsne2"],
+                color=colors(i), alpha=0.8, label=val
+            )
+        plt.xlabel("t-SNE 1")
+        plt.ylabel("t-SNE 2")
+        plt.title(f"t-SNE before Augmentation (colored by {label})")
+        plt.legend(title=label, bbox_to_anchor=(1.05, 1), loc='upper left')
+        plt.tight_layout()
+        plt.savefig(ba_path, bbox_inches='tight')
+        plt.close()
+
+    # =================================================================
+    # 2. CopulaGANの学習準備
+    # =================================================================
+    print("Preparing data for CopulaGAN training...")
+    # --- yの連続値を3クラスに分類 ---
+    y_classes = pd.DataFrame()
+    y_class_cols = []
+    for reg in reg_list:
+        class_col_name = f'{reg}_class'
+        try:
+            # データ量に基づいて3等分 (qcut)
+            y_classes[class_col_name] = pd.qcut(y[reg], q=3, labels=False, duplicates='drop')
+        except ValueError:
+            # qcutが失敗した場合 (ユニーク値が少ないなど) は値の範囲で3等分 (cut)
+            y_classes[class_col_name] = pd.cut(y[reg], bins=3, labels=False, duplicates='drop')
+        y_class_cols.append(class_col_name)
+
+    # --- 学習用データフレームを作成 ---
+    # crop-idがyに含まれていることを想定
+    if 'crop-id' not in y.columns:
+        raise ValueError("The 'crop-id' column is missing from the y DataFrame.")
+        
+    df_for_training = pd.concat([y[['crop-id']], X, y[reg_list], y_classes, y[labels]], axis=1)
+    discrete_columns = y_class_cols + labels
+    
+    # メタデータの設定
+    metadata = SingleTableMetadata()
+    metadata.detect_from_dataframe(data=df_for_training)
+    metadata.update_column(column_name='crop-id', sdtype='id')
+    metadata.set_primary_key(column_name='crop-id')
+
+    # =================================================================
+    # 3. CopulaGANの学習と条件付きデータ生成
+    # =================================================================
+    print("Training CopulaGAN synthesizer...")
+    # CTGANSynthesizerからCopulaGANSynthesizerに変更
+    # epochsやembedding_dimなどのCTGAN特有の引数は不要
+    synthesizer = CopulaGANSynthesizer(metadata, verbose=True)
+    synthesizer.fit(df_for_training)
+
+    print("Generating conditional synthetic data...")
+    # --- 条件付き生成のための組み合わせを計算 ---
+    conditional_columns = labels + y_class_cols
+    synthetic_df = pd.DataFrame() # 生成データを格納する空のDFを初期化
+
+    if conditional_columns:
+        unique_values_per_column = [df_for_training[col].dropna().unique() for col in conditional_columns]
+        all_combinations = list(product(*unique_values_per_column))
+        
+        combination_counts = df_for_training.groupby(conditional_columns).size()
+        
+        if not combination_counts.empty:
+            max_count = combination_counts.max()
+            conditions_to_generate = []
+            for combo in all_combinations:
+                combo_dict = dict(zip(conditional_columns, combo))
+                current_count = combination_counts.get(combo, 0)
+                num_to_generate = max_count - current_count
+                
+                if num_to_generate > 0:
+                    # num_to_generateを明示的にint型に変換する
+                    condition = Condition(num_rows=int(num_to_generate), column_values=combo_dict)
+                    conditions_to_generate.append(condition)
+            
+            if conditions_to_generate:
+                synthetic_df = synthesizer.sample_from_conditions(conditions=conditions_to_generate)
+            else:
+                print("All combinations are already balanced. No new data generated.")
+        else:
+            print("No combinations found to generate data for.")
+            
+    else:
+        # 条件がない場合は、元のデータ数と同数を生成
+        print("No conditional columns specified. Generating generic samples.")
+        synthetic_df = synthesizer.sample(num_rows=num_to_generate)
+        
+    if not synthetic_df.empty:
+        print(f"Generated {len(synthetic_df)} synthetic samples.")
+    
+    # =================================================================
+    # 4. 拡張後のデータをt-SNEで可視化
+    # =================================================================
+    print("Visualizing data after augmentation...")
+    
+    # --- 拡張後の完全なデータフレームを作成 ---
+    augmented_df_full = pd.concat([df_for_training, synthetic_df], ignore_index=True)
+    synthetic_features = augmented_df_full[X.columns]
+    synthetic_targets = augmented_df_full[reg_list]
+    
+    # --- t-SNEの計算 ---
+    tsne_after = TSNE(n_components=2, random_state=42, perplexity=min(30, len(synthetic_features)-1))
+    X_augmented_embedded = tsne_after.fit_transform(synthetic_features.values)
+    df_augmented_embedded = pd.DataFrame(X_augmented_embedded, columns=["tsne1", "tsne2"])
+
+    n_original = len(df_for_training)
+
+    # --- ターゲット変数(y)で可視化 ---
+    for reg in reg_list:
+        aa_path = os.path.join(result_dir, f'{reg}_after_augument.png')
+        df_augmented_embedded["target"] = synthetic_targets[reg].values
+        
+        plt.figure(figsize=(8, 6))
+        # 元のデータ (マーカー: 〇)
+        plt.scatter(
+            df_augmented_embedded["tsne1"][:n_original], df_augmented_embedded["tsne2"][:n_original],
+            c=df_augmented_embedded["target"][:n_original], cmap="viridis", alpha=0.8, marker='o'
+        )
+        # 生成データ (マーカー: △)
+        sc = plt.scatter(
+            df_augmented_embedded["tsne1"][n_original:], df_augmented_embedded["tsne2"][n_original:],
+            c=df_augmented_embedded["target"][n_original:], cmap="viridis", alpha=0.8, marker='^'
+        )
+        
+        plt.colorbar(sc, label="target")
+        plt.xlabel("t-SNE 1")
+        plt.ylabel("t-SNE 2")
+        plt.title(f"t-SNE after Augmentation (target: {reg})")
+        # 凡例を手動で追加
+        legend_elements = [Line2D([0], [0], marker='o', color='w', label='Original', markerfacecolor='grey', markersize=10),
+                           Line2D([0], [0], marker='^', color='w', label='Generated', markerfacecolor='grey', markersize=10)]
+        plt.legend(handles=legend_elements)
+        plt.tight_layout()
+        plt.savefig(aa_path)
+        plt.close()
+
+    # --- ラベル(labels)で可視化 ---
+    for label in labels:
+        aa_path = os.path.join(result_dir, f'{label}_after_augument.png')
+        
+        plt.figure(figsize=(10, 6))
+        unique_values = augmented_df_full[label].unique()
+        colors = plt.cm.get_cmap('tab10', len(unique_values))
+        color_map = {val: colors(i) for i, val in enumerate(unique_values)}
+        
+        # 色情報を列として追加
+        df_augmented_embedded['color'] = augmented_df_full[label].map(color_map)
+        
+        # 元のデータ (マーカー: 〇)
+        plt.scatter(
+            df_augmented_embedded.iloc[:n_original]['tsne1'], df_augmented_embedded.iloc[:n_original]['tsne2'],
+            c=df_augmented_embedded.iloc[:n_original]['color'], marker='o', alpha=0.8
+        )
+        # 生成データ (マーカー: △)
+        if len(df_augmented_embedded) > n_original:
+            plt.scatter(
+                df_augmented_embedded.iloc[n_original:]['tsne1'], df_augmented_embedded.iloc[n_original:]['tsne2'],
+                c=df_augmented_embedded.iloc[n_original:]['color'], marker='^', alpha=0.8
+            )
+            
+        plt.xlabel("t-SNE 1")
+        plt.ylabel("t-SNE 2")
+        plt.title(f"t-SNE after Augmentation (colored by {label})")
+        
+        # 凡例を2種類作成 (マーカーの種類と色の意味)
+        legend_marker = [Line2D([0], [0], marker='o', color='w', label='Original', markerfacecolor='k', markersize=10),
+                         Line2D([0], [0], marker='^', color='w', label='Generated', markerfacecolor='k', markersize=10)]
+        legend1 = plt.legend(handles=legend_marker, loc='upper right')
+        plt.gca().add_artist(legend1)
+
+        legend_color = [Patch(facecolor=color_map[val], label=val) for val in unique_values]
+        plt.legend(handles=legend_color, title=label, bbox_to_anchor=(1.05, 1), loc='upper left')
+        
+        plt.tight_layout()
+        plt.savefig(aa_path, bbox_inches='tight')
+        plt.close()
+
+    return synthetic_features, synthetic_targets
