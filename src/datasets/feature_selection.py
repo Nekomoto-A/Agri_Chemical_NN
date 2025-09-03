@@ -272,7 +272,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 import lightgbm as lgb
-from BorutaShap import BorutaShap
+#from BorutaShap import BorutaShap
 
 def boruta_shap_feature_selection(X, y, reg_list, output_dir, model=None, data_vis=None, random_state=42,
                                   output_csv_path=None, n_trials=1, classification=False):
@@ -423,3 +423,173 @@ def boruta_shap_feature_selection(X, y, reg_list, output_dir, model=None, data_v
             print(f"t-SNEプロットを '{result_dir}' に保存しました。")
             
     return selected_features, feature_importance_df, final_importance
+
+from sklearn.model_selection import cross_val_score
+
+def rfe_shap_feature_selection(X, y, reg_list, output_dir, data_vis=None, 
+                               model=None, min_features_to_select=1, step=1, cv=5, 
+                               scoring='r2', random_state=42, output_csv_path=None):
+    """
+    RFE (Recursive Feature Elimination) と SHAP を用いて、
+    データ駆動型のしきい値設定で特徴選択を行う関数（モデルにカラム名を渡さない修正版）。
+
+    Parameters:
+        X (pd.DataFrame): 特徴量データ
+        y (pd.DataFrame or pd.Series): 目的変数データ
+        reg_list (list): 目的変数のカラム名リスト
+        output_dir (str): t-SNEの可視化結果を保存するディレクトリ
+        data_vis (str, optional): t-SNEの可視化結果を保存するサブディレクトリ名。Noneの場合は可視化しない。
+        model (object, optional): 使用する機械学習モデル。Noneの場合はLightGBMの回帰モデルを使用。
+        min_features_to_select (int): 選択する特徴量の最小数
+        step (int): 各ステップで削除する特徴量の数
+        cv (int): クロスバリデーションの分割数
+        scoring (str): モデル性能の評価指標 (scikit-learnのscoring文字列)
+        random_state (int): 乱数シード
+        output_csv_path (str, optional): 特徴量スコア等を保存するCSVファイルのパス。Noneの場合は保存しない。
+
+    Returns:
+        selected_features (list): 選択された特徴量名のリスト
+        final_shap_scores (dict): 各目的変数に対する最終的なSHAPスコアを格納した辞書
+        feature_importance_final (pd.Series): 最終的な特徴量重要度（最大SHAPスコア）
+    """
+    
+    # 1. (オプション) 特徴選択前のt-SNEによる可視化
+    if data_vis is not None:
+        print("特徴選択前のt-SNEプロットを生成中...")
+        tsne = TSNE(n_components=2, random_state=random_state)
+        X_embedded = tsne.fit_transform(X.values) # ここは元々.valuesなので変更なし
+        df_embedded = pd.DataFrame(X_embedded, columns=["tsne1", "tsne2"])
+        
+        result_dir = os.path.join(output_dir, data_vis)
+        os.makedirs(result_dir, exist_ok=True)
+        for reg in reg_list:
+            bf_path = os.path.join(result_dir, f'{reg}_before_fs.png')
+            
+            df_embedded["target"] = y[reg].values
+            plt.figure(figsize=(8, 6))
+            sc = plt.scatter(
+                df_embedded["tsne1"], df_embedded["tsne2"],
+                c=df_embedded["target"], cmap="viridis", alpha=0.8
+            )
+            plt.colorbar(sc, label="target")
+            plt.xlabel("t-SNE 1")
+            plt.ylabel("t-SNE 2")
+            plt.title(f'Before Feature Selection - {reg}')
+            plt.tight_layout()
+            plt.savefig(bf_path)
+            plt.close()
+        print(f"t-SNEプロットを '{result_dir}' に保存しました。")
+
+    # 2. RFE SHAP の実行
+    print("RFE SHAPによる特徴選択を開始します...")
+    if model is None:
+        model = lgb.LGBMRegressor(random_state=random_state, verbosity=-1)
+
+    features = list(X.columns)
+    history = []
+    
+    # 全特徴量での初期スコアを計算
+    initial_scores = [np.mean(cross_val_score(model, X.values, y[reg].values, cv=cv, scoring=scoring)) for reg in reg_list]
+    initial_score = np.mean(initial_scores)
+    history.append((len(features), initial_score, None))
+    print(f"特徴量 {len(features)}個 の場合: スコア = {initial_score:.4f}")
+
+    # 特徴量を削減していくループ
+    while len(features) > min_features_to_select:
+        X_subset = X[features]
+        # SHAP重要度を計算
+        shap_values_agg = np.zeros(len(features))
+        for reg in reg_list:
+            current_model = model.fit(X_subset.values, y[reg].values)
+            explainer = shap.TreeExplainer(current_model)
+            shap_values = explainer.shap_values(X_subset.values)
+            shap_values_agg += np.abs(shap_values).mean(axis=0)
+        
+        feature_importance = pd.Series(shap_values_agg, index=features)
+        least_important_features = feature_importance.nsmallest(step).index.tolist()
+        
+        # 特徴量を削減
+        features = [f for f in features if f not in least_important_features]
+        
+        # 性能を評価
+        if features:
+            X_subset_reduced = X[features]
+            current_scores = [np.mean(cross_val_score(model, X_subset_reduced.values, y[reg].values, cv=cv, scoring=scoring)) for reg in reg_list]
+            current_score = np.mean(current_scores)
+            history.append((len(features), current_score, least_important_features))
+            print(f"特徴量 {len(features)}個 の場合: スコア = {current_score:.4f} (削除: {least_important_features})")
+        else:
+            break
+
+    # 3. 最適な特徴量セットの決定
+    history_df = pd.DataFrame(history, columns=['num_features', 'score', 'removed_features'])
+    best_idx = history_df['score'].idxmax()
+    best_num_features = int(history_df.loc[best_idx, 'num_features'])
+    best_score = history_df.loc[best_idx, 'score']
+    
+    print(f"\n最適な特徴量数: {best_num_features} (スコア: {best_score:.4f})")
+    
+    # 最適な特徴量セットを再構築
+    removed_features_total = []
+    rows_to_consider = history_df[history_df['num_features'] >= best_num_features]['removed_features']
+    for features_to_remove_list in rows_to_consider.dropna():
+        removed_features_total.extend(features_to_remove_list)
+    
+    selected_features_list = [f for f in list(X.columns) if f not in removed_features_total]
+
+    # 4. 最終的な重要度計算とCSV出力
+    final_shap_scores = {}
+    X_final = X[selected_features_list]
+    print("最終的なSHAP重要度を計算中...")
+    for reg in reg_list:
+        final_model = model.fit(X_final.values, y[reg].values)
+        explainer = shap.TreeExplainer(final_model)
+        shap_values = explainer.shap_values(X_final.values)
+        mean_abs_shap = np.abs(shap_values).mean(axis=0)
+        final_shap_scores[reg] = mean_abs_shap
+        
+    final_shap_scores['max'] = pd.DataFrame(list(final_shap_scores.values())).max(axis=0).values
+    feature_importance_final = pd.Series(final_shap_scores['max'], index=selected_features_list).sort_values(ascending=False)
+    selected_features = feature_importance_final.index.tolist()
+
+    if output_csv_path is not None:
+        os.makedirs(output_csv_path, exist_ok=True)
+        rfe_history_path = os.path.join(output_csv_path, 'rfe_shap_history.csv')
+        history_df.to_csv(rfe_history_path, index=False)
+        print(f"RFEの履歴を '{rfe_history_path}' に保存しました。")
+        
+        df_to_save = pd.DataFrame(final_shap_scores, index=selected_features)
+        df_to_save = df_to_save.sort_values(by='max', ascending=False)
+        shap_scores_path = os.path.join(output_csv_path, 'shap_scores.csv')
+        df_to_save.to_csv(shap_scores_path)
+        print(f"最終的な特徴量の重要度を '{shap_scores_path}' に保存しました。")
+        
+    # 5. (オプション) 特徴選択後のt-SNEによる可視化
+    if data_vis is not None:
+        print("特徴選択後のt-SNEプロットを生成中...")
+        tsne = TSNE(n_components=2, random_state=random_state)
+        X_selected = X[selected_features]
+        X_embedded = tsne.fit_transform(X_selected.values)
+        df_embedded = pd.DataFrame(X_embedded, columns=["tsne1", "tsne2"])
+        
+        result_dir = os.path.join(output_dir, data_vis)
+        os.makedirs(result_dir, exist_ok=True)
+        for reg in reg_list:
+            af_path = os.path.join(result_dir, f'{reg}_after_fs.png')
+            
+            df_embedded["target"] = y[reg].values
+            plt.figure(figsize=(8, 6))
+            sc = plt.scatter(
+                df_embedded["tsne1"], df_embedded["tsne2"],
+                c=df_embedded["target"], cmap="viridis", alpha=0.8
+            )
+            plt.colorbar(sc, label="target")
+            plt.xlabel("t-SNE 1")
+            plt.ylabel("t-SNE 2")
+            plt.title(f'After Feature Selection - {reg}')
+            plt.tight_layout()
+            plt.savefig(af_path)
+            plt.close()
+        print(f"t-SNEプロットを '{result_dir}' に保存しました。")
+            
+    return selected_features, final_shap_scores, feature_importance_final

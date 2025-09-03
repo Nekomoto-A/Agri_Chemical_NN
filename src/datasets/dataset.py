@@ -57,6 +57,7 @@ def ilr_transform(data_array):
 
 class data_create:
     def __init__(self,path_asv,path_chem,reg_list,exclude_ids, label_list = None, feature_transformer = config['feature_transformer'], label_data = config['labels']):
+        self.path_asv = path_asv
         self.asv_data = pd.read_csv(path_asv)#.drop('index',axis = 1)
         #self.chem_data = pd.read_excel(path_chem)
         self.chem_data = pd.read_excel(path_chem)
@@ -72,7 +73,12 @@ class data_create:
             asv_data = self.asv_data.loc[:, self.asv_data.columns.str.contains('d_')]
         
             taxa = asv_data.columns.to_list()
-            tax_levels = ["domain", "phylum", "class", "order", "family", "genus", "species"]
+
+            if 'lv6' in self.path_asv:
+                #tax_levels = ["domain", "phylum", "class", "order", "family", "genus", "species"]
+                tax_levels = ["domain", "phylum", "class", "order", "family", "genus"]
+            elif 'lv7' in self.path_asv:
+                tax_levels = ["domain", "phylum", "class", "order", "family", "genus", "species"]
             
             # 分類階層の分割情報をDataFrame化
             tax_split = pd.DataFrame(
@@ -241,7 +247,7 @@ def create_soft_labels_vectorized(values: torch.Tensor, thresholds: torch.Tensor
     #print(soft_labels)
     return soft_labels
 
-from src.datasets.feature_selection import shap_feature_selection, mutual_info_feature_selection
+from src.datasets.feature_selection import shap_feature_selection, mutual_info_feature_selection, rfe_shap_feature_selection
 from src.datasets.data_augumentation import augment_with_ctgan, augment_with_smoter, augment_with_gaussian_copula, augment_with_copulagan
 
 def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
@@ -307,6 +313,11 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
         x_test = x_test[selected_features]
         if isinstance(val_size, (int, float)):
             x_val = x_val[selected_features]
+    elif feature_selection == 'rfeshap':
+        selected_features, _, _ = rfe_shap_feature_selection(x_train_split, y_train_split[reg_list], 
+                                                             reg_list, output_dir = fold, data_vis=data_vis, 
+                                model=None, min_features_to_select=3, step=1, cv=5, 
+                                scoring='r2', random_state=42, output_csv_path = fold)
     else:
         selected_features = x_train_split.columns#.to_list()
 

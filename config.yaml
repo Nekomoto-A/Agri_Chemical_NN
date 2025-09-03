@@ -11,7 +11,7 @@ dataset.py:
   softlabel: True
   labels: ['crop']
   data_vis: 'visualize'
-  data_augumentation: None #copulagan #ctgan' #'gaussian_copula'
+  data_augumentation: copulagan #ctgan' #'gaussian_copula'
   num_augumentation: 200
   num_epochs: 30
   batch_size: 32
@@ -53,7 +53,7 @@ test_GP.py:
 test_HBM.py:
   num_samples_for_vi_pred: 10000
 fold_eval.py:
-  feature_selection: 'borutashap'
+  feature_selection: 'rfeshap'
   num_selected_features: 15
   feature_selection_all: False
   start_features: 3
@@ -62,8 +62,8 @@ fold_eval.py:
   feature_selection_dir: 'result_feature_selection_NN_cg1000'
   carr_calc: False
   k_fold: 5
-  model_name: 'NN'
-  result_dir: 'result_NN_shap15_cg200'
+  model_name: 'CNN'
+  result_dir: 'result_rfeshap_cg200'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
@@ -74,7 +74,7 @@ fold_eval.py:
     #'049_20_Sait_Yama', '050_20_Sait_Stra', '061_20_Naga_Barl', '062_20_Naga_Barl',
     #'067_20_Naga_Pump', '331_22_Niig_jpea', '332_22_Niig_jpea'
   ]
-  feature_path: 'data/raw/taxon_data/lv7.csv'
+  feature_path: 'data/raw/taxon_data/lv6.csv'
   target_path: 'data/raw/chem_data.xlsx'
 main.py:
   reg_list: [
