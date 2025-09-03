@@ -12,6 +12,11 @@ import numpy as np
 torch.manual_seed(42)
 np.random.seed(42)
 
+import warnings
+# 不要な警告を非表示にする
+warnings.filterwarnings('ignore', category=UserWarning)
+warnings.filterwarnings('ignore', category=FutureWarning)
+
 def main():
     reg_list = config['reg_list']
     if any(isinstance(i, list) for i in reg_list) == False:
