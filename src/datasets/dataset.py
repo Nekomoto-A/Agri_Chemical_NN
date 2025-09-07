@@ -262,6 +262,9 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
                           num_epochs = config['num_epochs'],
                           batch_size = config['batch_size'],
                           n_trials = config['n_trials'],
+                          hist = config['hist'],
+                          clustering = config['clustering'],
+                          marginal_hist_train = config['marginal_hist_train'],
                           fold = None
                           ):
     
@@ -272,7 +275,8 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
         y_train_split = y_train
     #print(x_train_split)
     #print(y_train_split)
-    print(x_train_split.shape)
+    print(f'特徴選択前：{x_train_split.shape}')
+
     if feature_selection == 'shap':
         # SHAPを用いた特徴選択
         #for reg in reg_list:
@@ -295,11 +299,11 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
                                                         output_csv_path = fold,
                                                         reg_list = reg_list, output_dir = fold, data_vis = data_vis,
                                                         )
-        x_train_split = x_train_split[selected_features]
-        x_test = x_test[selected_features]
-        if isinstance(val_size, (int, float)):
-            x_val = x_val[selected_features]
-        print(f"選択された特徴量数: {len(selected_features)}")
+        # x_train_split = x_train_split[selected_features]
+        # x_test = x_test[selected_features]
+        # if isinstance(val_size, (int, float)):
+        #     x_val = x_val[selected_features]
+        # print(f"選択された特徴量数: {len(selected_features)}")
         #print(f"学習データ:{x_train_split}")
     elif feature_selection == 'borutashap':
         from src.datasets.feature_selection import boruta_shap_feature_selection
@@ -309,10 +313,10 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
                                                         reg_list = reg_list, output_dir = fold, data_vis = data_vis,
                                                         n_trials=n_trials, 
                                                         )
-        x_train_split = x_train_split[selected_features]
-        x_test = x_test[selected_features]
-        if isinstance(val_size, (int, float)):
-            x_val = x_val[selected_features]
+        # x_train_split = x_train_split[selected_features]
+        # x_test = x_test[selected_features]
+        # if isinstance(val_size, (int, float)):
+        #     x_val = x_val[selected_features]
     elif feature_selection == 'rfeshap':
         selected_features, _, _ = rfe_shap_feature_selection(x_train_split, y_train_split[reg_list], 
                                                              reg_list, output_dir = fold, data_vis=data_vis, 
@@ -321,7 +325,13 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
     else:
         selected_features = x_train_split.columns#.to_list()
 
-    print(x_train_split.shape)
+    x_train_split = x_train_split[selected_features]
+    x_test = x_test[selected_features]
+    if isinstance(val_size, (int, float)):
+        x_val = x_val[selected_features]
+
+    print(f'特徴選択後：{x_train_split.shape}')
+
     if fold is not None:
         train_feature_dir = os.path.join(fold, f'train_feature.csv')
         x_train_split.to_csv(train_feature_dir)
@@ -338,6 +348,39 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
             x_val.to_csv(val_feature_dir)
             val_target_dir = os.path.join(fold, f'val_chem.csv')
             y_val.to_csv(val_target_dir)
+    
+    if fold is not None:
+        if hist:
+            # 診断結果を保存するディレクトリを作成
+            hist_dir = os.path.join(fold, 'histograms')
+            os.makedirs(hist_dir, exist_ok=True)
+
+            # 数値型の列を取得 (ID列は除く)
+            numerical_cols = x_train_split.select_dtypes(include=['float64', 'int64']).columns
+            if 'crop-id' in numerical_cols:
+                numerical_cols = numerical_cols.drop('crop-id')
+
+            print(f"各数値列のヒストグラムを {hist_dir} フォルダに保存します...")
+
+            # 各数値列のヒストグラムを個別のファイルとして保存
+            for col in numerical_cols:
+                # グラフの作成
+                plt.figure(figsize=(8, 6))
+                x_train_split[col].hist(bins=50)
+                
+                # タイトルとラベルの設定
+                plt.title(f'Histogram of {col}')
+                plt.xlabel(col)
+                plt.ylabel('Frequency')
+                
+                # ファイルに保存
+                save_path = os.path.join(hist_dir, f'{col}.png')
+                plt.savefig(save_path)
+                
+                # メモリを解放するためにグラフを閉じる
+                plt.close()
+
+            print("ヒストグラムの保存が完了しました。")
 
     #X_columns = x_train_split.columns.to_list()
     #x_train_split_clr,mean = clr_transform(x_train_split.astype(float))
@@ -352,6 +395,8 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
 
     test_ids = y_test['crop-id']
 
+    #print(f'データ拡張前：{x_train_split.shape}')
+
     if data_augumentation == 'ctgan':
         #x_train_split, y_train_split = augment_with_ctgan(x_train_split, y_train_split, reg_list, labels = labels,n_samples=num_augumentation, epochs=num_epochs, output_dir = fold,data_vis = data_vis)
         x_train_split, y_train_split = augment_with_ctgan(x_train_split, y_train_split, reg_list, labels = labels, epochs=num_epochs,batch_size = batch_size, output_dir = fold,data_vis = data_vis)
@@ -361,7 +406,17 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
         x_train_split, y_train_split = augment_with_gaussian_copula(x_train_split, y_train_split, reg_list, output_dir = fold, data_vis = data_vis, num_synthetic_samples = num_augumentation)
     elif data_augumentation == 'copulagan':
         x_train_split, y_train_split = augment_with_copulagan(X = x_train_split, y = y_train_split, reg_list = reg_list, output_dir = fold, data_vis = data_vis, num_to_generate = num_augumentation)
-        
+    
+    #print(f'データ拡張後：{x_train_split.shape}')
+
+    if marginal_hist_train:
+        from src.experiments.merginal_hist import save_marginal_histograms
+        save_marginal_histograms(x = x_train_split, y = y_train_split, features = selected_features, reg_list = reg_list , output_dir = fold)
+
+    if clustering:
+        from src.experiments.gmm_clus import auto_gmm_pipeline
+        auto_gmm_pipeline(data = x_train_split, features = selected_features, max_clusters = 10, output_dir = fold)
+
     X_train_tensor = torch.tensor(x_train_split.to_numpy(), dtype=torch.float32)
     X_test_tensor = torch.tensor(x_test.to_numpy(), dtype=torch.float32)
 

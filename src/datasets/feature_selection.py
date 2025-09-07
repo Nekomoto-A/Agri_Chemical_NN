@@ -591,5 +591,5 @@ def rfe_shap_feature_selection(X, y, reg_list, output_dir, data_vis=None,
             plt.savefig(af_path)
             plt.close()
         print(f"t-SNEプロットを '{result_dir}' に保存しました。")
-            
+
     return selected_features, final_shap_scores, feature_importance_final

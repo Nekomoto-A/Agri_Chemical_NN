@@ -52,6 +52,7 @@ def calculate_and_save_correlations(df, target_data, output_dir, reg_list):
         print("---------------------------------")
 
 
+
 def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path = config['target_path'], exclude_ids = config['exclude_ids'],
                   k = config['k_fold'], output_dir = config['result_dir'], csv_path = config['result_fold'], 
                   final_output = config['result_average'], model_name = config['model_name'], reduced_feature_path = config['reduced_feature'],
@@ -59,7 +60,8 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
                   selection_ratio = config['selection_ratio'],
                   fsdir = config['feature_selection_dir'],
                   feature_selection = config['feature_selection'],
-                  num_features_to_select = config['num_selected_features']
+                  num_features_to_select = config['num_selected_features'],
+                  marginal_hist = config['marginal_hist']
                   ):
     #if feature_selection_all:
     #    output_dir = os.path.join(fsdir, output_dir)
@@ -78,6 +80,10 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
     
     if corr_calc:
         calculate_and_save_correlations(X, Y, output_dir, reg_list)
+
+    if marginal_hist:
+        from src.experiments.merginal_hist import save_marginal_histograms
+        save_marginal_histograms(x = X, y = Y, features = X.columns, reg_list = reg_list , output_dir = output_dir)
 
     for reg in reg_list:
         #os.makedirs(output_dir,exist_ok=True)

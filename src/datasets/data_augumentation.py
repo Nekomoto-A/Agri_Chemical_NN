@@ -10,6 +10,9 @@ from sdv.sampling import Condition
 from itertools import product
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
+from rdt.transformers import NullTransformer
+
+import math
 
 def augment_with_ctgan(X, y, reg_list, output_dir, data_vis, labels=None, epochs=10, batch_size=32):
     """
@@ -119,8 +122,26 @@ def augment_with_ctgan(X, y, reg_list, output_dir, data_vis, labels=None, epochs
     # =================================================================
     # 3. CTGANの学習と条件付きデータ生成
     # =================================================================
+
+    numerical_cols = []
+    for col, sdtype in metadata.to_dict()['columns'].items():
+        if sdtype['sdtype'] == 'numerical':
+            numerical_cols.append(col)
+
+    # すべての数値列に対して、デフォルトの'beta'分布ではなく、
+    # 'gaussian'分布を使用するように変換器（transformer）を設定します。
+    field_transformers = {
+        col: NullTransformer(distribution='gaussian') for col in numerical_cols
+    }
+
     print("Training CTGAN synthesizer...")
-    synthesizer = CTGANSynthesizer(metadata, epochs=epochs,embedding_dim=64, verbose=True)
+    #synthesizer = CTGANSynthesizer(metadata, epochs=epochs,embedding_dim=64, verbose=True)
+    
+    synthesizer = CopulaGANSynthesizer(
+    metadata,
+    field_transformers=field_transformers, # この引数を追加
+    verbose=True
+    )
     synthesizer.fit(df_for_training)
 
     print("Generating conditional synthetic data...")
@@ -383,6 +404,7 @@ def augment_with_gaussian_copula(X, y, target_col, output_dir, data_vis, num_syn
     # =================================================================
     # 1. 拡張前のデータをt-SNEで可視化
     # =================================================================
+    print(f'拡張前:{X.shape}')
     print("Visualizing data before augmentation...")
     for reg in target_col:
         # t-SNEモデルの初期化と実行
@@ -447,6 +469,7 @@ def augment_with_gaussian_copula(X, y, target_col, output_dir, data_vis, num_syn
     # =================================================================
     # 3. 拡張後のデータをt-SNEで可視化 (★ここを修正)
     # =================================================================
+    print(f'拡張後:{X.shape}')
     print("\nVisualizing data after augmentation...")
     for reg in target_col:
         # t-SNEモデルで次元削減
@@ -515,7 +538,9 @@ from itertools import product
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
-def augment_with_copulagan(X, y, reg_list, output_dir, data_vis, num_to_generate, labels=None):
+def augment_with_copulagan(X, y, reg_list, output_dir, data_vis, num_to_generate, 
+                           #labels=None
+                           ):
     """
     CopulaGANを使用して表形式データを拡張し、t-SNEで可視化する関数。
     - yの連続値を3クラスに分類し、学習データに加えます。
@@ -535,8 +560,8 @@ def augment_with_copulagan(X, y, reg_list, output_dir, data_vis, num_to_generate
         tuple: (拡張後の特徴量, 拡張後のターゲット) のタプル。
     """
     # labelsがNoneの場合に空リストを割り当てて、後の処理を簡潔にする
-    if labels is None:
-        labels = []
+    #if labels is None:
+    #    labels = []
 
     result_dir = os.path.join(output_dir, data_vis)
     os.makedirs(result_dir, exist_ok=True)
@@ -566,52 +591,55 @@ def augment_with_copulagan(X, y, reg_list, output_dir, data_vis, num_to_generate
         plt.savefig(ba_path)
         plt.close()
 
-    # --- ラベル(labels)で可視化 ---
-    for label in labels:
-        ba_path = os.path.join(result_dir, f'{label}_before_augument.png')
-        df_embedded["target"] = y[label].values
-        unique_labels = df_embedded["target"].unique()
-        colors = plt.cm.get_cmap('tab10', len(unique_labels))
 
-        plt.figure(figsize=(8, 6))
-        for i, val in enumerate(unique_labels):
-            subset = df_embedded[df_embedded["target"] == val]
-            plt.scatter(
-                subset["tsne1"], subset["tsne2"],
-                color=colors(i), alpha=0.8, label=val
-            )
-        plt.xlabel("t-SNE 1")
-        plt.ylabel("t-SNE 2")
-        plt.title(f"t-SNE before Augmentation (colored by {label})")
-        plt.legend(title=label, bbox_to_anchor=(1.05, 1), loc='upper left')
-        plt.tight_layout()
-        plt.savefig(ba_path, bbox_inches='tight')
-        plt.close()
+    # --- ラベル(labels)で可視化 ---
+    # for label in labels:
+    #     ba_path = os.path.join(result_dir, f'{label}_before_augument.png')
+    #     df_embedded["target"] = y[label].values
+    #     unique_labels = df_embedded["target"].unique()
+    #     colors = plt.cm.get_cmap('tab10', len(unique_labels))
+
+    #     plt.figure(figsize=(8, 6))
+    #     for i, val in enumerate(unique_labels):
+    #         subset = df_embedded[df_embedded["target"] == val]
+    #         plt.scatter(
+    #             subset["tsne1"], subset["tsne2"],
+    #             color=colors(i), alpha=0.8, label=val
+    #         )
+    #     plt.xlabel("t-SNE 1")
+    #     plt.ylabel("t-SNE 2")
+    #     plt.title(f"t-SNE before Augmentation (colored by {label})")
+    #     plt.legend(title=label, bbox_to_anchor=(1.05, 1), loc='upper left')
+    #     plt.tight_layout()
+    #     plt.savefig(ba_path, bbox_inches='tight')
+    #     plt.close()
 
     # =================================================================
     # 2. CopulaGANの学習準備
     # =================================================================
     print("Preparing data for CopulaGAN training...")
     # --- yの連続値を3クラスに分類 ---
-    y_classes = pd.DataFrame()
-    y_class_cols = []
-    for reg in reg_list:
-        class_col_name = f'{reg}_class'
-        try:
-            # データ量に基づいて3等分 (qcut)
-            y_classes[class_col_name] = pd.qcut(y[reg], q=3, labels=False, duplicates='drop')
-        except ValueError:
-            # qcutが失敗した場合 (ユニーク値が少ないなど) は値の範囲で3等分 (cut)
-            y_classes[class_col_name] = pd.cut(y[reg], bins=3, labels=False, duplicates='drop')
-        y_class_cols.append(class_col_name)
+    # y_classes = pd.DataFrame()
+    # y_class_cols = []
+    # for reg in reg_list:
+    #     class_col_name = f'{reg}_class'
+    #     try:
+    #         # データ量に基づいて3等分 (qcut)
+    #         y_classes[class_col_name] = pd.qcut(y[reg], q=3, labels=False, duplicates='drop')
+    #     except ValueError:
+    #         # qcutが失敗した場合 (ユニーク値が少ないなど) は値の範囲で3等分 (cut)
+    #         y_classes[class_col_name] = pd.cut(y[reg], bins=3, labels=False, duplicates='drop')
+    #     y_class_cols.append(class_col_name)
 
     # --- 学習用データフレームを作成 ---
     # crop-idがyに含まれていることを想定
     if 'crop-id' not in y.columns:
         raise ValueError("The 'crop-id' column is missing from the y DataFrame.")
         
-    df_for_training = pd.concat([y[['crop-id']], X, y[reg_list], y_classes, y[labels]], axis=1)
-    discrete_columns = y_class_cols + labels
+    # df_for_training = pd.concat([y[['crop-id']], X, y[reg_list], y_classes, y[labels]], axis=1)
+    # discrete_columns = y_class_cols + labels
+    #df_for_training = pd.concat([y[['crop-id']], X, y[reg_list], y_classes], axis=1)
+    df_for_training = pd.concat([y[['crop-id']], X, y[reg_list]], axis=1)
     
     # メタデータの設定
     metadata = SingleTableMetadata()
@@ -625,45 +653,66 @@ def augment_with_copulagan(X, y, reg_list, output_dir, data_vis, num_to_generate
     print("Training CopulaGAN synthesizer...")
     # CTGANSynthesizerからCopulaGANSynthesizerに変更
     # epochsやembedding_dimなどのCTGAN特有の引数は不要
+
+    # 学習に使用する数値列を特定
+    numerical_cols = X.columns.tolist() + reg_list
+
+    print("--- 学習データフレームの診断 ---")
+    print("各数値列のユニークな値の数:")
+    print(df_for_training[numerical_cols].nunique())
+
+    print("\n各数値列の統計情報:")
+    print(df_for_training[numerical_cols].describe())
+
+    # 標準偏差が非常に小さい列を見つける
+    low_variance_cols = df_for_training[numerical_cols].std()[df_for_training[numerical_cols].std() < 1e-9]
+    if not low_variance_cols.empty:
+        print("\n警告: 以下の列は値のばらつきが非常に小さいです。")
+        print(low_variance_cols)
+    else:
+        print("\nすべての数値列に十分なばらつきがあります。")
+
     synthesizer = CopulaGANSynthesizer(metadata, verbose=True)
     synthesizer.fit(df_for_training)
 
     print("Generating conditional synthetic data...")
     # --- 条件付き生成のための組み合わせを計算 ---
-    conditional_columns = labels + y_class_cols
+    #conditional_columns = labels + y_class_cols
     synthetic_df = pd.DataFrame() # 生成データを格納する空のDFを初期化
 
-    if conditional_columns:
-        unique_values_per_column = [df_for_training[col].dropna().unique() for col in conditional_columns]
-        all_combinations = list(product(*unique_values_per_column))
+    # if conditional_columns:
+    #     unique_values_per_column = [df_for_training[col].dropna().unique() for col in conditional_columns]
+    #     all_combinations = list(product(*unique_values_per_column))
         
-        combination_counts = df_for_training.groupby(conditional_columns).size()
+    #     combination_counts = df_for_training.groupby(conditional_columns).size()
         
-        if not combination_counts.empty:
-            max_count = combination_counts.max()
-            conditions_to_generate = []
-            for combo in all_combinations:
-                combo_dict = dict(zip(conditional_columns, combo))
-                current_count = combination_counts.get(combo, 0)
-                num_to_generate = max_count - current_count
+    #     if not combination_counts.empty:
+    #         max_count = combination_counts.max()
+    #         conditions_to_generate = []
+    #         for combo in all_combinations:
+    #             combo_dict = dict(zip(conditional_columns, combo))
+    #             current_count = combination_counts.get(combo, 0)
+    #             num_to_generate = max_count - current_count
                 
-                if num_to_generate > 0:
-                    # num_to_generateを明示的にint型に変換する
-                    condition = Condition(num_rows=int(num_to_generate), column_values=combo_dict)
-                    conditions_to_generate.append(condition)
+    #             if num_to_generate > 0:
+    #                 # num_to_generateを明示的にint型に変換する
+    #                 condition = Condition(num_rows=int(num_to_generate), column_values=combo_dict)
+    #                 conditions_to_generate.append(condition)
             
-            if conditions_to_generate:
-                synthetic_df = synthesizer.sample_from_conditions(conditions=conditions_to_generate)
-            else:
-                print("All combinations are already balanced. No new data generated.")
-        else:
-            print("No combinations found to generate data for.")
+    #         if conditions_to_generate:
+    #             synthetic_df = synthesizer.sample_from_conditions(conditions=conditions_to_generate)
+    #         else:
+    #             print("All combinations are already balanced. No new data generated.")
+    #     else:
+    #         print("No combinations found to generate data for.")
             
-    else:
-        # 条件がない場合は、元のデータ数と同数を生成
-        print("No conditional columns specified. Generating generic samples.")
-        synthetic_df = synthesizer.sample(num_rows=num_to_generate)
-        
+    # else:
+    #     # 条件がない場合は、元のデータ数と同数を生成
+    #     print("No conditional columns specified. Generating generic samples.")
+    #     synthetic_df = synthesizer.sample(num_rows=num_to_generate)
+
+    synthetic_df = synthesizer.sample(num_rows=num_to_generate)
+    
     if not synthetic_df.empty:
         print(f"Generated {len(synthetic_df)} synthetic samples.")
     
@@ -714,44 +763,44 @@ def augment_with_copulagan(X, y, reg_list, output_dir, data_vis, num_to_generate
         plt.close()
 
     # --- ラベル(labels)で可視化 ---
-    for label in labels:
-        aa_path = os.path.join(result_dir, f'{label}_after_augument.png')
+    # for label in labels:
+    #     aa_path = os.path.join(result_dir, f'{label}_after_augument.png')
         
-        plt.figure(figsize=(10, 6))
-        unique_values = augmented_df_full[label].unique()
-        colors = plt.cm.get_cmap('tab10', len(unique_values))
-        color_map = {val: colors(i) for i, val in enumerate(unique_values)}
+    #     plt.figure(figsize=(10, 6))
+    #     unique_values = augmented_df_full[label].unique()
+    #     colors = plt.cm.get_cmap('tab10', len(unique_values))
+    #     color_map = {val: colors(i) for i, val in enumerate(unique_values)}
         
-        # 色情報を列として追加
-        df_augmented_embedded['color'] = augmented_df_full[label].map(color_map)
+    #     # 色情報を列として追加
+    #     df_augmented_embedded['color'] = augmented_df_full[label].map(color_map)
         
-        # 元のデータ (マーカー: 〇)
-        plt.scatter(
-            df_augmented_embedded.iloc[:n_original]['tsne1'], df_augmented_embedded.iloc[:n_original]['tsne2'],
-            c=df_augmented_embedded.iloc[:n_original]['color'], marker='o', alpha=0.8
-        )
-        # 生成データ (マーカー: △)
-        if len(df_augmented_embedded) > n_original:
-            plt.scatter(
-                df_augmented_embedded.iloc[n_original:]['tsne1'], df_augmented_embedded.iloc[n_original:]['tsne2'],
-                c=df_augmented_embedded.iloc[n_original:]['color'], marker='^', alpha=0.8
-            )
+    #     # 元のデータ (マーカー: 〇)
+    #     plt.scatter(
+    #         df_augmented_embedded.iloc[:n_original]['tsne1'], df_augmented_embedded.iloc[:n_original]['tsne2'],
+    #         c=df_augmented_embedded.iloc[:n_original]['color'], marker='o', alpha=0.8
+    #     )
+    #     # 生成データ (マーカー: △)
+    #     if len(df_augmented_embedded) > n_original:
+    #         plt.scatter(
+    #             df_augmented_embedded.iloc[n_original:]['tsne1'], df_augmented_embedded.iloc[n_original:]['tsne2'],
+    #             c=df_augmented_embedded.iloc[n_original:]['color'], marker='^', alpha=0.8
+    #         )
             
-        plt.xlabel("t-SNE 1")
-        plt.ylabel("t-SNE 2")
-        plt.title(f"t-SNE after Augmentation (colored by {label})")
+    #     plt.xlabel("t-SNE 1")
+    #     plt.ylabel("t-SNE 2")
+    #     plt.title(f"t-SNE after Augmentation (colored by {label})")
         
-        # 凡例を2種類作成 (マーカーの種類と色の意味)
-        legend_marker = [Line2D([0], [0], marker='o', color='w', label='Original', markerfacecolor='k', markersize=10),
-                         Line2D([0], [0], marker='^', color='w', label='Generated', markerfacecolor='k', markersize=10)]
-        legend1 = plt.legend(handles=legend_marker, loc='upper right')
-        plt.gca().add_artist(legend1)
+    #     # 凡例を2種類作成 (マーカーの種類と色の意味)
+    #     legend_marker = [Line2D([0], [0], marker='o', color='w', label='Original', markerfacecolor='k', markersize=10),
+    #                      Line2D([0], [0], marker='^', color='w', label='Generated', markerfacecolor='k', markersize=10)]
+    #     legend1 = plt.legend(handles=legend_marker, loc='upper right')
+    #     plt.gca().add_artist(legend1)
 
-        legend_color = [Patch(facecolor=color_map[val], label=val) for val in unique_values]
-        plt.legend(handles=legend_color, title=label, bbox_to_anchor=(1.05, 1), loc='upper left')
+    #     legend_color = [Patch(facecolor=color_map[val], label=val) for val in unique_values]
+    #     plt.legend(handles=legend_color, title=label, bbox_to_anchor=(1.05, 1), loc='upper left')
         
-        plt.tight_layout()
-        plt.savefig(aa_path, bbox_inches='tight')
-        plt.close()
+    #     plt.tight_layout()
+    #     plt.savefig(aa_path, bbox_inches='tight')
+    #     plt.close()
 
     return synthetic_features, synthetic_targets
