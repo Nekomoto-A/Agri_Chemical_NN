@@ -79,6 +79,17 @@ class data_create:
                 tax_levels = ["domain", "phylum", "class", "order", "family", "genus"]
             elif 'lv7' in self.path_asv:
                 tax_levels = ["domain", "phylum", "class", "order", "family", "genus", "species"]
+            elif 'lv5' in self.path_asv:
+                #tax_levels = ["domain", "phylum", "class", "order", "family", "genus", "species"]
+                tax_levels = ["domain", "phylum", "class", "order", "family"]
+            elif 'lv4' in self.path_asv:
+                tax_levels = ["domain", "phylum", "class", "order"]
+            elif 'lv3' in self.path_asv:
+                tax_levels = ["domain", "phylum", "class"]
+            elif 'lv2' in self.path_asv:
+                tax_levels = ["domain", "phylum"]
+            elif 'lv1' in self.path_asv:
+                tax_levels = ["domain"]
             
             # 分類階層の分割情報をDataFrame化
             tax_split = pd.DataFrame(
