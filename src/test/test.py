@@ -312,7 +312,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                   labels_train = None,
                   labels_val = None,
                   labels_test = None,
-                  loss_sum = config['loss_sum'], shap_eval = config['shap_eval']):
+                  loss_sum = config['loss_sum'], shap_eval = config['shap_eval'], save_feature = config['save_feature']):
 
     output_dims = []
     #print(Y_train)
@@ -436,7 +436,14 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                     model_name = model_name,
                                     loss_sum = loss_sum
                                     )
+        
         predicts, true, r2_results, mse_results = test_MT(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir, features = features)
+        
+        if save_feature:
+            from src.experiments.shared_deature_save import save_features
+            save_features(model = model_trained, x_data = X_train, y_data_dict = Y_train, output_dir = vis_dir, features = 'feature_train')
+            save_features(model = model_trained, x_data = X_test, y_data_dict = Y_test, output_dir = vis_dir, features = 'feature_test')
+        
         if shap_eval == True:
             model_trained.eval()
             #with torch.no_grad():
