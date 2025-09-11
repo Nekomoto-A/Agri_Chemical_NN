@@ -20,6 +20,7 @@ dataset.py:
   hist: False
   num_clusters: 2
   marginal_hist_train: False
+  unknown_drop: True
 train.py:
   early_stopping: False
   patience: 5
@@ -48,6 +49,12 @@ train_HBM.py:
   num_chains: 1
   learning_rate_vi: 0.001
   num_steps_vi: 3000
+train_AE.py:
+  batch_size: 32
+  epochs: 60
+  lr: 0.001
+  train_vis: True
+  vis_step: 10
 test.py:
   loss_sum: 'PCgrad'
   num_predictive_samples: 100
@@ -58,18 +65,18 @@ test_GP.py:
 test_HBM.py:
   num_samples_for_vi_pred: 10000
 fold_eval.py:
-  feature_selection: 'rfeshap'
+  feature_selection: None
   num_selected_features: 15
   feature_selection_all: False
   start_features: 3
   selection_ratio: 1
   end_features: 20
   feature_selection_dir: 'result_feature_selection_NN_cg1000'
-  carr_calc: False
-  marginal_hist: False
+  carr_calc: True
+  marginal_hist: True
   k_fold: 5
   model_name: 'CNN'
-  result_dir: 'result_enc_rfe'
+  result_dir: 'result_lv5_unknown'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
@@ -85,9 +92,9 @@ fold_eval.py:
 main.py:
   reg_list: [
             #'pH','Available.P'
-            #['pH','Available.P','EC',
+            ['pH','Available.P','EC',
             #'NH4.N',
-            #'NO3.N','Exchangeable.K'],
+            'NO3.N','Exchangeable.K'],
             ['pH'],
             ['Available.P'],
             ['EC'],

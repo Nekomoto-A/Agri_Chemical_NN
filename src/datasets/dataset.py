@@ -56,7 +56,8 @@ def ilr_transform(data_array):
     return ilr_data
 
 class data_create:
-    def __init__(self,path_asv,path_chem,reg_list,exclude_ids, label_list = None, feature_transformer = config['feature_transformer'], label_data = config['labels']):
+    def __init__(self,path_asv,path_chem,reg_list,exclude_ids, label_list = None, feature_transformer = config['feature_transformer'], 
+                 label_data = config['labels'], unknown_drop  = config['unknown_drop']):
         self.path_asv = path_asv
         self.asv_data = pd.read_csv(path_asv)#.drop('index',axis = 1)
         #self.chem_data = pd.read_excel(path_chem)
@@ -67,29 +68,46 @@ class data_create:
         self.feature_transformer = feature_transformer
         self.label_list = label_list
         self.label_data = label_data
+        self.unknown_drop = unknown_drop
     def __iter__(self):
         #self.chem_data.columns = [col.replace('.', '_') for col in self.chem_data.columns]
         if config['level'] != 'asv':
             asv_data = self.asv_data.loc[:, self.asv_data.columns.str.contains('d_')]
-        
-            taxa = asv_data.columns.to_list()
 
+            taxa = asv_data.columns.to_list()
+            
             if 'lv6' in self.path_asv:
                 #tax_levels = ["domain", "phylum", "class", "order", "family", "genus", "species"]
                 tax_levels = ["domain", "phylum", "class", "order", "family", "genus"]
+                ends_with_patterns = (';__',';g__')
             elif 'lv7' in self.path_asv:
                 tax_levels = ["domain", "phylum", "class", "order", "family", "genus", "species"]
+                ends_with_patterns = (';__',';s__')
             elif 'lv5' in self.path_asv:
                 #tax_levels = ["domain", "phylum", "class", "order", "family", "genus", "species"]
                 tax_levels = ["domain", "phylum", "class", "order", "family"]
+                ends_with_patterns = (';__',';f__')
             elif 'lv4' in self.path_asv:
                 tax_levels = ["domain", "phylum", "class", "order"]
+                ends_with_patterns = (';__',';o__')
             elif 'lv3' in self.path_asv:
                 tax_levels = ["domain", "phylum", "class"]
+                ends_with_patterns = (';__',';c__')
             elif 'lv2' in self.path_asv:
                 tax_levels = ["domain", "phylum"]
+                ends_with_patterns = (';__',';p__')
             elif 'lv1' in self.path_asv:
                 tax_levels = ["domain"]
+                ends_with_patterns = (';__')
+            
+            if self.unknown_drop:
+                #columns_to_drop1 = [col for col in taxa if col.endswith(';s__')]
+                #ends_with_patterns = (';__', ';s__')
+                #    endswith()メソッドはタプルを渡すことで、いずれかのパターンに一致するかを判定できます。
+                columns_to_drop = [col for col in taxa if col.endswith(ends_with_patterns)]
+
+                asv_data = asv_data.drop(columns_to_drop, axis=1)
+                taxa = asv_data.columns.to_list()
             
             # 分類階層の分割情報をDataFrame化
             tax_split = pd.DataFrame(
@@ -427,6 +445,13 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
     if clustering:
         from src.experiments.gmm_clus import auto_gmm_pipeline
         auto_gmm_pipeline(data = x_train_split, features = selected_features, max_clusters = 10, output_dir = fold)
+
+
+    # カラム名を縦に列挙してテキスト保存
+    used_dir = os.path.join(fold,'used_columns.txt')
+    with open(used_dir, "w", encoding="utf-8") as f:
+        for col in x_train_split.columns:
+            f.write(col + "\n")
 
     X_train_tensor = torch.tensor(x_train_split.to_numpy(), dtype=torch.float32)
     X_test_tensor = torch.tensor(x_test.to_numpy(), dtype=torch.float32)

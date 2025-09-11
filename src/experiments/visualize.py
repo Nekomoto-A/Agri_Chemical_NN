@@ -12,34 +12,21 @@ from matplotlib.lines import Line2D
 def reduce_feature(model,X1,model_name, X2 = None):
     model.eval()
     with torch.no_grad():
-        if model_name =='CNN' or model_name =='Attention_CNN' or model_name == 'CNN_catph' or model_name == 'CNN_SA' or model_name == 'CNN_Di':
-            #shared_features1 = model.sharedconv(X1.unsqueeze(1)).cpu().numpy()  # 共有層の出力を取得
-            _,shared_features = model(X1)  # 共有層の出力を取得
-            shared_features = shared_features.reshape(shared_features.shape[0], -1)
-            
-            if X2 != None:
-                labels = np.ones(len(shared_features), dtype=int)
-                #shared_features = model.sharedconv(X2.unsqueeze(1)).cpu().numpy()  # 共有層の出力を取得
-                _,shared_features2 = model(X2)  # 共有層の出力を取得
-                shared_features2 = shared_features2.reshape(shared_features2.shape[0], -1)
+        #shared_features1 = model.sharedconv(X1.unsqueeze(1)).cpu().numpy()  # 共有層の出力を取得
+        _,shared_features = model(X1)  # 共有層の出力を取得
+        shared_features = shared_features.reshape(shared_features.shape[0], -1)
+        
+        if X2 != None:
+            labels = np.ones(len(shared_features), dtype=int)
+            #shared_features = model.sharedconv(X2.unsqueeze(1)).cpu().numpy()  # 共有層の出力を取得
+            _,shared_features2 = model(X2)  # 共有層の出力を取得
+            shared_features2 = shared_features2.reshape(shared_features2.shape[0], -1)
 
-                shared_features = np.concatenate([shared_features, shared_features2])
-                labels = np.concatenate([labels, np.zeros(len(shared_features2), dtype=int)])
+            shared_features = np.concatenate([shared_features, shared_features2])
+            labels = np.concatenate([labels, np.zeros(len(shared_features2), dtype=int)])
             #else:
             #    shared_features = shared_features1
 
-        elif model_name =='NN':
-            shared_features1 = model.sharedfc(X1).cpu().numpy()  # 共有層の出力を取得
-            
-            if X2 != None:
-                labels = np.ones(len(shared_features1), dtype=int)
-                shared_features2 = model.sharedfc(X2).cpu().numpy()  # 共有層の出力を取得
-
-                shared_features = np.concatenate([shared_features1, shared_features2])
-                labels = np.concatenate([labels, np.zeros(len(shared_features2), dtype=int)])
-            else:
-                shared_features = shared_features1
-        
         # t-SNE で2次元に圧縮
         #reducer = TSNE(n_components=2, perplexity=20, random_state=42, init = 'random')
         reducer = umap.UMAP(n_components=2, random_state=42)
