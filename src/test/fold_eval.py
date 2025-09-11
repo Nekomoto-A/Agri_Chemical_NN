@@ -132,7 +132,8 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
         
         X_train_tensor, X_val_tensor, X_test_tensor,features, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids,label_train_tensor,label_test_tensor,label_val_tensor = transform_after_split(X_train,X_test,Y_train,Y_test, reg_list = reg_list,fold = fold_dir,
                                                                                                                                                                                                                               feature_selection = feature_selection,
-                                                                                                                                                                                                                              num_selected_features = num_features_to_select)
+                                                                                                                                                                                                                              num_selected_features = num_features_to_select,
+                                                                                                                                                                                                                              data_name = config['feature_path'])
         input_dim = X_train_tensor.shape[1]
 
         if len(reg_list) > 1:

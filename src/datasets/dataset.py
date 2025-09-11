@@ -57,7 +57,9 @@ def ilr_transform(data_array):
 
 class data_create:
     def __init__(self,path_asv,path_chem,reg_list,exclude_ids, label_list = None, feature_transformer = config['feature_transformer'], 
-                 label_data = config['labels'], unknown_drop  = config['unknown_drop']):
+                 label_data = config['labels'], unknown_drop  = config['unknown_drop'], 
+                 
+                 ):
         self.path_asv = path_asv
         self.asv_data = pd.read_csv(path_asv)#.drop('index',axis = 1)
         #self.chem_data = pd.read_excel(path_chem)
@@ -126,9 +128,11 @@ class data_create:
         chem_data = self.chem_data
         #print(asv_data)
         #print(chem_data)
-        if self.exclude_ids != None:
-            mask = ~chem_data['crop-id'].isin(self.exclude_ids)
-            asv_data,chem_data = asv_data[mask], chem_data[mask]
+        if 'riken' in self.path_asv:
+            if self.exclude_ids != None:
+                mask = ~chem_data['crop-id'].isin(self.exclude_ids)
+                asv_data,chem_data = asv_data[mask], chem_data[mask]
+        
         label_encoders = {}
         
         for r in self.reg_list:
@@ -280,7 +284,7 @@ from src.datasets.feature_selection import shap_feature_selection, mutual_info_f
 from src.datasets.data_augumentation import augment_with_ctgan, augment_with_smoter, augment_with_gaussian_copula, augment_with_copulagan
 
 def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
-                          feature_selection,num_selected_features,
+                          feature_selection,num_selected_features, data_name, 
                           val_size = config['val_size'],transformer= config['transformer'],
                           #augmentation = config['augmentation'],
                           softlabel = config['softlabel'],
@@ -420,9 +424,24 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
     #x_val_clr = x_val_clr.to_numpy()
     #x_test_clr = x_test_clr.to_numpy()
 
-    train_ids = y_train_split['crop-id']
-
-    test_ids = y_test['crop-id']
+    if 'riken' in data_name:
+        train_ids = y_train_split['crop-id']
+        test_ids = y_test['crop-id']
+        if isinstance(val_size, (int, float)):
+            X_val_tensor = torch.tensor(x_val.to_numpy(), dtype=torch.float32)
+            val_ids = y_val['crop-id']
+        else:
+            X_val_tensor = torch.tensor([])
+            val_ids = torch.tensor([])
+    elif 'DRA' in data_name:
+        train_ids = y_train_split['index']
+        test_ids = y_test['index']
+        if isinstance(val_size, (int, float)):
+            X_val_tensor = torch.tensor(x_val.to_numpy(), dtype=torch.float32)
+            val_ids = y_val['index']
+        else:
+            X_val_tensor = torch.tensor([])
+            val_ids = torch.tensor([])
 
     #print(f'データ拡張前：{x_train_split.shape}')
 
@@ -455,13 +474,6 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
 
     X_train_tensor = torch.tensor(x_train_split.to_numpy(), dtype=torch.float32)
     X_test_tensor = torch.tensor(x_test.to_numpy(), dtype=torch.float32)
-
-    if isinstance(val_size, (int, float)):
-        X_val_tensor = torch.tensor(x_val.to_numpy(), dtype=torch.float32)
-        val_ids = y_val['crop-id']
-    else:
-        X_val_tensor = torch.tensor([])
-        val_ids = torch.tensor([])
     
     scalers = {}
     #Y_train_tensor, Y_val_tensor, Y_test_tensor = [], [], []
