@@ -58,7 +58,6 @@ def ilr_transform(data_array):
 class data_create:
     def __init__(self,path_asv,path_chem,reg_list,exclude_ids, label_list = None, feature_transformer = config['feature_transformer'], 
                  label_data = config['labels'], unknown_drop  = config['unknown_drop'], 
-                 
                  ):
         self.path_asv = path_asv
         self.asv_data = pd.read_csv(path_asv)#.drop('index',axis = 1)
@@ -105,7 +104,8 @@ class data_create:
             if self.unknown_drop:
                 #columns_to_drop1 = [col for col in taxa if col.endswith(';s__')]
                 #ends_with_patterns = (';__', ';s__')
-                #    endswith()メソッドはタプルを渡すことで、いずれかのパターンに一致するかを判定できます。
+                #    endswith()メソッドはタプルを渡すことで、いずれかのパターンに一致するかを判定できます。]
+                
                 columns_to_drop = [col for col in taxa if col.endswith(ends_with_patterns)]
 
                 asv_data = asv_data.drop(columns_to_drop, axis=1)
@@ -243,7 +243,6 @@ class data_create:
         yield asv_feature
         yield chem_data
         
-
         #if self.label_list != None:
         #    label_data = chem_data[self.label_list]
 

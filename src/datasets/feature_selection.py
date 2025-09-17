@@ -528,6 +528,35 @@ def rfe_shap_feature_selection(X, y, reg_list, output_dir, data_vis=None,
     best_score = history_df.loc[best_idx, 'score']
     
     print(f"\n最適な特徴量数: {best_num_features} (スコア: {best_score:.4f})")
+
+        # === 追加ここから ===
+    # 4. スコアの推移をグラフ化して保存
+    # t-SNEの可視化が有効な場合のみ、スコアグラフも同じディレクトリに保存します。
+    if data_vis is not None:
+        print("特徴量数ごとのスコア推移グラフを生成中...")
+        result_dir = os.path.join(output_dir, data_vis)
+        os.makedirs(result_dir, exist_ok=True)
+        
+        plt.figure(figsize=(10, 6))
+        # スコアの推移をプロット
+        plt.plot(history_df['num_features'], history_df['score'], marker='o', linestyle='-')
+        # 最もスコアが高かった特徴量数に赤い縦線を引く
+        plt.axvline(x=best_num_features, color='r', linestyle='--', 
+                    label=f'Best score ({best_score:.4f}) at {best_num_features} features')
+        
+        plt.title('RFE Score vs. Number of Features')
+        plt.xlabel('Number of Features')
+        plt.ylabel(f'Score ({scoring})')
+        plt.grid(True)
+        plt.legend()
+        # X軸を降順にして、特徴量が減っていく過程を視覚的にわかりやすくします
+        plt.gca().invert_xaxis()
+        
+        # PNGファイルとして保存
+        score_graph_path = os.path.join(result_dir, 'rfe_score_history.png')
+        plt.savefig(score_graph_path)
+        plt.close()
+        print(f"スコア推移グラフを '{score_graph_path}' に保存しました。")
     
     # 最適な特徴量セットを再構築
     removed_features_total = []

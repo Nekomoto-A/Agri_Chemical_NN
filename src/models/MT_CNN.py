@@ -3,7 +3,7 @@ import torch.nn as nn
 import os
 
 class MTCNNModel(nn.Module):
-    def __init__(self, input_dim, output_dims, reg_list,raw_thresholds = [], conv_layers=[(64,3,1,1)], hidden_dim=128):
+    def __init__(self, input_dim, output_dims, reg_list,raw_thresholds = [], conv_layers=[(64,3,1,1),(64,3,1,1)], hidden_dim=128):
         super(MTCNNModel, self).__init__()
         self.input_sizes = input_dim
         self.hidden_dim = hidden_dim
@@ -16,7 +16,9 @@ class MTCNNModel(nn.Module):
         for i, (out_channels, kernel_size, stride, padding) in enumerate(conv_layers):
             self.sharedconv.add_module(f"conv{i+1}", nn.Conv1d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding))
             self.sharedconv.add_module(f"batchnorm{i+1}", nn.BatchNorm1d(out_channels))
-            self.sharedconv.add_module(f"relu{i+1}", nn.ReLU())
+            #self.sharedconv.add_module(f"relu{i+1}", nn.ReLU())
+            #self.sharedconv.add_module(f"relu{i+1}", nn.Tanh())
+            self.sharedconv.add_module(f"relu{i+1}", nn.LeakyReLU(negative_slope=0.05))
             #self.sharedconv.add_module(f"dropout{i+1}", nn.Dropout(0.2))
             #self.sharedconv.add_module(f"dropout{i+1}", nn.Dropout2d(0.2))
             self.sharedconv.add_module(f"maxpool{i+1}", nn.MaxPool1d(kernel_size=2))
@@ -34,7 +36,9 @@ class MTCNNModel(nn.Module):
         self.shared_fc = nn.Sequential(
                     nn.Linear(total_features, self.hidden_dim),
                     #nn.Dropout(0.2),
-                    nn.ReLU()
+                    #nn.ReLU()
+                    #nn.Tanh()
+                    nn.LeakyReLU(negative_slope=0.05)
                     #nn.Dropout(0.2) # ドロップアウトはオプション
                 )
         
@@ -44,7 +48,9 @@ class MTCNNModel(nn.Module):
                 #nn.Linear(total_features, self.hidden_dim),
                 #nn.ReLU(),
                 nn.Linear(self.hidden_dim, 64),
-                nn.ReLU(),
+                #nn.ReLU(),
+                #nn.Tanh(),
+                nn.LeakyReLU(negative_slope=0.05),
                 #nn.Dropout(0.2),
                 #nn.Linear(64, 32),
                 #nn.ReLU(),

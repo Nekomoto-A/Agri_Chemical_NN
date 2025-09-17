@@ -77,7 +77,7 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
         os.remove(csv_dir)
 
     X,Y = data_create(feature_path, target_path, reg_list, exclude_ids)
-    
+    print(X)
     if corr_calc:
         calculate_and_save_correlations(X, Y, output_dir, reg_list)
 

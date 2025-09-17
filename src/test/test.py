@@ -8,7 +8,7 @@ from src.experiments.visualize import visualize_tsne
 import shap
 import pandas as pd
 import numpy as np
-
+import mpld3
 import yaml
 import os
 yaml_path = 'config.yaml'
@@ -455,20 +455,40 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         print(f"Output {i+1} ({reg_list[i]}): R^2 Score = {r2:.3f}, MSE = {mse:.3f}")
 
     for reg in reg_list:
-        if 'CNN' in model_name:
-            #print(test_ids)
-            loss = np.abs(predicts[reg]-true[reg])
-            #print(loss)
-            loss_dir = os.path.join(vis_dir, reg)
-            os.makedirs(loss_dir,exist_ok=True)
-            out = os.path.join(loss_dir, 'loss.png')
+        #if 'CNN' in model_name:
+        #print(test_ids)
+        loss = np.abs(predicts[reg]-true[reg])
+        #print(loss)
+        loss_dir = os.path.join(vis_dir, reg)
+        os.makedirs(loss_dir,exist_ok=True)
+        out = os.path.join(loss_dir, 'loss.png')
 
-            plt.figure(figsize=(18, 14))
-            plt.bar(test_ids.to_numpy().ravel(),loss.ravel())
-            plt.xticks(rotation=90)
-            #plt.tight_layout()
-            plt.savefig(out)
-            plt.close()
+
+        # 1. グラフの準備 (figとaxを取得)
+        # figsizeでグラフ全体のサイズを指定します。幅を広く(30)、高さを標準(8)に設定してみましょう。
+        fig, ax = plt.subplots(figsize=(30, 8))
+
+        # 2. グラフの描画
+        # 元のコードと同じように棒グラフを作成します。
+        ax.bar(test_ids.to_numpy().ravel(), loss.ravel())
+        ax.tick_params(axis='x', rotation=90) # x軸のラベルを90度回転
+
+        # グラフのレイアウトを自動調整
+        fig.tight_layout()
+
+        
+        # 4. HTMLファイルとして保存
+        # plt.savefig() の代わりに、mpld3.save_html() を使います。
+        mpld3.save_html(fig, out)
+        # メモリを解放するためにプロットを閉じます（多くのグラフを作成する場合に有効です）
+        plt.close(fig)
+
+        # plt.figure(figsize=(18, 14))
+        # plt.bar(test_ids.to_numpy().ravel(),loss.ravel())
+        # plt.xticks(rotation=90)
+        # #plt.tight_layout()
+        # plt.savefig(out)
+        # plt.close()
 
         predictions.setdefault(method, {}).setdefault(reg, []).append(predicts[reg])
         trues.setdefault(method, {}).setdefault(reg, []).append(true[reg])
