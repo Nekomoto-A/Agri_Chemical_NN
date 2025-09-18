@@ -461,7 +461,8 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         #print(loss)
         loss_dir = os.path.join(vis_dir, reg)
         os.makedirs(loss_dir,exist_ok=True)
-        out = os.path.join(loss_dir, 'loss.png')
+        #out = os.path.join(loss_dir, 'loss.png')
+        out = os.path.join(loss_dir, 'loss.html')
 
 
         # 1. グラフの準備 (figとaxを取得)

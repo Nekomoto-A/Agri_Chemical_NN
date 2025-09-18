@@ -123,7 +123,8 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                 lr=config['learning_rate'],weights = config['weights'],vis_step = config['vis_step'],SUM_train_lim = config['SUM_train_lim'],personal_train_lim = config['personal_train_lim'],
                 l2_shared = config['l2_shared'],lambda_l2 = config['lambda_l2'], lambda_l1 = config['lambda_l1'], 
                 alpha = config['GradNorm_alpha'],
-                batch_size = config['batch_size']
+                batch_size = config['batch_size'],
+                reg_loss_fanction = config['reg_loss_fanction']
                 ):
 
     if len(lr) == 1:
@@ -224,8 +225,11 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
             #personal_losses.append(MSLELoss())
             #personal_losses.append(nn.MSELoss())
             #print(reg)
-            #personal_losses[reg] = nn.MSELoss()
-            personal_losses[reg] = nn.SmoothL1Loss()
+            if reg_loss_fanction == 'mse':
+                personal_losses[reg] = nn.MSELoss()
+            elif reg_loss_fanction == 'hloss':
+                personal_losses[reg] = nn.SmoothL1Loss()
+            
         elif '_rank' in reg:
             personal_losses[reg] = nn.KLDivLoss(reduction='batchmean')
         else:

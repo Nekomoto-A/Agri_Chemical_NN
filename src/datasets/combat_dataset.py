@@ -372,6 +372,43 @@ def visualize_tsne_with_custom_combat_model(df1, df2, labels1, labels2, df1_name
     plt.tight_layout(rect=[0, 0, 0.85, 1])
     plt.show()
 
+def plot_histograms(df1, df2, df1_label='DataFrame 1', df2_label='DataFrame 2', df1_color='skyblue', df2_color='salmon'):
+    """
+    2つのデータフレームの指定された列のヒストグラムを色分けして重ねて表示する関数。
+
+    Args:
+        df1 (pd.DataFrame): 1つ目のデータフレーム。
+        df2 (pd.DataFrame): 2つ目のデータフレーム。
+        column_name (str): ヒストグラムを作成する列の名前。
+        df1_label (str, optional): 1つ目のデータフレームの凡例ラベル。デフォルトは 'DataFrame 1'。
+        df2_label (str, optional): 2つ目のデータフレームの凡例ラベル。デフォルトは 'DataFrame 2'。
+        df1_color (str, optional): 1つ目のヒストグラムの色。デフォルトは 'skyblue'。
+        df2_color (str, optional): 2つ目のヒストグラムの色。デフォルトは 'salmon'。
+    """
+    # グラフのスタイルとサイズを設定
+    plt.style.use('seaborn-v0_8-whitegrid')
+    plt.figure(figsize=(10, 6))
+
+    # 1つ目のデータフレームのヒストグラムをプロット
+    plt.hist(df1.values, bins=30, alpha=0.7, color=df1_color, label=df1_label, density=True)
+
+    # 2つ目のデータフレームのヒストグラムをプロット
+    plt.hist(df2.values, bins=30, alpha=0.7, color=df2_color, label=df2_label, density=True)
+
+    # グラフのタイトルと軸ラベルを設定
+    #plt.title(f"'{column_name}' の分布の比較", fontsize=16)
+    plt.xlabel("Value", fontsize=12)
+    plt.ylabel("確率密度", fontsize=12)
+
+    # 凡例を表示
+    plt.legend()
+
+    # グリッドを表示
+    plt.grid(True)
+    
+    # グラフを表示
+    plt.show()
+
 if __name__ == '__main__':
     dra_asv = '/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/lv6.csv' 
     dra_chem = '/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/chem_data.xlsx' 
@@ -409,6 +446,9 @@ if __name__ == '__main__':
     #                           labels2 = d_chem['rate_of_chemical_fertilizer_applicationK'].values, 
     #                           df1_name='DataFrame 1', df2_name='DataFrame 2')
     
+    plot_histograms(r_chem['Available.P'], d_chem['available_P'], 
+                    df1_label='DataFrame 1', df2_label='DataFrame 2', df1_color='skyblue', df2_color='salmon')
+
     visualize_tsne_with_custom_combat_model(df1 = riken, df2 = dra, 
                               labels1 = r_chem['pH'].values, 
                               #labels2 = d_chem['pH_dry_soil'].str[:4].values, 

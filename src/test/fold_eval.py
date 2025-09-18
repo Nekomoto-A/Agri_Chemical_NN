@@ -222,7 +222,7 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
 
             stats_scores = stats_models_result(X_train = X_train_tensor, Y_train = Y_train_single, 
                                         X_test = X_test_tensor, Y_test = Y_test_single, scalers = scalers, reg = r, 
-                                        result_dir = csv_dir, index = index)
+                                        result_dir = csv_dir, index = index, feature_names = features)
             
             for metrics, dict in stats_scores.items():
                 for method_name, regs in dict.items():
@@ -231,7 +231,12 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
 
     for method, regs in predictions.items():
         for reg, values in regs.items():
-            final_hist_dir = os.path.join(sub_dir, f'hist_{reg}_{method}.png')
+            final_hist_dir = os.path.join(sub_dir, 'final_hist')
+            os.makedirs(final_hist_dir, exist_ok=True)
+            all_hist_dir = os.path.join(final_hist_dir, 'all')
+            os.makedirs(all_hist_dir, exist_ok=True)
+
+            all_hist_path = os.path.join(all_hist_dir, f'hist_{reg}_{method}.png')
             #print(values)
             target = np.concatenate(trues[method][reg])
             out = np.concatenate(values)
@@ -246,7 +251,7 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
             plt.ylabel('Frequency')
             #plt.grid(True)
             plt.legend()
-            plt.savefig(final_hist_dir)
+            plt.savefig(all_hist_path)
             plt.close()
 
             if reg == 'pH':
@@ -268,7 +273,10 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
             result = np.select(conditions, choices)
             
             for choice in choices:
-                split_hist_dir = os.path.join(sub_dir, f'split_hist_{reg}_{method}_{choice}.png')
+                split_hist_dir = os.path.join(final_hist_dir, 'predict_hist')
+                os.makedirs(split_hist_dir, exist_ok=True)
+                split_hist_path = os.path.join(split_hist_dir, f'split_hist_{reg}_{method}_{choice}.png')
+                
                 target_split = target[result == choice] # 閾値1未満
                 output_spilit = out[result == choice]
 
@@ -287,7 +295,7 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
                 plt.tight_layout()
 
                 # 画像として保存
-                plt.savefig(split_hist_dir)
+                plt.savefig(split_hist_path)
                 plt.close()
 
     #pprint.pprint(reduced)
