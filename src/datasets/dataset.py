@@ -362,6 +362,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
     if isinstance(val_size, (int, float)):
         x_val = x_val[selected_features]
 
+
     print(f'特徴選択後：{x_train_split.shape}')
 
     if fold is not None:

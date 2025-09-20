@@ -4,7 +4,7 @@ MT_CNN_Attention.py:
   shared_layers: [(64,3,1,1)]
 dataset.py:
   non_outlier: None
-  val_size: 0.2
+  val_size: 0.1
   level: 7
   transformer: 'SS'
   feature_transformer: 'ILR'
@@ -26,11 +26,11 @@ train.py:
   patience: 5
   least_epoch: 0
   visualize: True
-  epochs: 30
+  epochs: 100
   vis_step: 5
   validation: True
   lambda: 0.1
-  learning_rate: [0.0001]
+  learning_rate: [0.00001]
   weights: [0.2, 0.1, 0.2, 0.2, 0.2, 0.1]
   SUM_train_lim: 10
   personal_train_lim: 1
@@ -39,7 +39,7 @@ train.py:
   lambda_l1: 0.01
   GradNorm_alpha: 1.0
   batch_size: 128
-  reg_loss_fanction: 'mse'
+  reg_loss_fanction: 'hloss'
 train_GP.py:
   learning_rate: 0.1
   epochs: 60
@@ -77,7 +77,6 @@ fold_eval.py:
   marginal_hist: False
   k_fold: 5
   model_name: 'NN'
-  result_dir: 'result_DRA_NN'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
@@ -93,13 +92,14 @@ fold_eval.py:
   feature_path: '/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/lv6.csv' #'data/raw/riken/taxon_data/lv6.csv' # #
   target_path:  '/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/chem_data.xlsx' #'data/raw/riken/chem_data.xlsx' # #
 main.py:
+  result_dir: 'result_DRA_NN_hloss'
   reg_list: [
             #'pH','Available.P'
             #['pH','Available.P','EC',
             #'NH4.N',
             #'NO3.N','Exchangeable.K'],
             #['pH'], ['Available.P'], ['EC'], ['NH4.N'], ['NO3.N'], ['Exchangeable.K'],
-            ['pH_dry_soil'] , ['available_P'], ['EC_electric_conductivity'], ['Total_C'], ['Total_N']
+            #['pH_dry_soil'] # , ['available_P'], ['EC_electric_conductivity'], ['Total_C'], ['Total_N'],
             ['pH_dry_soil', 'available_P', 'EC_electric_conductivity', 'Total_C', 'Total_N']
   ]
 

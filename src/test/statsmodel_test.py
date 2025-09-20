@@ -84,8 +84,8 @@ def statsmodel_test(X, Y, models, scalers, reg, result_dir,index, feature_names)
     #X_df.columns = X_df.columns.astype(str)
 
     Y = Y[reg].numpy().reshape(-1, 1)
-    print(Y.shape)
-    print(X.shape)
+    #print(Y.shape)
+    #print(X.shape)
     scores = {}
     for name, model in models.items():
         if np.issubdtype(Y.dtype, np.floating):

@@ -1,85 +1,74 @@
 import torch
 import torch.nn as nn
-import os
-
-import torch
-import torch.nn as nn
 
 class MTNNModel(nn.Module):
-    def __init__(self, input_dim, output_dims, reg_list, hidden_dim=128, fc_layers=[(256, nn.ReLU())]):
+    """
+    共有層とタスク特化層の数を任意に設定できるマルチタスクニューラルネットワークモデル。
+    """
+    def __init__(self, input_dim, output_dims, reg_list, shared_layers=[512, 256, 128], task_specific_layers=[64]):
+        """
+        Args:
+            input_dim (int): 入力データの特徴量の数。
+            output_dims (list of int): 各タスクの出力次元数のリスト。
+            reg_list (list of str): 各タスクの名前のリスト。
+            shared_layers (list of int): 共有層の各全結合層の出力ユニット数のリスト。
+                                         例: [512, 256, 128]
+            task_specific_layers (list of int): 各タスク特化層の隠れ層の出力ユニット数のリスト。
+                                                例: [64]
+        """
         super(MTNNModel, self).__init__()
         
         self.input_dim = input_dim
-        self.hidden_dim = hidden_dim
         self.reg_list = reg_list
+        
+        # --- 1. 共有層の構築 ---
+        self.shared_block = nn.Sequential()
+        in_features = self.input_dim
+        
+        # `shared_layers`リストに基づいて動的に層を追加します。
+        for i, out_features in enumerate(shared_layers):
+            self.shared_block.add_module(f"shared_fc_{i+1}", nn.Linear(in_features, out_features))
+            self.shared_block.add_module(f"shared_batchnorm_{i+1}", nn.BatchNorm1d(out_features))
+            self.shared_block.add_module(f"shared_relu_{i+1}", nn.ReLU())
+            in_features = out_features # 次の層の入力特徴量を更新します。
+            
+        # --- 2. 各タスク特化層（ヘッド）の構築 ---
+        self.task_specific_heads = nn.ModuleList()
+        
+        # 共有層の最終出力次元を取得します。共有層がない場合は入力次元をそのまま使います。
+        last_shared_layer_dim = shared_layers[-1] if shared_layers else input_dim
 
-        # 共有の全結合層を作成
-        self.shared_fc = nn.Sequential()
-        in_features = input_dim
-        for i, (out_features, activation) in enumerate(fc_layers):
-            self.shared_fc.add_module(f"fc_layer{i+1}", nn.Linear(in_features, out_features))
-            self.shared_fc.add_module(f"batchnorm{i+1}", nn.BatchNorm1d(out_features))
-            self.shared_fc.add_module(f"activation{i+1}", activation)
-            in_features = out_features
-        
-        # 共有の隠れ層（元の shared_fc に相当）
-        self.shared_fc_hidden = nn.Sequential(
-            nn.Linear(in_features, self.hidden_dim),
-            nn.ReLU()
-        )
-        
-        # 各出力層を作成
-        self.outputs = nn.ModuleList([ 
-            nn.Sequential(
-                nn.Linear(self.hidden_dim, 64),
-                nn.ReLU(),
-                nn.Linear(64, out_dim)
-            ) for out_dim in output_dims
-        ])
+        for out_dim in output_dims:
+            task_head = nn.Sequential()
+            in_features_task = last_shared_layer_dim
+            
+            # `task_specific_layers`に基づいてタスク特化の隠れ層を追加します。
+            for i, hidden_units in enumerate(task_specific_layers):
+                task_head.add_module(f"task_fc_{i+1}", nn.Linear(in_features_task, hidden_units))
+                task_head.add_module(f"task_relu_{i+1}", nn.ReLU())
+                in_features_task = hidden_units
+            
+            # 最終的な出力層を追加します。
+            task_head.add_module("task_output_layer", nn.Linear(in_features_task, out_dim))
+            
+            self.task_specific_heads.append(task_head)
 
     def forward(self, x):
-        # 入力はすでにフラット化されたベクトルを想定
-        # x.unsqueeze(1) や x.view(...) は不要
+        """
+        順伝播の定義。
+        Args:
+            x (torch.Tensor): 入力テンソル (バッチサイズ, 入力次元数)。
+        Returns:
+            tuple: (outputs_dict, shared_features)
+                   - outputs_dict: 各タスクの出力を持つ辞書。
+                   - shared_features: 共有層からの出力テンソル。
+        """
+        # 共有層を通過させ、特徴量を抽出します。
+        shared_features = self.shared_block(x)
         
-        # 共有の全結合層を適用
-        shared_features = self.shared_fc(x)
-        
-        # 共有の隠れ層を適用
-        shared_features = self.shared_fc_hidden(shared_features)
-
         outputs = {}
-        # 各出力層を適用
-        for (reg, output_layer) in zip(self.reg_list, self.outputs):
-            outputs[reg] = output_layer(shared_features)
+        # 抽出した特徴量を各タスク特化層に入力します。
+        for reg, head in zip(self.reg_list, self.task_specific_heads):
+            outputs[reg] = head(shared_features)
             
         return outputs, shared_features
-
-    '''
-    # 畳み込み層の重みに対する総和ゼロ制約のペナルティを計算するメソッド
-    def calculate_sum_zero_penalty(self):
-        penalty = 0.0
-        # sharedconv内のすべてのConv1d層を走査
-        for module in self.sharedconv.modules():
-            if isinstance(module, nn.Conv1d):
-                # Conv1d層の重みを取得
-                weights = module.weight # 形状は (out_channels, in_channels, kernel_size)
-                
-                # 各カーネル (out_channel, in_channel) ごとに総和を計算し、二乗して加算
-                # sum(dim=2) で kernel_size 次元を合計
-                kernel_sums = torch.sum(weights, dim=2) 
-                
-                # その二乗を全て合計
-                penalty += torch.sum(kernel_sums**2)
-        
-        #return self.lambda_reg * penalty
-        return penalty
-    # 各タスクの最終層の重みを取得するヘルパー関数
-    def get_task_weights(self):
-        task_weights = []
-        for i, output_layer in enumerate(self.outputs):
-            # output_layerはSequentialなので、最後のLinear層の重みを取得
-            # 構造によってインデックスが変わる可能性があるので注意
-            # この例では、nn.Linear(64, out_dim) が最後の層
-            task_weights.append(output_layer[2].weight) # output_layer[0]はLinear(self.hidden_dim, 64), output_layer[1]はReLU, output_layer[2]はLinear(64, out_dim)
-        return task_weights
-    '''

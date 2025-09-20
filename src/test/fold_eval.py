@@ -53,8 +53,11 @@ def calculate_and_save_correlations(df, target_data, output_dir, reg_list):
 
 
 
-def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path = config['target_path'], exclude_ids = config['exclude_ids'],
-                  k = config['k_fold'], output_dir = config['result_dir'], csv_path = config['result_fold'], 
+def fold_evaluate(reg_list, output_dir,
+                  feature_path = config['feature_path'], target_path = config['target_path'], exclude_ids = config['exclude_ids'],
+                  k = config['k_fold'], 
+                  #output_dir = config['result_dir'], 
+                  csv_path = config['result_fold'], 
                   final_output = config['result_average'], model_name = config['model_name'], reduced_feature_path = config['reduced_feature'],
                   comp_method = config['comp_method'], corr_calc = config['carr_calc'], feature_selection_all = config['feature_selection_all'], 
                   selection_ratio = config['selection_ratio'],
@@ -77,7 +80,7 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
         os.remove(csv_dir)
 
     X,Y = data_create(feature_path, target_path, reg_list, exclude_ids)
-    print(X)
+    #print(X)
     if corr_calc:
         calculate_and_save_correlations(X, Y, output_dir, reg_list)
 
@@ -356,8 +359,9 @@ def fold_evaluate(reg_list, feature_path = config['feature_path'], target_path =
 
     return avg_dict, std_dict
 
-def loop_evaluate(reg_list, feature_selection_all = config['feature_selection_all'], 
-                  output_dir = config['result_dir'],
+def loop_evaluate(reg_list, output_dir,
+                  feature_selection_all = config['feature_selection_all'], 
+                  #output_dir = config['result_dir'],
                   start_features = config['start_features'], 
                   selection_ratio = config['selection_ratio'],
                   end_features = config['end_features'],fsdir = config['feature_selection_dir'],):
@@ -516,5 +520,5 @@ def loop_evaluate(reg_list, feature_selection_all = config['feature_selection_al
         '''
                     
     else:
-        _, _ = fold_evaluate(reg_list = reg_list)
+        _, _ = fold_evaluate(reg_list = reg_list, output_dir = output_dir)
     

@@ -409,6 +409,157 @@ def plot_histograms(df1, df2, df1_label='DataFrame 1', df2_label='DataFrame 2', 
     # グラフを表示
     plt.show()
 
+from sklearn.model_selection import train_test_split
+
+
+def ilr_data(asv_data):
+    asv_data = asv_data.div(asv_data.sum(axis=1), axis=0)
+    #asv_array = multiplicative_replacement(asv_data.values)
+    asv_array = asv_data.where(asv_data != 0, asv_data + 1e-100).values
+    ilr_array = ilr_transform(asv_array)
+    #print(ilr_array.shape)
+    # 結果をDataFrameに戻す
+    asv_feature = pd.DataFrame(ilr_array, columns=asv_data.columns[:-1], index=asv_data.index)
+    return asv_feature
+
+def process_and_visualize(
+    df1: pd.DataFrame, 
+    df2: pd.DataFrame, 
+    df1_name: str = 'Dataset1', 
+    df2_name: str = 'Dataset2', 
+    split_target_name: str = 'Dataset1', 
+    test_size: float = 0.3, 
+    random_state: int = 42
+) -> pd.DataFrame:
+    """
+    2つの遺伝子データフレームを処理し、t-SNEで可視化する関数。
+
+    Args:
+        df1 (pd.DataFrame): 1つ目のデータフレーム (サンプル x 遺伝子)。
+        df2 (pd.DataFrame): 2つ目のデータフレーム (サンプル x 遺伝子)。
+        df1_name (str): df1の名称（プロットの凡例用）。
+        df2_name (str): df2の名称（プロットの凡例用）。
+        split_target_name (str): 学習/テスト用に分割するデータフレームの名前（df1_nameかdf2_name）。
+        test_size (float): テストデータの割合。
+        random_state (int): データ分割時の乱数シード。
+
+    Returns:
+        pd.DataFrame: t-SNEの結果と各種ラベルを含むデータフレーム。
+    """
+    print("--- 処理開始 ---")
+
+    # --- 1. 共通カラムの抽出 ---
+    common_cols = df1.columns.intersection(df2.columns)
+    if len(common_cols) == 0:
+        raise ValueError("2つのデータフレームに共通のカラムが存在しません。")
+    print(f"ステップ1: {len(common_cols)}個の共通カラムを抽出しました。")
+    df1_common = df1[common_cols]
+    df2_common = df2[common_cols]
+
+    # --- 2. 相対量変換とilr変換 ---
+    # 各行の合計で割って相対量に変換
+    df1_rel = df1_common.div(df1_common.sum(axis=1), axis=0)
+    df2_rel = df2_common.div(df2_common.sum(axis=1), axis=0)
+    
+    # ilr変換
+    #df1_ilr = ilr_transform(df1_rel.values)
+    df1_ilr = ilr_data(df1_rel) 
+    #df2_ilr = ilr_transform(df2_rel.values)
+    df2_ilr = ilr_data(df2_rel)
+    
+    # DataFrameに戻す (カラム名はilr_1, ilr_2, ...)
+    #df1_ilr = pd.DataFrame(df1_ilr, index=df1_common.index, columns=[f'ilr_{i+1}' for i in range(df1_ilr.shape[1])])
+    #df2_ilr = pd.DataFrame(df2_ilr, index=df2_common.index, columns=[f'ilr_{i+1}' for i in range(df2_ilr.shape[1])])
+    print("ステップ2: データを相対量に変換後、ilr変換を適用しました。")
+
+    # --- 3. データの分割 ---
+    if split_target_name == df1_name:
+        train_df, test_df = train_test_split(df1_ilr, test_size=test_size, random_state=random_state)
+        other_df = df2_ilr
+        other_name = df2_name
+    elif split_target_name == df2_name:
+        train_df, test_df = train_test_split(df2_ilr, test_size=test_size, random_state=random_state)
+        other_df = df1_ilr
+        other_name = df1_name
+    else:
+        raise ValueError(f"split_target_nameは'{df1_name}'または'{df2_name}'である必要があります。")
+    print(f"ステップ3: '{split_target_name}'を学習データ({len(train_df)}件)とテストデータ({len(test_df)}件)に分割しました。")
+
+    # --- 4. ComBatモデルによるバッチ効果補正 ---
+    # 学習用データの準備 (分割しなかったデータ + 学習データ)
+    combat_train_data = pd.concat([other_df, train_df])
+    
+    # バッチラベルの作成 (0: other_df, 1: train_df)
+    batch_labels_train = np.array(
+        [0] * len(other_df) + [1] * len(train_df)
+    )
+
+    print(combat_train_data.shape)
+
+    # ComBatモデルの学習と変換
+    combat_model = CombatModel()
+    print("ComBatモデルの学習と変換を開始します...")
+    combat_train_transformed = combat_model.fit_transform(
+        data=combat_train_data.values,
+        sites=batch_labels_train.reshape(-1, 1)
+    )
+
+    # テストデータの変換
+    # テストデータ用のバッチラベルを作成 (split_target由来なのでラベルは1)
+    batch_labels_test = np.array([1] * len(test_df))
+    print("テストデータを学習済みモデルで変換します...")
+    combat_test_transformed = combat_model.transform(
+        data=test_df.values,
+        sites=batch_labels_test.reshape(-1, 1)
+    )
+    
+    # 変換後のデータをDataFrameに戻す
+    other_transformed = pd.DataFrame(combat_train_transformed[:len(other_df)], index=other_df.index, columns=combat_train_data.columns)
+    train_transformed = pd.DataFrame(combat_train_transformed[len(other_df):], index=train_df.index, columns=combat_train_data.columns)
+    test_transformed = pd.DataFrame(combat_test_transformed, index=test_df.index, columns=combat_train_data.columns)
+    print("ステップ4: ComBatによるバッチ効果補正が完了しました。")
+
+    # --- 5. t-SNEによる次元削減 ---
+    all_transformed_data = pd.concat([other_transformed, train_transformed, test_transformed])
+    
+    tsne = TSNE(n_components=2, random_state=random_state, perplexity=min(30, len(all_transformed_data)-1))
+    tsne_results = tsne.fit_transform(all_transformed_data.values)
+    
+    tsne_df = pd.DataFrame(data=tsne_results, columns=['t-SNE 1', 't-SNE 2'], index=all_transformed_data.index)
+    print("ステップ5: t-SNEによる次元削減が完了しました。")
+
+    # --- 6. 結果の可視化 ---
+    # プロット用のラベルを追加
+    tsne_df['color_label'] = ''
+    tsne_df.loc[other_transformed.index, 'color_label'] = f'Unsplit ({other_name})'
+    tsne_df.loc[train_transformed.index, 'color_label'] = 'Train Data'
+    tsne_df.loc[test_transformed.index, 'color_label'] = 'Test Data'
+    
+    tsne_df['shape_label'] = ''
+    tsne_df.loc[df1_ilr.index, 'shape_label'] = df1_name
+    tsne_df.loc[df2_ilr.index, 'shape_label'] = df2_name
+    
+    # プロット実行
+    plt.figure(figsize=(10, 8))
+    sns.scatterplot(
+        x='t-SNE 1', y='t-SNE 2',
+        hue='color_label',
+        style='shape_label',
+        data=tsne_df,
+        s=100,  # マーカーのサイズ
+        alpha=0.8
+    )
+    plt.title('t-SNE Visualization of ComBat Corrected Data')
+    plt.xlabel('t-SNE Dimension 1')
+    plt.ylabel('t-SNE Dimension 2')
+    plt.legend(title='Labels')
+    plt.grid(True)
+    plt.show()
+    print("ステップ6: 結果をプロットしました。")
+    print("--- 全ての処理が完了しました ---")
+
+    return tsne_df
+
 if __name__ == '__main__':
     dra_asv = '/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/lv6.csv' 
     dra_chem = '/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/chem_data.xlsx' 
@@ -446,13 +597,21 @@ if __name__ == '__main__':
     #                           labels2 = d_chem['rate_of_chemical_fertilizer_applicationK'].values, 
     #                           df1_name='DataFrame 1', df2_name='DataFrame 2')
     
-    plot_histograms(r_chem['Available.P'], d_chem['available_P'], 
-                    df1_label='DataFrame 1', df2_label='DataFrame 2', df1_color='skyblue', df2_color='salmon')
+    # plot_histograms(r_chem['Available.P'], d_chem['available_P'], 
+    #                 df1_label='DataFrame 1', df2_label='DataFrame 2', df1_color='skyblue', df2_color='salmon')
 
-    visualize_tsne_with_custom_combat_model(df1 = riken, df2 = dra, 
-                              labels1 = r_chem['pH'].values, 
-                              #labels2 = d_chem['pH_dry_soil'].str[:4].values, 
-                              labels2 = d_chem['pH_dry_soil'].values, 
-                              df1_name='DataFrame 1', df2_name='DataFrame 2')
+    # visualize_tsne_with_custom_combat_model(df1 = riken, df2 = dra, 
+    #                           labels1 = r_chem['pH'].values, 
+    #                           #labels2 = d_chem['pH_dry_soil'].str[:4].values, 
+    #                           labels2 = d_chem['pH_dry_soil'].values, 
+    #                           df1_name='DataFrame 1', df2_name='DataFrame 2')
 
-    
+    d =process_and_visualize(
+        df1 = riken, 
+        df2 = dra, 
+        #df1_name: str = 'Dataset1', 
+        #df2_name: str = 'Dataset2', 
+        #split_target_name: str = 'Dataset1', 
+        test_size = 0.2, 
+        #random_state: int = 42
+    )
