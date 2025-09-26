@@ -64,7 +64,8 @@ def fold_evaluate(reg_list, output_dir,
                   fsdir = config['feature_selection_dir'],
                   feature_selection = config['feature_selection'],
                   num_features_to_select = config['num_selected_features'],
-                  marginal_hist = config['marginal_hist']
+                  marginal_hist = config['marginal_hist'],
+                  data_inte = config['data_inte']
                   ):
     #if feature_selection_all:
     #    output_dir = os.path.join(fsdir, output_dir)
@@ -79,7 +80,11 @@ def fold_evaluate(reg_list, output_dir,
     if os.path.exists(csv_dir):
         os.remove(csv_dir)
 
-    X,Y = data_create(feature_path, target_path, reg_list, exclude_ids)
+    if data_inte:
+        X,Y = data_create(feature_path, target_path, reg_list, exclude_ids, feature_transformer='NON_TR',)
+    else:
+        X,Y = data_create(feature_path, target_path, reg_list, exclude_ids)
+    
     #print(X)
     if corr_calc:
         calculate_and_save_correlations(X, Y, output_dir, reg_list)
@@ -136,7 +141,8 @@ def fold_evaluate(reg_list, output_dir,
         X_train_tensor, X_val_tensor, X_test_tensor,features, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids,label_train_tensor,label_test_tensor,label_val_tensor = transform_after_split(X_train,X_test,Y_train,Y_test, reg_list = reg_list,fold = fold_dir,
                                                                                                                                                                                                                               feature_selection = feature_selection,
                                                                                                                                                                                                                               num_selected_features = num_features_to_select,
-                                                                                                                                                                                                                              data_name = config['feature_path'])
+                                                                                                                                                                                                                              data_name = config['feature_path'],
+                                                                                                                                                                                                                              data_inte=data_inte)
         input_dim = X_train_tensor.shape[1]
 
         if len(reg_list) > 1:

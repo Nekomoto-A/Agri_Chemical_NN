@@ -9,7 +9,6 @@ import numpy as np
 import seaborn as sns
 import pandas as pd
 
-
 import os
 import yaml
 yaml_path = 'config.yaml'
@@ -126,6 +125,7 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                 batch_size = config['batch_size'],
                 reg_loss_fanction = config['reg_loss_fanction']
                 ):
+
 
     if len(lr) == 1:
         lr = lr[0]
@@ -274,13 +274,30 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
             #for j in range(len(output_dim)):
             for i,reg in enumerate(reg_list):
                 true_tr = y_batch[reg]
-                loss = personal_losses[reg](outputs[reg], true_tr)
+                output = outputs[reg]
+
+                mask = ~torch.isnan(true_tr)
+
+                #loss = personal_losses[reg](outputs[reg], true_tr)
+                valid_preds = output[mask]
+                valid_labels = true_tr[mask]
+
+                if valid_labels.numel() > 0:
+                    # マスク処理後の個別の損失を計算
+                    loss = personal_losses[reg](valid_preds, valid_labels).mean()
+                    train_losses[reg] = loss
+                    print(f'{reg}損失:{loss.item()}')
+                else:
+                    # このバッチに有効なラベルがない場合、損失を0とする
+                    train_losses[reg] = torch.tensor(0.0)
                 #print(f'{reg}:{loss}')
                 #train_losses.append(loss)
-                train_losses[reg] = loss
+                #train_losses[reg] = loss
                 #train_loss_history.setdefault(reg, []).append(loss.item())
                 running_train_losses[reg] += loss.item()
                 running_train_losses['SUM'] += loss.item()
+
+            #print(train_losses)
 
             if loss_sum == 'PCgrad' or loss_sum == 'PCgrad_initial_weight':
                 if len(reg_list)==1:
@@ -363,6 +380,10 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                 # バックワードパスと最適化 (モデルパラメータの更新)
                 optimizer.zero_grad()
                 learning_loss.backward()
+                # 2. 勾配クリッピングを実行 (optimizer.step() の前)
+                
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+
                 optimizer.step()
 
                 train_loss = sum(train_losses.values())
@@ -551,6 +572,47 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
         plt.savefig(train_loss_history_dir)
         plt.close()
 
+    with torch.no_grad():
+        true = {}
+        pred = {}
+        for x_tr_batch, y_tr_batch in train_loader:
+            outputs,_ = model(x_tr_batch)
+            
+            for target in reg_list:
+                true.setdefault(target, []).append(y_tr_batch[target].cpu().numpy())
+                pred.setdefault(target, []).append(outputs[target].cpu().numpy())
+        
+        for r in reg_list:
+            save_dir = os.path.join(train_dir, r)
+            os.makedirs(save_dir, exist_ok = True)
+            save_path = os.path.join(save_dir, f'train_{r}.png')
+
+            all_labels = np.concatenate(true[r])
+            all_predictions = np.concatenate(pred[r])
+
+            # 7. Matplotlibを使用してグラフを描画
+            plt.figure(figsize=(8, 8))
+            plt.scatter(all_labels, all_predictions, alpha=0.5, label='prediction')
+            
+            # 理想的な予測を示す y=x の直線を引く
+            min_val = min(all_labels.min(), all_predictions.min())
+            max_val = max(all_labels.max(), all_predictions.max())
+            plt.plot([min_val, max_val], [min_val, max_val], 'r--', label = 'x=y')
+
+            # グラフの装飾
+            plt.title('train vs prediction')
+            plt.xlabel('true data')
+            plt.ylabel('predicted data')
+            plt.legend()
+            plt.grid(True)
+            plt.axis('equal') # 縦横のスケールを同じにする
+            plt.tight_layout()
+
+            # 8. グラフを指定されたパスに保存
+            plt.savefig(save_path)
+            print(f"学習データに対する予測値を {save_path} に保存しました。")
+            plt.close() # メモリ解放のためにプロットを閉じる
+    
     return model
 
 def training_MT_BNN(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, model_name,loss_sum, #optimizer, 

@@ -4,7 +4,7 @@ MT_CNN_Attention.py:
   shared_layers: [(64,3,1,1)]
 dataset.py:
   non_outlier: None
-  val_size: 0.1
+  val_size: 0.2
   level: 7
   transformer: 'SS'
   feature_transformer: 'ILR'
@@ -21,16 +21,20 @@ dataset.py:
   num_clusters: 2
   marginal_hist_train: False
   unknown_drop: True
+  asv_path: '/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/lv6.csv' #'data/raw/riken/taxon_data/lv6.csv' # # #
+  chem_path:  '/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/chem_data.xlsx' #'data/raw/riken/chem_data.xlsx' # # #
+  reg_list2: ['pH_dry_soil']
+  exclude_ids2: []
 train.py:
   early_stopping: False
   patience: 5
   least_epoch: 0
-  visualize: True
-  epochs: 100
+  visualize: False
+  epochs: 30
   vis_step: 5
   validation: True
   lambda: 0.1
-  learning_rate: [0.00001]
+  learning_rate: [0.001]
   weights: [0.2, 0.1, 0.2, 0.2, 0.2, 0.1]
   SUM_train_lim: 10
   personal_train_lim: 1
@@ -38,8 +42,8 @@ train.py:
   lambda_l2: 1.0
   lambda_l1: 0.01
   GradNorm_alpha: 1.0
-  batch_size: 128
-  reg_loss_fanction: 'hloss'
+  batch_size: 1024
+  reg_loss_fanction: 'mse'
 train_GP.py:
   learning_rate: 0.1
   epochs: 60
@@ -57,7 +61,7 @@ train_AE.py:
   train_vis: True
   vis_step: 10
 test.py:
-  loss_sum: 'PCgrad'
+  loss_sum: 'GradNorm'
   num_predictive_samples: 100
   shap_eval: False
   save_feature: True
@@ -76,7 +80,7 @@ fold_eval.py:
   carr_calc: False
   marginal_hist: False
   k_fold: 5
-  model_name: 'NN'
+  model_name: 'CNN'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
@@ -86,20 +90,20 @@ fold_eval.py:
     #'045_20_Sait_Broc', '046_20_Sait_Burd', '047_20_Sait_Burd', '048_20_Sait_Yama',
     #'049_20_Sait_Yama', '050_20_Sait_Stra', '061_20_Naga_Barl', '062_20_Naga_Barl',
     #'067_20_Naga_Pump', '331_22_Niig_jpea', '332_22_Niig_jpea'
-
-
   ]
-  feature_path: '/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/lv6.csv' #'data/raw/riken/taxon_data/lv6.csv' # #
-  target_path:  '/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/chem_data.xlsx' #'data/raw/riken/chem_data.xlsx' # #
+  feature_path: 'data/raw/riken/taxon_data/lv6.csv' #'/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/lv6.csv' # # #
+  target_path:  'data/raw/riken/chem_data.xlsx' #'/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/chem_data.xlsx' # # #
+  data_inte: True
 main.py:
-  result_dir: 'result_DRA_NN_hloss'
+  result_dir: 'result_semi'
   reg_list: [
             #'pH','Available.P'
-            #['pH','Available.P','EC',
-            #'NH4.N',
-            #'NO3.N','Exchangeable.K'],
+            ['pH',
+              #'Available.P','EC',
+            'NH4.N',
+            'NO3.N','Exchangeable.K'],
             #['pH'], ['Available.P'], ['EC'], ['NH4.N'], ['NO3.N'], ['Exchangeable.K'],
-            #['pH_dry_soil'] # , ['available_P'], ['EC_electric_conductivity'], ['Total_C'], ['Total_N'],
-            ['pH_dry_soil', 'available_P', 'EC_electric_conductivity', 'Total_C', 'Total_N']
+            #['pH_dry_soil'], ['available_P'], ['EC_electric_conductivity'], ['Total_C'], ['Total_N'],
+            #['pH_dry_soil', 'available_P', 'EC_electric_conductivity', 'Total_C', 'Total_N']
   ]
 

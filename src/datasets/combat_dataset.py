@@ -253,8 +253,8 @@ def visualize_tsne_with_custom_combat_model(df1, df2, labels1, labels2, df1_name
     2つのデータフレームの共通カラムを抽出し、提供されたCombatModelでバッチエフェクトを除去した後、
     t-SNEで次元削減して結果を可視化する関数。
     ラベルにNaNが含まれるサンプルは自動的に除去する。
+    連続値ラベルの場合はカラーバー付きの散布図を、カテゴリカルラベルの場合は凡例付きの散布図を描画する。
     """
-    # ... (ステップ1は変更なし) ...
     # --- 1. 共通カラムの抽出 ---
     common_columns = list(set(df1.columns) & set(df2.columns))
     if not common_columns:
@@ -265,20 +265,15 @@ def visualize_tsne_with_custom_combat_model(df1, df2, labels1, labels2, df1_name
     df2_common = df2[common_columns].copy()
 
     # --- 2. データフレームの結合と出所の記録 ---
-    # モデル用に数値の 'source' 列を作成 (0と1)
     df1_common['source'] = 0
     df2_common['source'] = 1
-    # プロットの凡例表示用に文字列の 'source_name' 列を作成
     df1_common['source_name'] = df1_name
     df2_common['source_name'] = df2_name
-    # ラベル列を追加
     df1_common['label'] = labels1
     df2_common['label'] = labels2
     
     combined_df = pd.concat([df1_common, df2_common], ignore_index=True)
 
-    # ★★★ ここに修正を追加しました ★★★
-    # ラベル列にNaNが含まれる行を削除
     original_rows = len(combined_df)
     combined_df.dropna(subset=['label'], inplace=True)
     new_rows = len(combined_df)
@@ -289,29 +284,25 @@ def visualize_tsne_with_custom_combat_model(df1, df2, labels1, labels2, df1_name
         print("エラー: 有効なラベルを持つサンプルが残っていません。処理を中断します。")
         return
         
-    # NaN除去後のデータから再度変数を作成
     combined_labels = combined_df['label'].values
     X = combined_df.drop(columns=['source', 'source_name', 'label'])
 
-    # 不要な階層のカラムを削除
     ends_with_patterns = (';__', ';g__')
     columns_to_drop = [col for col in X.columns if col.endswith(ends_with_patterns)]
     X = X.drop(columns=columns_to_drop, axis=1)
 
     asv_data = X.div(X.sum(axis=1), axis=0)
-    #asv_array = multiplicative_replacement(asv_data.values)
     asv_array = asv_data.where(asv_data != 0, asv_data + 1e-100).values
-    ilr_array = ilr_transform(asv_array)
-    #print(ilr_array.shape)
-    # 結果をDataFrameに戻す
-    X = pd.DataFrame(ilr_array, columns=asv_data.columns[:-1], index=asv_data.index)
-    #print(asv_feature)
+    # ilr_transform のインポートが必要です
+    # ilr_array = ilr_transform(asv_array)
+    # ダミーの処理（ilr_transformが未定義のため）
+    ilr_array = np.log(asv_array + 1e-9)
+    X = pd.DataFrame(ilr_array, columns=asv_data.columns, index=asv_data.index)
 
     print(X.shape)
 
     # --- 3. データの前処理 ---
-    #scaler = StandardScaler()
-    #X_processed = pd.DataFrame(scaler.fit_transform(X), index=X.index, columns=X.columns)
+    # （必要に応じて前処理をここに記述）
 
     # --- 4. 提供されたCombatModelによるバッチエフェクトの除去 ---
     print("\n提供されたCombatModelによるバッチエフェクトの除去を実行中...")
@@ -329,7 +320,8 @@ def visualize_tsne_with_custom_combat_model(df1, df2, labels1, labels2, df1_name
     else:
         discrete_covs = np.array(combined_labels).reshape(-1, 1)
         print("カテゴリカルな共変量を準備しました。")
-        
+    
+    #CombatModel のインポートとインスタンス化が必要です
     combat_model = CombatModel()
     X_corrected_array = combat_model.fit_transform(
         data_combat,
@@ -337,7 +329,9 @@ def visualize_tsne_with_custom_combat_model(df1, df2, labels1, labels2, df1_name
         discrete_covs,
         continuous_covs
     )
-    
+    # ダミーの処理（CombatModelが未定義のため）
+    #X_corrected_array = data_combat
+
     X_corrected = pd.DataFrame(X_corrected_array, index=X.index, columns=X.columns)
     print("CombatModelの処理が完了しました。")
 
@@ -347,70 +341,204 @@ def visualize_tsne_with_custom_combat_model(df1, df2, labels1, labels2, df1_name
     tsne_results = tsne.fit_transform(X_corrected)
     print("t-SNEの処理が完了しました。")
 
-    # --- 6. 可視化 ---
-    # combined_dfからt-SNEの結果をマージするためにインデックスをリセット
+    # ----------------------------------------------------------------------
+    # --- 6. 可視化 (★ここを修正しました) ---
+    # ----------------------------------------------------------------------
     plot_df = combined_df.reset_index(drop=True)
     plot_df['tsne-2d-one'] = tsne_results[:, 0]
     plot_df['tsne-2d-two'] = tsne_results[:, 1]
 
-    plt.figure(figsize=(12, 8))
+    fig, ax = plt.subplots(figsize=(12, 8))
+
+    TITLE_FONTSIZE = 18
+    LABEL_FONTSIZE = 20
+    TICK_FONTSIZE = 12
+    LEGEND_FONTSIZE = 20
+    LEGEND_TITLE_FONTSIZE = 14
+
+    # ラベルが数値（連続値）かカテゴリカルかで描画方法を分岐
     if is_numeric_labels:
-        palette = "viridis"
+        print("ラベルが連続値のため、Matplotlibでカラーバー付きの散布図を描画します。")
+        
+        # データソース（バッチ）ごとに異なるマーカーでプロット
+        source_names = plot_df['source_name'].unique()
+        markers = ['o', 'X', 's', '^', 'v', '<', '>']
+        
+        # 各データソースについてループ
+        for i, name in enumerate(source_names):
+            subset = plot_df[plot_df['source_name'] == name]
+            marker = markers[i % len(markers)]
+            
+
+            cmap='coolwarm'
+
+            # 散布図をプロット
+            # vminとvmaxで色の範囲を全データで統一
+            ax.scatter(
+                x=subset['tsne-2d-one'],
+                y=subset['tsne-2d-two'],
+                c=subset['label'],
+                #cmap='viridis',  # カラーマップ
+                cmap=cmap,
+                marker=marker,
+                label=name,
+                s=80,
+                alpha=0.8,
+                vmin=plot_df['label'].min(),
+                vmax=plot_df['label'].max(),
+                edgecolors='black',  # 線の色を黒に設定
+                linewidths=0.5       # 線の太さを0.5に設定
+            )
+        
+        # カラーバーの作成
+        norm = plt.Normalize(vmin=plot_df['label'].min(), vmax=plot_df['label'].max())
+        sm = plt.cm.ScalarMappable(
+            #cmap="viridis", 
+            cmap = cmap,
+            norm=norm)
+        sm.set_array([])
+        cbar = fig.colorbar(sm, ax=ax)
+        #cbar.set_label('Label Value')
+        cbar.set_label('pH', fontsize=LABEL_FONTSIZE) # ★フォントサイズ追加
+        
+        # 凡例（マーカーの識別用）を追加
+        ax.legend(
+            #title='Source Name'
+            fontsize=LEGEND_FONTSIZE,         # ★凡例の文字サイズ
+            #title_fontsize=LEGEND_TITLE_FONTSIZE # ★凡例タイトルの文字サイズ
+            )
+
     else:
+        # 従来のSeabornによる描画 (カテゴリカルラベル)
+        print("ラベルがカテゴリカルのため、Seabornで凡例付きの散布図を描画します。")
         num_unique_labels = len(pd.unique(plot_df['label']))
         palette = sns.color_palette("hsv", num_unique_labels)
-    
-    sns.scatterplot(
-        x="tsne-2d-one", y="tsne-2d-two", hue="label", style="source_name",
-        palette=palette, data=plot_df, legend="full", s=80, alpha=0.8
-    )
-    plt.title('t-SNE with Custom CombatModel Batch Correction')
-    plt.xlabel('t-SNE Dimension 1')
-    plt.ylabel('t-SNE Dimension 2')
-    plt.legend(title='Legend', bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.grid(True)
-    plt.tight_layout(rect=[0, 0, 0.85, 1])
-    plt.show()
+        
+        sns.scatterplot(
+            x="tsne-2d-one", y="tsne-2d-two",
+            hue="label", style="source_name",
+            palette=palette, data=plot_df, legend="full",
+            s=80, alpha=0.8, ax=ax
+        )
+        ax.legend(title='Legend', bbox_to_anchor=(1.05, 1), loc='upper left')
 
-def plot_histograms(df1, df2, df1_label='DataFrame 1', df2_label='DataFrame 2', df1_color='skyblue', df2_color='salmon'):
+    # --- 共通のプロット設定 ---
+    #ax.set_title('t-SNE with Custom CombatModel Batch Correction')
+    #ax.set_xlabel('t-SNE Dimension 1')
+    #ax.set_ylabel('t-SNE Dimension 2')
+    ax.set_xlabel('t-SNE Dimension 1', fontsize=LABEL_FONTSIZE) # ★フォントサイズ追加
+    ax.set_ylabel('t-SNE Dimension 2', fontsize=LABEL_FONTSIZE) # ★フォントサイズ追加
+    ax.grid(True)
+    
+    # レイアウトを自動調整
+    if not is_numeric_labels and len(ax.get_legend().get_texts()) > 10:
+        plt.tight_layout(rect=[0, 0, 0.85, 1])
+    else:
+        plt.tight_layout()
+
+    # ファイルへの保存とプロットのクローズ
+    # plt.show()
+    plt.savefig('datas/asv_lv6_pH.png')
+    plt.close()
+    print("\nプロットを 'datas/asv_lv6_pH.png' に保存しました。")
+
+def plot_histograms(df1, df2, df1_label='DataFrame 1', df2_label='DataFrame 2', 
+                    df1_color='skyblue', df2_color='salmon', path='datas', 
+                    filename='pH.png', min_val=None, max_val=None,
+                    label_fontsize=14, tick_fontsize=12, legend_fontsize=12):
     """
-    2つのデータフレームの指定された列のヒストグラムを色分けして重ねて表示する関数。
+    2つのデータフレームの指定された列のヒストグラムと箱ひげ図を作成・保存する関数。
+    指定された最小値・最大値に基づいてデータをフィルタリングする機能を持つ。
 
     Args:
-        df1 (pd.DataFrame): 1つ目のデータフレーム。
-        df2 (pd.DataFrame): 2つ目のデータフレーム。
-        column_name (str): ヒストグラムを作成する列の名前。
-        df1_label (str, optional): 1つ目のデータフレームの凡例ラベル。デフォルトは 'DataFrame 1'。
-        df2_label (str, optional): 2つ目のデータフレームの凡例ラベル。デフォルトは 'DataFrame 2'。
+        df1 (pd.Series or pd.DataFrame): 1つ目のデータ。
+        df2 (pd.Series or pd.DataFrame): 2つ目のデータ。
+        df1_label (str, optional): 1つ目のデータの凡例ラベル。デフォルトは 'DataFrame 1'。
+        df2_label (str, optional): 2つ目のデータの凡例ラベル。デフォルトは 'DataFrame 2'。
         df1_color (str, optional): 1つ目のヒストグラムの色。デフォルトは 'skyblue'。
         df2_color (str, optional): 2つ目のヒストグラムの色。デフォルトは 'salmon'。
+        path (str, optional): 画像を保存するディレクトリのパス。デフォルトは 'datas'。
+        filename (str, optional): 保存する画像のファイル名。デフォルトは 'pH.png'。
+        min_val (float or int, optional): グラフに含めるデータの最小値。この値より小さいデータは除外される。デフォルトは None。
+        max_val (float or int, optional): グラフに含めるデータの最大値。この値より大きいデータは除外される。デフォルトは None。
     """
-    # グラフのスタイルとサイズを設定
+    
+    # フォルダが存在しない場合は作成
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+    # 1. データの準備 (NaN値の削除)
+    df1_clean = df1.dropna()
+    df2_clean = df2.dropna()
+
+    # 2. データのフィルタリング (min_val, max_val に基づく)
+    # df.squeeze() は、データが1列のDataFrameの場合にSeriesに変換し、両方の形式に対応できるようにします。
+    if min_val is not None:
+        df1_clean = df1_clean[df1_clean.squeeze() > min_val]
+        df2_clean = df2_clean[df2_clean.squeeze() > min_val]
+    
+    if max_val is not None:
+        df1_clean = df1_clean[df1_clean.squeeze() < max_val]
+        df2_clean = df2_clean[df2_clean.squeeze() < max_val]
+        
+    # === ヒストグラムの作成 ===
     plt.style.use('seaborn-v0_8-whitegrid')
     plt.figure(figsize=(10, 6))
 
     # 1つ目のデータフレームのヒストグラムをプロット
-    plt.hist(df1.values, bins=30, alpha=0.7, color=df1_color, label=df1_label, density=True)
-
+    plt.hist(df1_clean.values, bins=30, alpha=0.7, color=df1_color, label=df1_label, density=True)
     # 2つ目のデータフレームのヒストグラムをプロット
-    plt.hist(df2.values, bins=30, alpha=0.7, color=df2_color, label=df2_label, density=True)
+    plt.hist(df2_clean.values, bins=30, alpha=0.7, color=df2_color, label=df2_label, density=True)
 
-    # グラフのタイトルと軸ラベルを設定
-    #plt.title(f"'{column_name}' の分布の比較", fontsize=16)
     plt.xlabel("Value", fontsize=12)
-    plt.ylabel("確率密度", fontsize=12)
-
-    # 凡例を表示
+    plt.ylabel("Probability density", fontsize=12)
     plt.legend()
-
-    # グリッドを表示
+    plt.tight_layout()
     plt.grid(True)
+
+    hist_filename = 'hist_' + filename
+    hist_path = os.path.join(path, hist_filename)
+    plt.savefig(hist_path)
+    plt.close() # グラフを閉じてメモリを解放
+
+    # === 箱ひげ図の作成 ===
+    # データが空でない場合のみプロット
+    plot_data = []
+    plot_labels = []
+    if not df1_clean.empty:
+        plot_data.append(df1_clean.values)
+        plot_labels.append(df1_label)
+    if not df2_clean.empty:
+        plot_data.append(df2_clean.values)
+        plot_labels.append(df2_label)
+        
+    if not plot_data:
+        print("警告: フィルタリング後にプロットするデータがありません。")
+        return
+
+    plt.figure(figsize=(8, 6)) # 箱ひげ図用に新しいFigureを作成
+    plt.boxplot(plot_data)
     
-    # グラフを表示
-    plt.show()
+    name = filename.replace('.png', '')
+    #plt.ylabel(name)
+
+    # ★変更点: fontsize引数を追加
+    plt.ylabel(name, fontsize=label_fontsize)
+    plt.xticks(ticks=range(1, len(plot_labels) + 1), labels=plot_labels, fontsize=tick_fontsize)
+    plt.yticks(fontsize=tick_fontsize)
+
+    #plt.xticks(ticks=range(1, len(plot_labels) + 1), labels=plot_labels, fontsize=12)
+
+    box_filename = 'box_' + filename
+    box_path = os.path.join(path, box_filename)
+    plt.savefig(box_path)
+    plt.tight_layout()
+    plt.close() # グラフを閉じてメモリを解放
+
+    print(f"グラフを保存しました: {hist_path}, {box_path}")
 
 from sklearn.model_selection import train_test_split
-
+import os
 
 def ilr_data(asv_data):
     asv_data = asv_data.div(asv_data.sum(axis=1), axis=0)
@@ -458,14 +586,14 @@ def process_and_visualize(
 
     # --- 2. 相対量変換とilr変換 ---
     # 各行の合計で割って相対量に変換
-    df1_rel = df1_common.div(df1_common.sum(axis=1), axis=0)
-    df2_rel = df2_common.div(df2_common.sum(axis=1), axis=0)
+    #df1_rel = df1_common.div(df1_common.sum(axis=1), axis=0)
+    #df2_rel = df2_common.div(df2_common.sum(axis=1), axis=0)
     
     # ilr変換
     #df1_ilr = ilr_transform(df1_rel.values)
-    df1_ilr = ilr_data(df1_rel) 
+    df1_ilr = ilr_data(df1_common) 
     #df2_ilr = ilr_transform(df2_rel.values)
-    df2_ilr = ilr_data(df2_rel)
+    df2_ilr = ilr_data(df2_common)
     
     # DataFrameに戻す (カラム名はilr_1, ilr_2, ...)
     #df1_ilr = pd.DataFrame(df1_ilr, index=df1_common.index, columns=[f'ilr_{i+1}' for i in range(df1_ilr.shape[1])])
@@ -555,6 +683,10 @@ def process_and_visualize(
     plt.legend(title='Labels')
     plt.grid(True)
     plt.show()
+
+    os.makedirs('datas',exist_ok=True)
+
+    #plt.savefig('datas/asv_lv6.png')
     print("ステップ6: 結果をプロットしました。")
     print("--- 全ての処理が完了しました ---")
 
@@ -597,21 +729,28 @@ if __name__ == '__main__':
     #                           labels2 = d_chem['rate_of_chemical_fertilizer_applicationK'].values, 
     #                           df1_name='DataFrame 1', df2_name='DataFrame 2')
     
-    # plot_histograms(r_chem['Available.P'], d_chem['available_P'], 
-    #                 df1_label='DataFrame 1', df2_label='DataFrame 2', df1_color='skyblue', df2_color='salmon')
+    plot_histograms(r_chem['pH'], d_chem['pH_dry_soil'],
+                    #r_chem['Inorganic.N'], d_chem['Total_N'], 
+                     #r_chem['EC'], d_chem['EC_electric_conductivity'], 
+                    # r_chem['Available.P'], d_chem['available_P'], 
+                     df1_label='riken data', df2_label='new data', df1_color='skyblue', df2_color='salmon',
+                     filename = 'pH.png',
+                     min_val=None, max_val=None,
+                     label_fontsize=20, tick_fontsize=18
+                     )
 
-    # visualize_tsne_with_custom_combat_model(df1 = riken, df2 = dra, 
-    #                           labels1 = r_chem['pH'].values, 
-    #                           #labels2 = d_chem['pH_dry_soil'].str[:4].values, 
-    #                           labels2 = d_chem['pH_dry_soil'].values, 
-    #                           df1_name='DataFrame 1', df2_name='DataFrame 2')
+    visualize_tsne_with_custom_combat_model(df1 = riken, df2 = dra, 
+                                labels1 = r_chem['pH'].values, 
+                                #labels2 = d_chem['pH_dry_soil'].str[:4].values, 
+                                labels2 = d_chem['pH_dry_soil'].values, 
+                                df1_name='riken data', df2_name='new data')
 
     d =process_and_visualize(
         df1 = riken, 
         df2 = dra, 
-        #df1_name: str = 'Dataset1', 
-        #df2_name: str = 'Dataset2', 
-        #split_target_name: str = 'Dataset1', 
+        df1_name = 'riken data', 
+        df2_name = 'new data', 
+        split_target_name = 'riken data', 
         test_size = 0.2, 
         #random_state: int = 42
     )

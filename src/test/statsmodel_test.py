@@ -112,9 +112,15 @@ def statsmodel_test(X, Y, models, scalers, reg, result_dir,index, feature_names)
             met_dir = os.path.join(reg_dir, f'{name}_result.png')
 
             plt.figure()
-            plt.scatter(Y_pp,pred)
+            plt.scatter(Y_pp,pred, label = 'prediction')
+
+            min_val = min(Y_pp.min(), pred.min())
+            max_val = max(Y_pp.max(), pred.max())
+            plt.plot([min_val, max_val], [min_val, max_val], 'r--', label = 'x=y')
+
             plt.xlabel('true_data')
             plt.ylabel('predicted_data')
+            plt.legend()
             plt.savefig(met_dir)
             plt.close()
 

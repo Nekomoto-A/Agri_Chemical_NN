@@ -102,8 +102,8 @@ def test_MT(x_te,y_te,model,reg_list,scalers,output_dir, features, shap_eval = c
                 true = torch.argmax(y_te[reg], dim=1).numpy()
                 
                 #print()
-                print(output)
-                print(true)
+                #print(output)
+                #print(true)
 
                 predicts[reg] = output
                 trues[reg] = true
@@ -214,6 +214,11 @@ def test_MT_BNN(x_te,y_te,model,reg_list,scalers,output_dir,num_predictive_sampl
                 TP_dir = os.path.join(result_dir, 'true_predict.png')
                 plt.figure()
                 plt.scatter(true,output)
+
+                min_val = min(true.min(), output.min())
+                max_val = max(true.max(), output.max())
+                plt.plot([min_val, max_val], [min_val, max_val], 'r--')
+
                 plt.xlabel('true_data')
                 plt.ylabel('predicted_data')
                 plt.savefig(TP_dir)
@@ -456,7 +461,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
 
     for reg in reg_list:
         #if 'CNN' in model_name:
-        #print(test_ids)
+        #print(f'test_ids = {test_ids.to_numpy().ravel()}')
         loss = np.abs(predicts[reg]-true[reg])
         #print(loss)
         loss_dir = os.path.join(vis_dir, reg)
@@ -467,11 +472,13 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
 
         # 1. グラフの準備 (figとaxを取得)
         # figsizeでグラフ全体のサイズを指定します。幅を広く(30)、高さを標準(8)に設定してみましょう。
-        fig, ax = plt.subplots(figsize=(30, 8))
+        fig, ax = plt.subplots(figsize=(90, 8))
 
         # 2. グラフの描画
         # 元のコードと同じように棒グラフを作成します。
-        ax.bar(test_ids.to_numpy().ravel(), loss.ravel())
+        #ax.bar(test_ids.to_numpy().ravel(), loss.ravel())
+        ax.bar(test_ids, loss.ravel())
+        #ax.bar(test_ids.values(), loss.ravel())
         ax.tick_params(axis='x', rotation=90) # x軸のラベルを90度回転
 
         # グラフのレイアウトを自動調整

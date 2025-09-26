@@ -223,11 +223,14 @@ class data_create:
             # 結果をDataFrameに戻す
             asv_feature = pd.DataFrame(ilr_array, columns=asv_data.columns[:-1], index=asv_data.index)
             #print(asv_feature)
+        elif self.feature_transformer == 'NON_TR':
+            asv_feature = asv_data
         else:
             asv_data = asv_data.div(asv_data.sum(axis=1), axis=0)
             #asv_array = multiplicative_replacement(asv_data.values)
             asv_array = asv_data.where(asv_data != 0, asv_data + 1e-100).values
             asv_feature = pd.DataFrame(asv_array, columns=asv_data.columns, index=asv_data.index)
+
         '''
         if self.label_data is not None:
             for l in self.label_data:
@@ -283,7 +286,7 @@ from src.datasets.feature_selection import shap_feature_selection, mutual_info_f
 from src.datasets.data_augumentation import augment_with_ctgan, augment_with_smoter, augment_with_gaussian_copula, augment_with_copulagan
 
 def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
-                          feature_selection,num_selected_features, data_name, 
+                          feature_selection,num_selected_features, data_name, data_inte, 
                           val_size = config['val_size'],transformer= config['transformer'],
                           #augmentation = config['augmentation'],
                           softlabel = config['softlabel'],
@@ -297,6 +300,12 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
                           hist = config['hist'],
                           clustering = config['clustering'],
                           marginal_hist_train = config['marginal_hist_train'],
+
+                          #data_inte = config['data_inte'],
+                          source_asv_path = config['asv_path'],
+                          source_chem_path = config['chem_path'],
+                          source_reg_list = config['reg_list2'],
+                          source_exclude_ids = config['exclude_ids2'],
                           fold = None
                           ):
     
@@ -307,9 +316,20 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
         y_train_split = y_train
     #print(x_train_split)
     #print(y_train_split)
-    print(f'特徴選択前：{x_train_split.shape}')
+    
+    if data_inte:
+        from src.datasets.data_integration import combat_integration
+        x_train_split, x_test, x_val, y_train_split = combat_integration(asv_path = source_asv_path, chem_path = source_chem_path, reg_list_big = source_reg_list, 
+                           x_train = x_train_split, y_train = y_train_split, x_test = x_test,
+                           #y_test,
+                           output_dir = fold,
+                           x_val = x_val,
+                           #y_val=None,
+                           exclude_ids = source_exclude_ids
+                           )
 
     if feature_selection == 'shap':
+        print(f'特徴選択前：{x_train_split.shape}')
         # SHAPを用いた特徴選択
         #for reg in reg_list:
         selected_features, _, _ = shap_feature_selection(x_train_split, y_train_split[reg_list], 
@@ -324,6 +344,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
         print(f"選択された特徴量数: {len(selected_features)}")
         #print(f"学習データ:{x_train_split}")
     elif feature_selection == 'mi':
+        print(f'特徴選択前：{x_train_split.shape}')
         # SHAPを用いた特徴選択
         #for reg in reg_list:
         selected_features, _, _ = mutual_info_feature_selection(x_train_split, y_train_split[reg_list], 
@@ -331,6 +352,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
                                                         output_csv_path = fold,
                                                         reg_list = reg_list, output_dir = fold, data_vis = data_vis,
                                                         )
+        print(f'特徴選択後：{x_train_split.shape}')
         # x_train_split = x_train_split[selected_features]
         # x_test = x_test[selected_features]
         # if isinstance(val_size, (int, float)):
@@ -338,6 +360,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
         # print(f"選択された特徴量数: {len(selected_features)}")
         #print(f"学習データ:{x_train_split}")
     elif feature_selection == 'borutashap':
+        print(f'特徴選択前：{x_train_split.shape}')
         from src.datasets.feature_selection import boruta_shap_feature_selection
         selected_features, _, _ = boruta_shap_feature_selection(x_train_split, y_train_split[reg_list], 
                                                         random_state=42,
@@ -345,25 +368,25 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
                                                         reg_list = reg_list, output_dir = fold, data_vis = data_vis,
                                                         n_trials=n_trials, 
                                                         )
+        print(f'特徴選択後：{x_train_split.shape}')
         # x_train_split = x_train_split[selected_features]
         # x_test = x_test[selected_features]
         # if isinstance(val_size, (int, float)):
         #     x_val = x_val[selected_features]
     elif feature_selection == 'rfeshap':
+        print(f'特徴選択前：{x_train_split.shape}')
         selected_features, _, _ = rfe_shap_feature_selection(x_train_split, y_train_split[reg_list], 
                                                              reg_list, output_dir = fold, data_vis=data_vis, 
                                 model=None, min_features_to_select=3, step=1, cv=5, 
                                 scoring='r2', random_state=42, output_csv_path = fold)
+        print(f'特徴選択後：{x_train_split.shape}')
     else:
-        selected_features = x_train_split.columns#.to_list()
+        selected_features = x_train_split.columns #.to_list()
 
     x_train_split = x_train_split[selected_features]
     x_test = x_test[selected_features]
     if isinstance(val_size, (int, float)):
         x_val = x_val[selected_features]
-
-
-    print(f'特徴選択後：{x_train_split.shape}')
 
     if fold is not None:
         train_feature_dir = os.path.join(fold, f'train_feature.csv')
@@ -442,6 +465,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
         else:
             X_val_tensor = torch.tensor([])
             val_ids = torch.tensor([])
+    #print(test_ids)
 
     #print(f'データ拡張前：{x_train_split.shape}')
 

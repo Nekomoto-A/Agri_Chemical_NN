@@ -13,12 +13,14 @@ def statsmodel_train(X,Y,scalers,reg):
     # モデルの定義
 
     X = X.numpy()
-
-    #if reg in scalers:
-    #    Y = scalers[reg].inverse_transform(Y[0].numpy().reshape(-1, 1))
-    #else:
-    #    Y = Y[0].numpy().reshape(-1, 1)
     Y = Y[reg].numpy().reshape(-1, 1)
+    # 欠損値がない行だけを残すマスクを作成
+    mask = ~np.isnan(Y).ravel()  # Yを1次元化してNaNチェック
+
+    # マスクを使って行を削除
+    X = X[mask]
+    Y = Y[mask]
+
     #print(Y.dtype)
     #print(f'train:{reg}:{Y.dtype}')
     if np.issubdtype(Y.dtype, np.floating):
