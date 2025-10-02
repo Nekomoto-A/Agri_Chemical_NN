@@ -81,7 +81,7 @@ def test_shap(x_tr, x_te,model,reg_list, features, output_dir):
             sorted_df_for_task.to_excel(writer, sheet_name=task_name, index=True)
     return feature_importance_dict
 
-def test_MT(x_te,y_te,model,reg_list,scalers,output_dir, features, shap_eval = config['shap_eval']):
+def test_MT(x_te,y_te,model,reg_list,scalers,output_dir,device, features, shap_eval = config['shap_eval']):
     model.eval()  # モデルを評価モードに
     # 出力ごとの予測と実際のデータをリストに格納
     r2_scores = []
@@ -91,6 +91,7 @@ def test_MT(x_te,y_te,model,reg_list,scalers,output_dir, features, shap_eval = c
     trues = {}
     with torch.no_grad():
         #outputs,sigmas = model(x_te)  # 予測値を取得
+        x_te = x_te.to(device)
         outputs,_ = model(x_te)  # 予測値を取得
 
         #print(outputs)
@@ -98,8 +99,8 @@ def test_MT(x_te,y_te,model,reg_list,scalers,output_dir, features, shap_eval = c
         for i,reg in enumerate(reg_list):
             if '_rank' in reg:
                 #print(outputs[reg])
-                output = torch.argmax(outputs[reg], dim=1).numpy()
-                true = torch.argmax(y_te[reg], dim=1).numpy()
+                output = torch.argmax(outputs[reg], dim=1).cpu().numpy()
+                true = torch.argmax(y_te[reg], dim=1).cpu().numpy()
                 
                 #print()
                 #print(output)
@@ -117,11 +118,11 @@ def test_MT(x_te,y_te,model,reg_list,scalers,output_dir, features, shap_eval = c
 
             elif torch.is_floating_point(y_te[reg]) == True:
                 if reg in scalers:
-                    output = scalers[reg].inverse_transform(outputs[reg].numpy())
-                    true = scalers[reg].inverse_transform(y_te[reg].numpy())
+                    output = scalers[reg].inverse_transform(outputs[reg].cpu().numpy())
+                    true = scalers[reg].inverse_transform(y_te[reg].cpu().numpy())
                 else:
-                    output = outputs[reg].numpy()
-                    true = y_te[reg].numpy()
+                    output = outputs[reg].cpu().numpy()
+                    true = y_te[reg].cpu().numpy()
 
                 predicts[reg] = output
                 trues[reg] = true
@@ -131,6 +132,10 @@ def test_MT(x_te,y_te,model,reg_list,scalers,output_dir, features, shap_eval = c
                 TP_dir = os.path.join(result_dir, 'true_predict.png')
                 plt.figure()
                 plt.scatter(true,output)
+                min_val = min(true.min(), output.min())
+                max_val = max(true.max(), output.max())
+                plt.plot([min_val, max_val], [min_val, max_val], 'r--', label = 'x=y')
+
                 plt.xlabel('true_data')
                 plt.ylabel('predicted_data')
                 plt.savefig(TP_dir)
@@ -158,7 +163,7 @@ def test_MT(x_te,y_te,model,reg_list,scalers,output_dir, features, shap_eval = c
                 #print(mse)
                 mse_scores.append(mse)
             else:
-                output = torch.argmax(outputs[reg], dim=-1).numpy()
+                output = torch.argmax(outputs[reg], dim=-1).cpu().numpy()
                 true = y_te[reg].numpy()
                 
                 predicts[reg] = output
@@ -313,11 +318,14 @@ def write_result(r2_results, mse_results, columns_list, csv_dir, method, ind):
     aligned_data.to_csv(csv_dir, mode="a", header=not os.path.exists(csv_dir), index=True, encoding="utf-8")
 
 def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predictions, trues, 
-                  input_dim, method, index, reg_list, csv_dir, vis_dir, model_name, test_ids, features,
+                  input_dim, method, index, reg_list, csv_dir, vis_dir, model_name, train_ids, test_ids, features,
+                  device,  
                   labels_train = None,
                   labels_val = None,
                   labels_test = None,
-                  loss_sum = config['loss_sum'], shap_eval = config['shap_eval'], save_feature = config['save_feature']):
+                  loss_sum = config['loss_sum'], shap_eval = config['shap_eval'], save_feature = config['save_feature'],
+                  batch_size = config['batch_size']
+                  ):
 
     output_dims = []
     #print(Y_train)
@@ -392,6 +400,8 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         #model =MT_HBM(x = X_train, location_idx = location_idx, num_locations = num_locations,num_tasks = len(reg_list))
         model = MultitaskModel(task_names=reg_list, num_features = input_dim)
 
+    model.to(device)
+
     print('学習データ数:',len(X_train))
     if X_val is not None:
         print('検証データ数:',len(X_val))
@@ -433,21 +443,24 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         predicts, true, r2_results, mse_results = test_pls_sem(X_test,Y_test,model_trained,reg_list,features,scalers,output_dir=vis_dir)
     else:
         #optimizer = optim.Adam(model.parameters(), lr=0.001)
-        model_trained = training_MT(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model,
+        model_trained = training_MT(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model, 
                                     #optimizer = optimizer, 
                                     scalers = scalers,
+                                    train_ids = train_ids,
                                     output_dim=output_dims,
                                     reg_list = reg_list, output_dir = vis_dir, 
                                     model_name = model_name,
-                                    loss_sum = loss_sum
+                                    loss_sum = loss_sum,
+                                    device = device,
+                                    batch_size = batch_size
                                     )
         
-        predicts, true, r2_results, mse_results = test_MT(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir, features = features)
+        predicts, true, r2_results, mse_results = test_MT(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir,device = device, features = features)
         
         if save_feature:
             from src.experiments.shared_deature_save import save_features
-            save_features(model = model_trained, x_data = X_train, y_data_dict = Y_train, output_dir = vis_dir, features = 'feature_train')
-            save_features(model = model_trained, x_data = X_test, y_data_dict = Y_test, output_dir = vis_dir, features = 'feature_test')
+            save_features(model = model_trained, x_data = X_train, y_data_dict = Y_train, output_dir = vis_dir, features = 'feature_train', batch_size = batch_size, device = device)
+            save_features(model = model_trained, x_data = X_test, y_data_dict = Y_test, output_dir = vis_dir, features = 'feature_test', batch_size = batch_size, device = device)
         
         if shap_eval == True:
             model_trained.eval()
@@ -459,47 +472,91 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
     for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
         print(f"Output {i+1} ({reg_list[i]}): R^2 Score = {r2:.3f}, MSE = {mse:.3f}")
 
-    for reg in reg_list:
-        #if 'CNN' in model_name:
-        #print(f'test_ids = {test_ids.to_numpy().ravel()}')
-        loss = np.abs(predicts[reg]-true[reg])
-        #print(loss)
-        loss_dir = os.path.join(vis_dir, reg)
-        os.makedirs(loss_dir,exist_ok=True)
-        #out = os.path.join(loss_dir, 'loss.png')
-        out = os.path.join(loss_dir, 'loss.html')
 
+    out = os.path.join(vis_dir, 'loss.html')
+    # 1. FigureとAxesの準備（縦に3つ、x軸を共有）
+    # figはグラフ全体、axesは各グラフ（ax1, ax2, ax3）をまとめたリスト
+    fig, axes = plt.subplots(nrows=len(reg_list), ncols=1, figsize=(60, 8 * len(reg_list)), sharex=True)
 
-        # 1. グラフの準備 (figとaxを取得)
-        # figsizeでグラフ全体のサイズを指定します。幅を広く(30)、高さを標準(8)に設定してみましょう。
-        fig, ax = plt.subplots(figsize=(90, 8))
+    # figに全体のタイトルを追加
+    #fig.suptitle('Comparison of Multiple Datasets', fontsize=16, y=0.95)
+    x_positions = np.arange(len(test_ids))
+    if len(reg_list) > 1:
+        for reg, ax in zip(reg_list, axes):
+            predictions.setdefault(method, {}).setdefault(reg, []).append(predicts[reg])
+            trues.setdefault(method, {}).setdefault(reg, []).append(true[reg])
 
-        # 2. グラフの描画
-        # 元のコードと同じように棒グラフを作成します。
-        #ax.bar(test_ids.to_numpy().ravel(), loss.ravel())
-        ax.bar(test_ids, loss.ravel())
-        #ax.bar(test_ids.values(), loss.ravel())
-        ax.tick_params(axis='x', rotation=90) # x軸のラベルを90度回転
+            #if 'CNN' in model_name:
+            #print(f'test_ids = {test_ids.to_numpy().ravel()}')
+            loss = np.abs(predicts[reg]-true[reg])
+            ax.bar(
+                x_positions, loss.ravel(), 
+                #color=colors[i], label=titles[i]
+                )
+            ax.set_ylabel(f'{reg}_MAE') # 各グラフのy軸ラベル
 
-        # グラフのレイアウトを自動調整
-        fig.tight_layout()
+        # axes[-1] が一番下のグラフのaxを指します
+        last_ax = axes[-1]
+        last_ax.set_xticks(x_positions) # 目盛りの位置を設定
+        # ラベルを設定し、回転させる
+        last_ax.set_xticklabels(test_ids, rotation=90, ha='right') 
+        # 4. レイアウトの自動調整
+        plt.tight_layout() # 全体タイトルと重ならないように調整
 
-        
-        # 4. HTMLファイルとして保存
-        # plt.savefig() の代わりに、mpld3.save_html() を使います。
         mpld3.save_html(fig, out)
         # メモリを解放するためにプロットを閉じます（多くのグラフを作成する場合に有効です）
         plt.close(fig)
 
-        # plt.figure(figsize=(18, 14))
-        # plt.bar(test_ids.to_numpy().ravel(),loss.ravel())
-        # plt.xticks(rotation=90)
-        # #plt.tight_layout()
-        # plt.savefig(out)
-        # plt.close()
+            #ax.legend() # 各グラフの凡例を表示
+            #ax.grid(axis='y', linestyle='--', alpha=0.7) # y軸のグリッド線
+            #print(loss)
+            #loss_dir = os.path.join(vis_dir, reg)
+            #os.makedirs(loss_dir,exist_ok=True)
+            #out = os.path.join(loss_dir, 'loss.png')
+            #out = os.path.join(loss_dir, 'loss.html')
 
-        predictions.setdefault(method, {}).setdefault(reg, []).append(predicts[reg])
-        trues.setdefault(method, {}).setdefault(reg, []).append(true[reg])
+            # 1. グラフの準備 (figとaxを取得)
+            # figsizeでグラフ全体のサイズを指定します。幅を広く(30)、高さを標準(8)に設定してみましょう。
+            #fig, ax = plt.subplots(figsize=(90, 8))
+
+            #print(f'ids:{test_ids}')
+            # 2. グラフの描画
+            # 元のコードと同じように棒グラフを作成します。
+            #ax.bar(test_ids.to_numpy().ravel(), loss.ravel())
+            # 2. 【変更点】x軸の位置を数値で作成
+
+            #ax.bar(test_ids, loss.ravel())
+            # 3. 【変更点】数値の位置を使ってグラフを描画
+            #ax.bar(x_positions, loss.ravel())
+            #ax.bar(test_ids.values(), loss.ravel())
+            #ax.tick_params(axis='x', rotation=90) # x軸のラベルを90度回転
+    else:
+        loss = np.abs(predicts[reg_list[0]]-true[reg_list[0]])
+        axes.bar(
+            x_positions, loss.ravel(), 
+            #color=colors[i], label=titles[i]
+            )
+        axes.set_ylabel(f'{reg_list[0]}_MAE') # 各グラフのy軸ラベル
+        axes.legend() # 各グラフの凡例を表示
+        axes.grid(axis='y', linestyle='--', alpha=0.7) # y軸のグリッド線
+        # 4. 【変更点】ティックの位置とラベルを明示的に設定
+        # 3. 共通のx軸の設定（一番下のグラフに対してのみ行う）
+        plt.xticks(x_positions, test_ids, rotation=90)
+        plt.xlabel('Categories')
+
+        # 4. レイアウトの自動調整
+        plt.tight_layout() # 全体タイトルと重ならないように調整
+
+        mpld3.save_html(fig, out)
+        # メモリを解放するためにプロットを閉じます（多くのグラフを作成する場合に有効です）
+        plt.close(fig)
+
+    # plt.figure(figsize=(18, 14))
+    # plt.bar(test_ids.to_numpy().ravel(),loss.ravel())
+    # plt.xticks(rotation=90)
+    # #plt.tight_layout()
+    # plt.savefig(out)
+    # plt.close()
     
     write_result(r2_results, mse_results, columns_list = reg_list, csv_dir = csv_dir, method = method, ind = index)
 

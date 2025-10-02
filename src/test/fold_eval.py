@@ -53,7 +53,7 @@ def calculate_and_save_correlations(df, target_data, output_dir, reg_list):
 
 
 
-def fold_evaluate(reg_list, output_dir,
+def fold_evaluate(reg_list, output_dir, device, 
                   feature_path = config['feature_path'], target_path = config['target_path'], exclude_ids = config['exclude_ids'],
                   k = config['k_fold'], 
                   #output_dir = config['result_dir'], 
@@ -149,11 +149,13 @@ def fold_evaluate(reg_list, output_dir,
             vis_dir_main = os.path.join(fold_dir, method)
             os.makedirs(vis_dir_main,exist_ok=True)
             
+        
             #print(X_train_tensor.shape)
             predictions, trues, r2_results, mse_results,model_trained = train_and_test(
                 X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor, 
                 scalers, predictions, trues, input_dim, method, index , reg_list, csv_dir,
-                vis_dir = vis_dir_main, model_name = model_name, test_ids = test_ids, features= features,
+                vis_dir = vis_dir_main, model_name = model_name, train_ids = train_ids, test_ids = test_ids, features= features,
+                device = device,
                 labels_train=label_train_tensor,
                 labels_val=label_val_tensor,
                 labels_test=label_test_tensor,
@@ -176,7 +178,8 @@ def fold_evaluate(reg_list, output_dir,
                     method_comp, 
                     index , reg_list, csv_dir,
                     vis_dir = vis_dir_comp, 
-                    model_name = model_name, test_ids = test_ids, features = features,
+                    model_name = model_name, train_ids = train_ids, test_ids = test_ids, features = features,
+                    device = device,
                     loss_sum = comp_method,
                     labels_train=label_train_tensor,
                     labels_val=label_val_tensor,
@@ -208,7 +211,8 @@ def fold_evaluate(reg_list, output_dir,
             predictions, trues, r2_result, mse_result, model_trained_st = train_and_test(
             X_train = X_train_tensor, X_val = X_val_tensor, X_test = X_test_tensor, Y_train = Y_train_single, Y_val = Y_val_single, Y_test = Y_test_single, 
             scalers = scalers, predictions = predictions, trues = trues, input_dim = input_dim, method = method_st, index = index , reg_list = reg, csv_dir = csv_dir, 
-            vis_dir = vis_dir_st, model_name = model_name,test_ids = test_ids, features = features,
+            vis_dir = vis_dir_st, model_name = model_name, train_ids = train_ids, est_ids = test_ids, features = features,
+            device = device,
             labels_train=label_train_tensor,
             labels_val=label_val_tensor,
             labels_test=label_test_tensor,
@@ -365,7 +369,7 @@ def fold_evaluate(reg_list, output_dir,
 
     return avg_dict, std_dict
 
-def loop_evaluate(reg_list, output_dir,
+def loop_evaluate(reg_list, output_dir, device,
                   feature_selection_all = config['feature_selection_all'], 
                   #output_dir = config['result_dir'],
                   start_features = config['start_features'], 
@@ -385,7 +389,7 @@ def loop_evaluate(reg_list, output_dir,
             output_dir = os.path.join(fsdir, output_name)
             print(f"特徴量 {number} 個で評価中...")
             # fold_evaluate関数が選択する特徴量数を引数に取ると仮定します
-            avg_dict, std_dict = fold_evaluate(reg_list=reg_list, num_features_to_select=number, output_dir=output_dir)
+            avg_dict, std_dict = fold_evaluate(reg_list=reg_list, num_features_to_select=number, output_dir=output_dir, device = device)
             results_avg[number] = avg_dict
             results_std[number] = std_dict
         print("モデルの評価が完了しました。")
@@ -526,5 +530,5 @@ def loop_evaluate(reg_list, output_dir,
         '''
                     
     else:
-        _, _ = fold_evaluate(reg_list = reg_list, output_dir = output_dir)
+        _, _ = fold_evaluate(reg_list = reg_list, output_dir = output_dir, device = device)
     

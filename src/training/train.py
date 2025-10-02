@@ -8,6 +8,7 @@ import torch.nn.functional as F
 import numpy as np
 import seaborn as sns
 import pandas as pd
+from torch.utils.tensorboard import SummaryWriter
 
 import os
 import yaml
@@ -113,18 +114,73 @@ class CustomDataset(Dataset):
         
         return x_data, y_data
 
-def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, model_name,loss_sum, #optimizer, 
-                scalers,
+from src.training.adversarial import Discriminator
+from src.training.adversarial import GradientReversalLayer
+from src.training.adversarial import create_data_from_dict
+
+class CustomDatasetAdv(Dataset):
+    """
+    敵対的学習のために拡張されたカスタムデータセット。
+    データ(X, y)に加えて、マスクと欠損パターンラベルも返します。
+    """
+    def __init__(self, X, y_dict):
+        """
+        Args:
+            X (torch.Tensor): 入力データ
+            y_dict (dict): 欠損値(NaN)を含む目的変数の辞書
+        """
+        self.X = X
+        
+        # __init__で一度だけ、y辞書から必要な情報をすべて前処理しておく
+        y_filled, masks, pattern_labels, pattern_map = create_data_from_dict(y_dict)
+        
+        self.y_filled = y_filled
+        self.masks = masks
+        self.pattern_labels = pattern_labels
+        self.pattern_map = pattern_map
+        
+        self.reg_list = list(y_dict.keys())
+        # ディスクリミネータの出力次元数として使えるように、パターンの総数を保存
+        self.num_patterns = len(pattern_map)
+
+    def __len__(self):
+        return len(self.X)
+
+    def __getitem__(self, idx):
+        # 1. 入力データを取得
+        x_data = self.X[idx]
+        
+        # 2. 0埋めされた目的変数を取得
+        y_data = {key: self.y_filled[key][idx] for key in self.reg_list}
+        
+        # 3. マスクを取得
+        mask_data = {key: self.masks[key][idx] for key in self.reg_list}
+        
+        # 4. 欠損パターンラベルを取得
+        pattern_label = self.pattern_labels[idx]
+        
+        # これら4つの情報をタプルとして返す
+        return x_data, y_data, mask_data, pattern_label
+
+def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, model_name,loss_sum, device, batch_size, #optimizer, 
+                scalers, 
+                train_ids, 
                 label_encoders = None, #scheduler = None, 
                 epochs = config['epochs'], patience = config['patience'],early_stopping = config['early_stopping'],
                 #loss_sum = config['loss_sum'],
                 visualize = config['visualize'], val = config['validation'], lambda_norm = config['lambda'],least_epoch = config['least_epoch'],
-                lr=config['learning_rate'],weights = config['weights'],vis_step = config['vis_step'],SUM_train_lim = config['SUM_train_lim'],personal_train_lim = config['personal_train_lim'],
+                lr=config['learning_rate'],weights = config['weights'],vis_step = config['vis_step'],SUM_train_lim = config['SUM_train_lim'],
+                personal_train_lim = config['personal_train_lim'],
                 l2_shared = config['l2_shared'],lambda_l2 = config['lambda_l2'], lambda_l1 = config['lambda_l1'], 
                 alpha = config['GradNorm_alpha'],
-                batch_size = config['batch_size'],
-                reg_loss_fanction = config['reg_loss_fanction']
+                #batch_size = config['batch_size'],
+                reg_loss_fanction = config['reg_loss_fanction'],
+                tr_loss = config['tr_loss']
                 ):
+    
+    # TensorBoardのライターを初期化
+    #tensor_dir = os.path.join(output_dir, 'runs/gradient_monitoring_experiment')
+    #writer = SummaryWriter(tensor_dir)
 
 
     if len(lr) == 1:
@@ -160,7 +216,31 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
         elif loss_sum == 'MGDA':
             optimizer = optim.Adam(model.parameters(), lr=lr)
             #mgda_solver = optimizers.MGDA(optimizer_single)
+        elif loss_sum == 'mmd':
+            from src.training.mmd import mmd_rbf
+            optimizer = optim.Adam(model.parameters(), lr=lr)
+        elif loss_sum == 'Adversarial':
+            discriminator = Discriminator(input_dim = 128, num_patterns=2).to(device)
+            params = list(model.parameters()) + list(discriminator.parameters())
+            optimizer = optim.Adam(params, lr=lr)
+            grl = GradientReversalLayer(alpha=1.0)
 
+            #Y_filled, masks, pattern_labels, pattern_map = create_data_from_dict(y_tr)
+            #adversarial_criterion = nn.BCELoss()
+            adversarial_criterion = nn.CrossEntropyLoss()
+        elif loss_sum == 'GradNorm+Adversarial':
+            discriminator = Discriminator(input_dim = 128, num_patterns=2).to(device)
+            params = list(model.parameters()) + list(discriminator.parameters())
+            optimizer = optim.Adam(params, lr=lr)
+            grl = GradientReversalLayer(alpha=1.0)
+
+            #Y_filled, masks, pattern_labels, pattern_map = create_data_from_dict(y_tr)
+            #adversarial_criterion = nn.BCELoss()
+            adversarial_criterion = nn.CrossEntropyLoss()
+            
+            grad_norm = optimizers.GradNorm(tasks=reg_list, alpha=alpha)
+            grad_norm.set_model_shared_params(model) # 共有層のパラメータを設定
+            #grad_norm = optimizers.GradNorm(tasks=reg_list, alpha=alpha)
         elif loss_sum =='GradNorm':
             # GradNorm のインスタンス化
             grad_norm = optimizers.GradNorm(tasks=reg_list, alpha=alpha)
@@ -168,55 +248,55 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
             grad_norm.set_model_shared_params(model) # 共有層のパラメータを設定
         else:
             optimizer = optim.Adam(model.parameters() , lr=lr)
-    else:
-        lr_list = {}
-        for l,reg in zip(lr,reg_list):
-            lr_list[reg] = l
-        if loss_sum == 'Normalized':
-            param_groups = []
-            for rate, reg_name in zip(lr, reg_list):
-                if reg_name in model.models:
-                    param_groups.append({
-                        'params': model.models[reg_name].parameters(),
-                        'lr': rate,
-                        'name': reg_name  # オプション：デバッグや識別のための名前
-                    })
-                else:
-                    print(f"Warning: Module '{reg_name}' not found in model.models. Skipping.")
+    # else:
+    #     lr_list = {}
+    #     for l,reg in zip(lr,reg_list):
+    #         lr_list[reg] = l
+    #     if loss_sum == 'Normalized':
+    #         param_groups = []
+    #         for rate, reg_name in zip(lr, reg_list):
+    #             if reg_name in model.models:
+    #                 param_groups.append({
+    #                     'params': model.models[reg_name].parameters(),
+    #                     'lr': rate,
+    #                     'name': reg_name  # オプション：デバッグや識別のための名前
+    #                 })
+    #             else:
+    #                 print(f"Warning: Module '{reg_name}' not found in model.models. Skipping.")
 
-            optimizer = optim.Adam(param_groups)
+    #         optimizer = optim.Adam(param_groups)
             
-            loss_fn = optimizers.NormalizedLoss(len(output_dim))
-        elif loss_sum == 'Uncertainlyweighted':
-            loss_fn = optimizers.UncertainlyweightedLoss(reg_list)
-            optimizer_params = []
-            for reg_name in reg_list:
-                if reg_name in model.models:
-                    # 各サブモデルのパラメータを取得
-                    # model.models[reg_name].parameters() は、そのサブモデル内のすべての学習可能なパラメータを返します。
-                    optimizer_params.append({
-                        'params': model.models[reg_name].parameters(),
-                        'lr': lr_list.get(reg_name, 0.001) # デフォルトの学習率を設定することも可能
-                    })
-                    optimizer = optim.Adam(param_groups)
-                else:
-                    print(f"警告: '{reg_name}' はモデルのModuleDictに存在しません。")
-        else:
-            optimizer_params = []
-            for reg_name in reg_list:
-                if reg_name in model.models:
-                    # 各サブモデルのパラメータを取得
-                    # model.models[reg_name].parameters() は、そのサブモデル内のすべての学習可能なパラメータを返します。
-                    optimizer_params.append({
-                        'params': model.models[reg_name].parameters(),
-                        'lr': lr_list[reg_name] # デフォルトの学習率を設定することも可能
-                    })
-                else:
-                    print(f"警告: '{reg_name}' はモデルのModuleDictに存在しません。")
+    #         loss_fn = optimizers.NormalizedLoss(len(output_dim))
+    #     elif loss_sum == 'Uncertainlyweighted':
+    #         loss_fn = optimizers.UncertainlyweightedLoss(reg_list)
+    #         optimizer_params = []
+    #         for reg_name in reg_list:
+    #             if reg_name in model.models:
+    #                 # 各サブモデルのパラメータを取得
+    #                 # model.models[reg_name].parameters() は、そのサブモデル内のすべての学習可能なパラメータを返します。
+    #                 optimizer_params.append({
+    #                     'params': model.models[reg_name].parameters(),
+    #                     'lr': lr_list.get(reg_name, 0.001) # デフォルトの学習率を設定することも可能
+    #                 })
+    #                 optimizer = optim.Adam(param_groups)
+    #             else:
+    #                 print(f"警告: '{reg_name}' はモデルのModuleDictに存在しません。")
+    #     else:
+    #         optimizer_params = []
+    #         for reg_name in reg_list:
+    #             if reg_name in model.models:
+    #                 # 各サブモデルのパラメータを取得
+    #                 # model.models[reg_name].parameters() は、そのサブモデル内のすべての学習可能なパラメータを返します。
+    #                 optimizer_params.append({
+    #                     'params': model.models[reg_name].parameters(),
+    #                     'lr': lr_list[reg_name] # デフォルトの学習率を設定することも可能
+    #                 })
+    #             else:
+    #                 print(f"警告: '{reg_name}' はモデルのModuleDictに存在しません。")
 
-            # オプティマイザのインスタンス化
-            # ここではAdamオプティマイザを使用していますが、SGDなど他のオプティマイザも同様に機能します。
-            optimizer = optim.Adam(optimizer_params)
+    #         # オプティマイザのインスタンス化
+    #         # ここではAdamオプティマイザを使用していますが、SGDなど他のオプティマイザも同様に機能します。
+    #         optimizer = optim.Adam(optimizer_params)
     
     #personal_losses = []
     personal_losses = {}
@@ -250,33 +330,49 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
     #y_val_tensor = torch.vstack([y_val[reg] for reg in reg_list]).T
     
     #train_dataset = TensorDataset(x_tr, y_tr_tensor)
-    train_dataset = CustomDataset(x_tr, y_tr)
+    #train_dataset = CustomDataset(x_tr, y_tr)
+    train_dataset = CustomDatasetAdv(x_tr, y_tr)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
     # 検証用 (シャッフルは必須ではない)
     #val_dataset = TensorDataset(x_val, y_val_tensor)
-    val_dataset = CustomDataset(x_val, y_val)
+    #val_dataset = CustomDataset(x_val, y_val)
+    val_dataset = CustomDatasetAdv(x_val, y_val)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     
     for epoch in range(epochs):
         if visualize == True:
             if epoch == 0:
                 vis_name = f'{epoch}epoch.png'
-                visualize_tsne(model = model, model_name = model_name,scalers = scalers, X = x_tr, Y = y_tr, reg_list = reg_list, output_dir = output_dir, file_name = vis_name,
+                visualize_tsne(model = model, model_name = model_name,scalers = scalers, 
+                               batch_size = batch_size, device = device, 
+                               X = x_tr, Y = y_tr, reg_list = reg_list, output_dir = output_dir, file_name = vis_name,
                                #X2 = x_val,Y2 = y_val
                                )
 
         running_train_losses = {key: 0.0 for key in ['SUM'] + reg_list}
-        for x_batch, y_batch in train_loader:
+        #for x_batch, y_batch in train_loader:
+        for x_batch, y_batch, masks_batch, patterns_batch in train_loader:
+            x_batch = x_batch.to(device)
+            patterns_batch = patterns_batch.to(device)
+            # 辞書型のデータは、各キーの値を転送する
+            y_batch = {k: v.to(device) for k, v in y_batch.items()}
+            masks_batch = {k: v.to(device) for k, v in masks_batch.items()}
+            #y_batch = y_batch.to(device)
+            
             model.train()
             outputs,shared = model(x_batch)
             train_losses = {}
             #for j in range(len(output_dim)):
+            # (ループの前にMMD損失を初期化しておく必要があります)
+
+            mmd_loss = torch.tensor(0.0, device=device) # deviceは適宜設定してください
+
             for i,reg in enumerate(reg_list):
-                true_tr = y_batch[reg]
+                true_tr = y_batch[reg]#.to(device)
                 output = outputs[reg]
 
-                mask = ~torch.isnan(true_tr)
+                mask = ~torch.isnan(true_tr).squeeze()
 
                 #loss = personal_losses[reg](outputs[reg], true_tr)
                 valid_preds = output[mask]
@@ -286,7 +382,7 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                     # マスク処理後の個別の損失を計算
                     loss = personal_losses[reg](valid_preds, valid_labels).mean()
                     train_losses[reg] = loss
-                    print(f'{reg}損失:{loss.item()}')
+                    #print(f'{reg}損失:{loss.item()}')
                 else:
                     # このバッチに有効なラベルがない場合、損失を0とする
                     train_losses[reg] = torch.tensor(0.0)
@@ -296,6 +392,19 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                 #train_loss_history.setdefault(reg, []).append(loss.item())
                 running_train_losses[reg] += loss.item()
                 running_train_losses['SUM'] += loss.item()
+
+                # 1. マスクを使って共有特徴量を2つのグループに分割
+                #    - features_present: ラベルが存在するサンプルの特徴量
+                #    - features_absent:  ラベルが欠損しているサンプルの特徴量
+                features_present = shared[mask]
+                features_absent = shared[~mask]
+                
+                # 2. 両方のグループにデータが存在する場合のみMMD損失を計算
+                #    (バッチ内に片方のグループしかない場合は計算できないため)
+                if features_present.shape[0] > 0 and features_absent.shape[0] > 0:
+                    # 3. mmd_rbf関数を呼び出し、タスクごとのMMD損失を累積
+                    mmd_loss += mmd_rbf(features_present, features_absent, sigma=1.0)
+        # sigma値はデータに応じて調整するハイパーパラメータ
 
             #print(train_losses)
 
@@ -331,10 +440,12 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                         # 表示用の総損失
                         train_loss = sum(train_losses.values()) # 表示用に合計する
                         learning_loss = train_loss
+            
             elif loss_sum == 'CAgrad':
                 optimizer.step(train_losses)
                 train_loss = sum(train_losses.values())
                 learning_loss = train_loss
+            
             elif loss_sum == 'MGDA':
                 if len(reg_list)==1:
                     train_loss = train_losses[reg_list[0]]
@@ -364,7 +475,7 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                     # 3-5. パラメータの更新
                     optimizer.step()
                     train_loss = sum(train_losses.values())
-                                    
+                
             elif loss_sum =='GradNorm':
                 # GradNorm の損失重み更新
                 # モデルのオプティマイザを渡すことで、その学習率をloss_weightsの更新に利用できる
@@ -387,15 +498,64 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                 optimizer.step()
 
                 train_loss = sum(train_losses.values())
+            elif loss_sum == 'GradNorm+Adversarial':
+                train_loss = sum(train_losses.values())
+                # GradNorm の損失重み更新
+                # モデルのオプティマイザを渡すことで、その学習率をloss_weightsの更新に利用できる
+                current_loss_weights = grad_norm.update_loss_weights(train_losses, optimizer)
+                
+                # 全体の加重損失計算
+                learning_loss = sum(current_loss_weights[i] * train_losses[reg_list[i]] for i in range(len(reg_list)))
 
+                if l2_shared == True:
+                    l2_loss = calculate_shared_l2_regularization(model = model,lambda_shared=lambda_l2)
+                    learning_loss += l2_loss
+
+                # 2. 敵対的パス
+                # GRLを通してディスクリミネータに特徴量を渡す
+                reversed_shared_features = grl(shared)
+                pattern_predictions = discriminator(reversed_shared_features)
+
+                # 3.2 敵対的損失
+                adversarial_loss = adversarial_criterion(pattern_predictions, patterns_batch)
+                
+                learning_loss += adversarial_loss
+
+                # バックワードパスと最適化 (モデルパラメータの更新)
+                optimizer.zero_grad()
+                learning_loss.backward()
+                # 2. 勾配クリッピングを実行 (optimizer.step() の前)
+                
+                #torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+
+                optimizer.step()
+
+                train_loss = sum(train_losses.values())
             else:
                 if len(reg_list)==1:
                     learning_loss = train_losses[reg_list[0]]
                     train_loss = learning_loss
+                elif loss_sum == 'Adversarial':
+                    #learning_loss = train_losses
+                    train_loss = sum(train_losses.values())
+                    # 2. 敵対的パス
+                    # GRLを通してディスクリミネータに特徴量を渡す
+                    reversed_shared_features = grl(shared)
+                    pattern_predictions = discriminator(reversed_shared_features)
 
+                    # 3.2 敵対的損失
+                    adversarial_loss = adversarial_criterion(pattern_predictions, patterns_batch)
+                    
+                    learning_loss = train_loss + adversarial_loss
+
+                    #train_loss = learning_loss
                 elif loss_sum == 'SUM':
                     learning_loss = sum(train_losses.values())
                     train_loss = sum(train_losses.values())
+                elif loss_sum == 'mmd':
+                    #from src.training.mmd import mmd_rbf
+                    train_loss = sum(train_losses.values())
+                    learning_loss = train_loss + mmd_loss
                 elif loss_sum == 'WeightedSUM':
                     learning_loss = 0
                     #weight_list = weights
@@ -467,13 +627,17 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
             running_val_losses = {key: 0.0 for key in ['SUM'] + reg_list}
             #val_loss = 0
             with torch.no_grad():
-                for x_val_batch, y_val_batch in val_loader:
+                for x_val_batch, y_val_batch, _, _ in val_loader:
+
+                    x_val_batch = x_val_batch.to(device)
+                    #y_val_batch = y_val_batch.to(device)
+                    
                     outputs,_ = model(x_val_batch)
                     val_losses = []
                     #for j in range(len(output_dim)):
                     
                     for reg,out in zip(reg_list,output_dim):
-                        true_val = y_val_batch[reg]
+                        true_val = y_val_batch[reg].to(device)
                         #print(f'reg:{output}')
                         loss = personal_losses[reg](outputs[reg], true_val)
 
@@ -506,28 +670,21 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
             if visualize == True:
                 if (epoch + 1) % vis_step == 0:
                     vis_name = f'{epoch+1}epoch.png'
-                    visualize_tsne(model = model, model_name = model_name,scalers = scalers, X = x_tr, Y = y_tr, reg_list = reg_list, output_dir = output_dir, file_name = vis_name, label_encoders = label_encoders,
+                    visualize_tsne(model = model, model_name = model_name,scalers = scalers, 
+                                   batch_size = batch_size, device = device, 
+                                   X = x_tr, Y = y_tr, reg_list = reg_list, output_dir = output_dir, file_name = vis_name, label_encoders = label_encoders,
                                    #X2 = x_val,Y2 = y_val
                                    )
+            
+            if tr_loss:
+                from src.training.tr_loss import predict_and_visualize_mae
 
-                    vis_losses = []
-                    vis_losses_val = []
-                    loss_list = []
+                train_dir = os.path.join(output_dir, 'train')
+                os.makedirs(train_dir,exist_ok=True)
 
-                    '''
-                    for j,reg in enumerate(reg_list):
-                        if torch.is_floating_point(y_tr[j]):
-                            vis_loss = torch.abs(y_tr[j] - model(x_tr)[j])
-                            vis_losses.append(vis_loss)
-                            
-                            vis_loss_val = torch.abs(y_val[j] - model(x_val)[j])
-                            vis_losses_val.append(vis_loss_val)
-                            loss_list.append(reg)
-                    #print(vis_losses)
-                    #print(y_tr)
-                    vis_name_loss = f'{epoch+1}epoch_loss.png'
-                    visualize_tsne(model = model, model_name = model_name , X = x_tr, Y = vis_losses, reg_list = loss_list, output_dir = output_dir, file_name = vis_name_loss,X2 = x_val,Y2 = vis_loss_val)
-                    '''
+                predict_and_visualize_mae(model = model, data_loader = train_loader, train_ids = train_ids, reg_list = reg_list, device = device, output_dir = train_dir, epoch = epoch+1)
+                
+
             if early_stopping == True:
                 if epoch >= least_epoch:
                     # --- 早期終了の判定 ---
@@ -575,7 +732,8 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
     with torch.no_grad():
         true = {}
         pred = {}
-        for x_tr_batch, y_tr_batch in train_loader:
+        for x_tr_batch, y_tr_batch, _, _ in train_loader:
+            x_tr_batch = x_tr_batch.to(device)
             outputs,_ = model(x_tr_batch)
             
             for target in reg_list:
@@ -615,7 +773,7 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
     
     return model
 
-def training_MT_BNN(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, model_name,loss_sum, #optimizer, 
+def training_MT_BNN(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, model_name,loss_sum, #optimizer, #
                 scalers,
                 label_encoders = None, #scheduler = None, 
                 epochs = config['epochs'], patience = config['patience'],early_stopping = config['early_stopping'],

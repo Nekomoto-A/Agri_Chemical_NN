@@ -595,40 +595,50 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
 
     #print(Y_train_tensor)
     #print(Y_test_tensor)
-
+    '''
     data = []
     data_cov = []
     #data = {}
 
     if len(reg_list) >= 2:
-        corr_dir = os.path.join(fold, f'corr.png')
-        for i,reg in enumerate(reg_list):
+        corr_dir = os.path.join(fold, f'corr')
+        os.makedirs(corr_dir, exist_ok = True)
+        data = []
+        for i, reg in enumerate(reg_list):
             data.append(Y_train_tensor[reg].numpy().ravel())
-            #data = Y_train_tensor[i].numpy().ravel()
-        corr_matrix = np.corrcoef(data)
+
+        # --- 欠損値の処理を追加 ---
+        data = np.array(data)  # list → numpy配列 (2次元: [変数数, サンプル数])
+        # 転置して [サンプル数, 変数数] にしてから NaN を含む行を削除
+        data = data.T
+        data = data[~np.isnan(data).any(axis=1)]
+        # 再度転置して [変数数, サンプル数] に戻す
+        data = data.T
+
+        if data.shape[1] > 1:  # サンプルが残っている場合のみ相関を計算
+            corr_matrix = np.corrcoef(data)
+        else:
+            corr_matrix = None
+
         plt.figure(figsize=(20,20))
         sns.heatmap(corr_matrix, cmap= sns.color_palette('coolwarm', 10), annot=True,fmt='.2f', vmin = -1, vmax = 1, xticklabels=reg_list, yticklabels=reg_list,annot_kws={"fontsize": 30})
-        plt.savefig(corr_dir)
+        matrix_path = os.path.join(corr_dir, f'corr_matrics.png')
+        plt.savefig(matrix_path)
         plt.close()
-        binary_matrix = (corr_matrix >= 0.5).astype(float)
-        np.fill_diagonal(binary_matrix, 1.0)
-        #print(corr_matrix)
-        #print(binary_matrix)
+        
+        import itertools
+        # 各ペアの散布図を保存
+        for (i, reg_i), (j, reg_j) in itertools.combinations(enumerate(reg_list), 2):
+            plt.figure(figsize=(5, 5))
+            plt.scatter(data[i], data[j], alpha=0.6)
+            plt.xlabel(reg_i)
+            plt.ylabel(reg_j)
+            corr_val = np.corrcoef(data[i], data[j])[0, 1]
+            plt.title(f"{reg_i} vs {reg_j}\nCorrelation = {corr_val:.2f}")
+            plt.tight_layout()
 
-        cov_dir = os.path.join(fold, f'covar.png')
-        for i,reg in enumerate(reg_list):
-            data_cov.append(Y_train_tensor[reg].numpy().ravel())
-            #data = Y_train_tensor[i].numpy().ravel()
-        #data = np.stack(data)
-        #print(data)
-        cov_matrix = np.cov(data, rowvar=True)
-        plt.figure(figsize=(20,20))
-        sns.heatmap(cov_matrix, cmap= sns.color_palette('coolwarm', 10), annot=True,fmt='.2f', vmin = -1, vmax = 1, xticklabels=reg_list, yticklabels=reg_list,annot_kws={"fontsize": 30})
-        plt.savefig(cov_dir)
-        plt.close()
-        #binary_matrix = (cov_matrix >= 0.5).astype(float)
-        #np.fill_diagonal(binary_matrix, 1.0)
-        #print(corr_matrix)
-        #print(binary_matrix)
-    '''
+            save_path = os.path.join(corr_dir, f"plot_{reg_i}_vs_{reg_j}.png")
+            plt.savefig(save_path)
+            plt.close()
+        
     return X_train_tensor, X_val_tensor, X_test_tensor,selected_features, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids,label_train_tensor,label_test_tensor,label_val_tensor
