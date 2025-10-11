@@ -29,6 +29,7 @@ class MTNNModel(nn.Module):
         for i, out_features in enumerate(shared_layers):
             self.shared_block.add_module(f"shared_fc_{i+1}", nn.Linear(in_features, out_features))
             self.shared_block.add_module(f"shared_batchnorm_{i+1}", nn.BatchNorm1d(out_features))
+            self.shared_block.add_module(f"dropout{i+1}", nn.Dropout(0.2))
             self.shared_block.add_module(f"shared_relu_{i+1}", nn.ReLU())
             in_features = out_features # 次の層の入力特徴量を更新します。
             
@@ -72,3 +73,4 @@ class MTNNModel(nn.Module):
             outputs[reg] = head(shared_features)
             
         return outputs, shared_features
+    

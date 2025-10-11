@@ -4,7 +4,7 @@ import pandas as pd
 from sklearn.model_selection import KFold
 from sklearn.model_selection import train_test_split
 import numpy as np
-from sklearn.preprocessing import StandardScaler,MinMaxScaler,PowerTransformer
+from sklearn.preprocessing import StandardScaler,MinMaxScaler,PowerTransformer, RobustScaler
 from torch.utils.data import TensorDataset, dataloader
 from sklearn.neighbors import LocalOutlierFactor
 from sklearn.preprocessing import LabelEncoder
@@ -57,7 +57,7 @@ def ilr_transform(data_array):
 
 class data_create:
     def __init__(self,path_asv,path_chem,reg_list,exclude_ids, label_list = None, feature_transformer = config['feature_transformer'], 
-                 label_data = config['labels'], unknown_drop  = config['unknown_drop'], 
+                 label_data = config['labels'], unknown_drop  = config['unknown_drop'], non_outlier = config['non_outlier']
                  ):
         self.path_asv = path_asv
         self.asv_data = pd.read_csv(path_asv)#.drop('index',axis = 1)
@@ -70,6 +70,8 @@ class data_create:
         self.label_list = label_list
         self.label_data = label_data
         self.unknown_drop = unknown_drop
+        self.non_outlier = non_outlier
+
     def __iter__(self):
         #self.chem_data.columns = [col.replace('.', '_') for col in self.chem_data.columns]
         if config['level'] != 'asv':
@@ -169,8 +171,9 @@ class data_create:
             #chem_data = chem_data.drop(ind)
 
             #if np.issubdtype(chem_data[r].dtype, np.floating):
+            print(f'全データ数:{len(chem_data)}')
             if pd.api.types.is_numeric_dtype(chem_data[r]):
-                if config['non_outlier'] == 'Q':
+                if self.non_outlier == 'Q':
                     Q1 = chem_data[r].quantile(0.25)
                     Q3 = chem_data[r].quantile(0.75)
                     IQR = Q3 - Q1
@@ -183,14 +186,15 @@ class data_create:
                     #print(len(out_ind))
                     asv_data = asv_data.drop(out_ind)
                     chem_data = chem_data.drop(out_ind)
-
-                if config['non_outlier'] == 'DBSCAN':
+                    print(f'削除後データ数:{len(chem_data)}')
+                if self.non_outlier == 'DBSCAN':
                     db = DBSCAN(eps=0.5, min_samples=3)
                     chem_data['labels'] = db.fit_predict(chem_data[r].values.reshape(-1, 1))
 
                     out_ind = chem_data[chem_data['labels'] == -1].index
                     asv_data = asv_data.drop(out_ind)
                     chem_data = chem_data.drop(out_ind)                    
+                    print(f'削除後データ数:{len(chem_data)}')
                 else:
                     pass
             else:
@@ -285,9 +289,10 @@ def create_soft_labels_vectorized(values: torch.Tensor, thresholds: torch.Tensor
 from src.datasets.feature_selection import shap_feature_selection, mutual_info_feature_selection, rfe_shap_feature_selection
 from src.datasets.data_augumentation import augment_with_ctgan, augment_with_smoter, augment_with_gaussian_copula, augment_with_copulagan
 
-def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
+def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer, 
                           feature_selection,num_selected_features, data_name, data_inte, 
-                          val_size = config['val_size'],transformer= config['transformer'],
+                          val_size = config['val_size'],
+                          #transformer = config['transformer'],
                           #augmentation = config['augmentation'],
                           softlabel = config['softlabel'],
                           labels = config['labels'],
@@ -306,6 +311,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
                           source_chem_path = config['chem_path'],
                           source_reg_list = config['reg_list2'],
                           source_exclude_ids = config['exclude_ids2'],
+                          combat = config['combat'],
                           fold = None
                           ):
     
@@ -318,15 +324,30 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
     #print(y_train_split)
     
     if data_inte:
-        from src.datasets.data_integration import combat_integration
-        x_train_split, x_test, x_val, y_train_split = combat_integration(asv_path = source_asv_path, chem_path = source_chem_path, reg_list_big = source_reg_list, 
-                           x_train = x_train_split, y_train = y_train_split, x_test = x_test,
-                           #y_test,
-                           output_dir = fold,
-                           x_val = x_val,
-                           #y_val=None,
-                           exclude_ids = source_exclude_ids
-                           )
+        from src.datasets.data_integration import prepare_and_ilr_transform
+        X_large_ilr, x_train_ilr, x_test, x_val, y_large = prepare_and_ilr_transform(asv_path = source_asv_path, chem_path = source_chem_path, 
+                                                                                     reg_list_big = source_reg_list, x_train =x_train_split,
+                                                                                 exclude_ids=source_exclude_ids, x_test=x_test, x_val=x_val)
+        #print(X_large_ilr.shape)
+        #print(y_large.shape)
+
+        if combat:
+            from src.datasets.data_integration import apply_combat_and_visualize
+            x_train_split, x_test, x_val, y_train_split = apply_combat_and_visualize(X_large_ilr, x_train_ilr, y_train_split, source_reg_list, y_large, fold, x_test, x_val)
+        else:
+            y_large = y_large.rename(columns={'index': 'crop-id'})
+            column_mapping = {
+                'pH_dry_soil': 'pH',
+                'EC_electric_conductivity': 'EC',
+                'available_P': 'Available.P'
+            }
+            # reg_list_bigに含まれるカラムのみをリネーム
+            rename_dict = {k: v for k, v in column_mapping.items() if k in source_reg_list and k in y_large.columns}
+            y_large = y_large.rename(columns=rename_dict)
+            x_train_split = pd.concat([X_large_ilr, x_train_ilr], ignore_index=True)
+            y_train_split = pd.concat([y_large, y_train_split], ignore_index=True)
+        #print(x_train_split.shape)
+        #print(y_train_split.shape)
 
     if feature_selection == 'shap':
         print(f'特徴選択前：{x_train_split.shape}')
@@ -489,7 +510,6 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
         from src.experiments.gmm_clus import auto_gmm_pipeline
         auto_gmm_pipeline(data = x_train_split, features = selected_features, max_clusters = 10, output_dir = fold)
 
-
     # カラム名を縦に列挙してテキスト保存
     used_dir = os.path.join(fold,'used_columns.txt')
     with open(used_dir, "w", encoding="utf-8") as f:
@@ -504,7 +524,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
     Y_train_tensor, Y_val_tensor, Y_test_tensor = {}, {}, {}
     label_train_tensor, label_val_tensor, label_test_tensor = {}, {}, {}
 
-    for reg in reg_list:
+    for reg,tr in zip(reg_list,transformer):
         if '_rank' in reg:
             #print(reg)
             SCALE = 2.0
@@ -540,11 +560,10 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
             #print(Y_test_tensor[reg])
         elif np.issubdtype(y_train_split[reg].dtype, np.floating):
             #print("SS")
-            pp = StandardScaler()
-            #pp = MinMaxScaler()
-            #pp = PowerTransformer(method='yeo-johnson')
-            
-            if transformer == 'SS':
+            if tr == 'SS':
+                pp = StandardScaler()
+                #pp = MinMaxScaler()
+                #pp = PowerTransformer(method='yeo-johnson')
                 pp = pp.fit(y_train_split[reg].values.reshape(-1, 1))
                 y_train_split_pp = pp.transform(y_train_split[reg].values.reshape(-1, 1))
                 if isinstance(val_size, (int, float)):
@@ -552,15 +571,59 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
                 y_test_pp = pp.transform(y_test[reg].values.reshape(-1, 1))
 
                 scalers[reg] = pp  # スケーラーを保存
+            elif tr == 'RS':
+                pp = RobustScaler()
+                #pp = MinMaxScaler()
+                #pp = PowerTransformer(method='yeo-johnson')
+                pp = pp.fit(y_train_split[reg].values.reshape(-1, 1))
+                y_train_split_pp = pp.transform(y_train_split[reg].values.reshape(-1, 1))
+                if isinstance(val_size, (int, float)):
+                    y_val_pp = pp.transform(y_val[reg].values.reshape(-1, 1))
+                y_test_pp = pp.transform(y_test[reg].values.reshape(-1, 1))
+
+                scalers[reg] = pp  # スケーラーを保存
+            elif tr == 'log':
+                from sklearn.preprocessing import FunctionTransformer
+                pp = FunctionTransformer(func=np.log1p, inverse_func=np.expm1)
+                pp = pp.fit(y_train_split[reg].values.reshape(-1, 1))
+                y_train_split_pp = pp.transform(y_train_split[reg].values.reshape(-1, 1))
+                if isinstance(val_size, (int, float)):
+                    y_val_pp = pp.transform(y_val[reg].values.reshape(-1, 1))
+                y_test_pp = pp.transform(y_test[reg].values.reshape(-1, 1))
+                scalers[reg] = pp  # スケーラーを保存
             else:
                 #pp = pp.fit(y_train_split[reg].values.reshape(-1, 1))
                 y_train_split_pp = y_train_split[reg].values.reshape(-1, 1)
                 if isinstance(val_size, (int, float)):
                     y_val_pp = y_val[reg].values.reshape(-1, 1)
                 y_test_pp = y_test[reg].values.reshape(-1, 1)
-
                 #print(y_train_split_pp)
                 #scalers[reg] = pp  # スケーラーを保存
+
+            plt.figure(figsize=(10, 6))
+            # ヒストグラムを描画
+            # alphaは透明度で、重なりが見やすくなります。
+            # binsは棒の数（階級の数）です。データの性質に合わせて調整してください。
+            plt.hist(y_train_split_pp, bins=30, alpha=0.7, color='blue', label='Train')
+            plt.hist(y_test_pp, bins=30, alpha=0.7, color='green', label='Test')
+            if isinstance(val_size, (int, float)):
+                plt.hist(y_val_pp, bins=30, alpha=0.7, color='red', label='Validation')
+
+            # グラフのタイトルと軸ラベルを設定
+            #plt.title('目的変数の分布の比較', fontsize=16)
+            plt.xlabel(f'{reg}', fontsize=12)
+            plt.ylabel('Frequency', fontsize=12)
+            # 凡例を表示
+            plt.legend()
+            plt.grid(True, linestyle='--', alpha=0.6)
+            plt.tight_layout()
+            if tr is not None:
+                target_hist_dir = os.path.join(fold, f'hist_{reg}.png')
+            else:
+                target_hist_dir = os.path.join(fold, f'hist_{reg}_{tr}.png')
+            plt.savefig(target_hist_dir)
+            plt.close()
+
 
             #Y_train_tensor.append(torch.tensor(y_train_split_pp, dtype=torch.float32))
             #Y_val_tensor.append(torch.tensor(y_val_pp, dtype=torch.float32))
@@ -584,6 +647,9 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
             if isinstance(val_size, (int, float)):
                 Y_val_tensor[reg] = torch.tensor(y_val_pp, dtype=torch.int64)
             Y_test_tensor[reg] = torch.tensor(y_test_pp, dtype=torch.int64)
+
+    
+
     '''
     if labels is not None:
         for l in labels:
@@ -599,7 +665,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
     data = []
     data_cov = []
     #data = {}
-
+    
     if len(reg_list) >= 2:
         corr_dir = os.path.join(fold, f'corr')
         os.makedirs(corr_dir, exist_ok = True)
@@ -640,5 +706,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list,
             save_path = os.path.join(corr_dir, f"plot_{reg_i}_vs_{reg_j}.png")
             plt.savefig(save_path)
             plt.close()
-        
+    
+
+
     return X_train_tensor, X_val_tensor, X_test_tensor,selected_features, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids,label_train_tensor,label_test_tensor,label_val_tensor

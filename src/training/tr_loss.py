@@ -39,99 +39,168 @@ class MultiTaskDataset(Dataset):
         # 入力、ラベル辞書、元のインデックスをタプルで返す
         return self.X[idx], labels, idx
         
-def predict_and_visualize_mae(model, data_loader, train_ids, reg_list, device, output_dir, epoch):
+import torch
+import numpy as np
+# Plotlyライブラリをインポート
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
+def calculate_and_save_mae_plot_html(model, X_data, y_data_dict, task_names, device, output_dir, x_labels=None, output_filename="mae_plot.html",
+                                     min_bar_pixel_width=15, min_total_width=800):
     """
-    モデルの予測を実行し、タスクごと・サンプルごとにMAEを計算して可視化する。
+    モデルの予測を実行し、タスクごと・サンプルごとにMAEを計算し、
+    縦に並べた棒グラフをスクロール可能なHTML形式で保存する。
 
     Args:
         model (nn.Module): 評価対象の学習済みモデル
         data_loader (DataLoader): 評価用データを含むデータローダー
         task_names (list): タスク名のリスト
-        device (torch.device): 計算に使用するデバイス (例: 'cpu' or 'cuda')
+        device (torch.device): 計算に使用するデバイス
+        x_labels (list or np.array, optional): グラフの横軸に使用するラベルの配列。
+        output_filename (str): 保存するHTMLファイルの名前。
     """
-    # 1. モデルを評価モードに設定
-    model.eval()
-    #model.to(device)
 
-    # 予測値、正解ラベル、インデックスを格納するリストを初期化
-    all_predictions = {task: [] for task in reg_list}
-    all_labels = {task: [] for task in reg_list}
+        # --- データセットとデータローダーの作成 ---
+    dataset = MultiTaskDataset(X=X_data, y_dict=y_data_dict)
+    # バッチサイズ32でデータを読み込むローダーを作成
+    data_loader = DataLoader(dataset, batch_size=32, shuffle=False)
+
+    # 1-4. MAEの計算 (この部分は前回と全く同じです)
+    model.eval()
+    model.to(device)
+    all_predictions = {task: [] for task in task_names}
+    all_labels = {task: [] for task in task_names}
     all_indices = []
 
-    # 2. バッチ処理で予測を実行
-    # 勾配計算を無効にし、メモリ効率を向上させる
     with torch.no_grad():
         for X_batch, y_batch_dict, indices_batch in data_loader:
-            # データを指定デバイスに転送
             X_batch = X_batch.to(device)
             y_batch_dict = {task: val.to(device) for task, val in y_batch_dict.items()}
-
-            # モデルで予測
             predictions_dict, _ = model(X_batch)
-
-            # バッチごとの結果をリストに保存
-            for task in reg_list:
+            for task in task_names:
                 all_predictions[task].append(predictions_dict[task].cpu())
                 all_labels[task].append(y_batch_dict[task].cpu())
             all_indices.append(indices_batch)
 
-    # 3. 結果を一つのテンソルにまとめる
-    for task in reg_list:
+    for task in task_names:
         all_predictions[task] = torch.cat(all_predictions[task], dim=0)
         all_labels[task] = torch.cat(all_labels[task], dim=0)
     all_indices = torch.cat(all_indices, dim=0)
     
-    # 元の順序に並び替える（DataLoaderがシャッフルした場合のため）
     sorted_indices = torch.argsort(all_indices)
-    for task in reg_list:
+    
+    for task in task_names:
         all_predictions[task] = all_predictions[task][sorted_indices]
         all_labels[task] = all_labels[task][sorted_indices]
 
-    # 4. サンプルごとのMAE（絶対誤差）を計算
+    # 2. 目的変数にNaNが含まれているサンプルを特定
+    #print("目的変数に欠損値(NaN)が含まれるサンプルを検出・除外します...")
+
+    nan_masks = []
+    for task in task_names:
+        labels = all_labels[task]
+        # ラベルが多次元の場合も考慮し、サンプル単位(dim=0)でNaNの有無をチェック
+        if labels.dim() > 1:
+            # dim=1のいずれかの要素がNaNなら、そのサンプルはNaN持ちと判断
+            task_nan_mask = torch.any(torch.isnan(labels), dim=1)
+        else:
+            task_nan_mask = torch.isnan(labels)
+        nan_masks.append(task_nan_mask)
+
+    # 全タスクを通じて、少なくとも1つのタスクでNaNを持つサンプルを特定
+    # nan_masksをスタックし、dim=0 (タスク方向)でanyを取り、サンプルごとのNaN有無を判定
+    combined_nan_mask = torch.stack(nan_masks, dim=0).any(dim=0)
+
+    # 3. NaNを含まない、有効なサンプルのマスクを作成
+    valid_mask = ~combined_nan_mask
+    num_original_samples = len(valid_mask)
+    num_valid_samples = valid_mask.sum().item()
+    #print(f"全 {num_original_samples} サンプルのうち、{num_valid_samples} サンプルが有効です。({num_original_samples - num_valid_samples} サンプルを除外)")
+
+    # 有効なサンプルのみを対象にデータをフィルタリング
+    for task in task_names:
+        all_predictions[task] = all_predictions[task][valid_mask]
+        all_labels[task] = all_labels[task][valid_mask]
+
+
     mae_scores = {}
-    for task in reg_list:
-        # 絶対誤差を計算
+    for task in task_names:
         mae = torch.abs(all_predictions[task] - all_labels[task])
-        # タスクの出力が多次元ベクトルの場合、要素の平均をとる
         if mae.dim() > 1 and mae.shape[1] > 1:
             mae = mae.mean(dim=1)
         mae_scores[task] = mae.squeeze().numpy()
 
-    # 5. タスクごとにグラフを可視化
-    print("各タスクのサンプルごとMAEを可視化します。")
-    out = os.path.join(output_dir, 'train_loss')
-    os.makedirs(out, exist_ok=True)
+    # --- ▼▼▼ ここからがPlotlyによる可視化と保存のコードです ▼▼▼ ---
+    
+    loss_path = os.path.join(output_dir, output_filename)
+    
+    # 5. Plotlyを使ってグラフを作成し、HTMLとして保存
+    #print(f"各タスクのMAEを計算し、グラフを '{output_filename}' に保存します...")
 
-    loss_path = os.path.join(out, f'{epoch}epoch.html')
+    # タスクの数だけ縦にサブプロットを作成
+    fig = make_subplots(
+        rows=len(task_names), 
+        cols=1, 
+        #subplot_titles=[f"タスク: {task}" for task in task_names] # 各グラフのタイトル
+    )
 
-    # 1. FigureとAxesの準備（縦に3つ、x軸を共有）
-    # figはグラフ全体、axesは各グラフ（ax1, ax2, ax3）をまとめたリスト
-    fig, axes = plt.subplots(nrows=len(reg_list), ncols=1, figsize=(60, 8 * len(reg_list)), sharex=True)
+    # x軸のラベルを準備
+    num_data = len(mae_scores[task_names[0]])
+    x_axis_title = "サンプルインデックス" # デフォルトのx軸ラベル
+    if x_labels is not None:
+        try:
+            x_labels_array = np.array(x_labels, dtype=object)
+            # まずソートし、次に有効なものでフィルタリング
+            sorted_x_labels_full = x_labels_array[sorted_indices.numpy()]
+            sorted_x_labels = sorted_x_labels_full[valid_mask.numpy()]
+            x_axis_title = "指定されたインデックス"
+        except IndexError:
+            sorted_x_labels = np.arange(num_data)
+            x_axis_title = "サンプルインデックス (x_labelsのサイズ不一致)"
+    else:
+        sorted_x_labels = np.arange(num_data)
 
-    # figに全体のタイトルを追加
-    #fig.suptitle('Comparison of Multiple Datasets', fontsize=16, y=0.95)
-    x_positions = np.arange(len(train_ids))
+    # 各タスクのグラフをサブプロットに一つずつ追加
+    for i, task in enumerate(task_names):
+        fig.add_trace(
+            go.Bar(
+                x=sorted_x_labels, 
+                y=mae_scores[task],
+                name=task,
+                marker_color='royalblue' # 棒グラフの色
+            ),
+            row=i + 1, col=1 # 何行目、何列目のプロットかを指定
+        )
+        # 各サブプロットのY軸ラベルを設定
+        fig.update_yaxes(title_text=f"{task}_MAE", row=i + 1, col=1)
 
-    if len(reg_list) > 1:
-        for reg, ax in zip(reg_list, axes):
+    calculated_width = min_bar_pixel_width * num_data + 150 
+    
+    # グラフが小さくなりすぎないように、最小の横幅を保証する
+    final_width = max(calculated_width, min_total_width)
 
-            #if 'CNN' in model_name:
-            #print(f'test_ids = {test_ids.to_numpy().ravel()}')
-            loss = np.abs(all_predictions[reg] - all_labels[reg])
-            ax.bar(
-                x_positions, loss.ravel(), 
-                #color=colors[i], label=titles[i]
-                )
-            ax.set_ylabel(f'{reg}_MAE') # 各グラフのy軸ラベル
+    # 全体のレイアウトを更新
+    fig.update_layout(
+        #title_text="タスクごと・サンプルごとのMAE",
+        height=300 * len(task_names),  # タスク数に応じて全体の高さを調整
+        width=final_width,  # 計算した横幅をここで設定
+        showlegend=False, # 各棒グラフの凡例は不要なので非表示
+        template='plotly_white' # 白背景のシンプルなテンプレート
+    )
+    
+    # X軸のタイトルは一番下のグラフにのみ表示
+    #fig.update_xaxes(title_text=x_axis_title, row=len(task_names), col=1)
+    fig.update_xaxes(tickangle=-90)
 
-        # axes[-1] が一番下のグラフのaxを指します
-        last_ax = axes[-1]
-        last_ax.set_xticks(x_positions) # 目盛りの位置を設定
-        # ラベルを設定し、回転させる
-        last_ax.set_xticklabels(train_ids, rotation=90) 
-        # 4. レイアウトの自動調整
-        plt.tight_layout() # 全体タイトルと重ならないように調整
+    if len(task_names) > 1:
+        for i in range(len(task_names) - 1):
+            fig.update_xaxes(showticklabels=False, row=i + 1, col=1)
 
-        mpld3.save_html(fig, out)
-        # メモリを解放するためにプロットを閉じます（多くのグラフを作成する場合に有効です）
-        plt.close(fig)
+    # HTMLファイルとして保存
+    try:
+        fig.write_html(loss_path)
+        #print(f"グラフが正常に '{loss_path}' として保存されました。ブラウザで開いて確認してください。")
+    except Exception as e:
+        print(f"HTMLファイルの保存中にエラーが発生しました: {e}")
+    
+    

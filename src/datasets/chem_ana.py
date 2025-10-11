@@ -123,13 +123,13 @@ if __name__ == '__main__':
     riken['pref'] = le.fit_transform(riken['pref'])
 
     feature_list = [
-        'pH',
-        'crop',
-        'pref',
-        'EC',
-        'Available.P'
+        #'Exchangeable.K',
+        'NH4.N',
+        'NO3.N',
+        #'Available.P',
+        'Exchangeable.K',
     ]
-    target = 'Exchangeable.K'
+    target = 'EC'
     id_column = 'crop-id'
 
 

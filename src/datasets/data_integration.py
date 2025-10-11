@@ -258,180 +258,384 @@ def ilr_data(asv_data):
     #print(asv_feature)
     return asv_feature
 
-from src.datasets.dataset import data_create
-
 import pandas as pd
 import numpy as np
-import os
-from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
+import os
+from src.datasets.dataset import data_create
+# from combat_py import CombatModel # ご自身の環境に合わせてインポートしてください
+# from your_utils import data_create, ilr_data # ご自身の環境に合わせてインポートしてください
 
-# data_create, ilr_data, CombatModel は事前に定義されていると仮定します。
-# 以下はダミーの定義です。ご自身の定義を使用してください。
-# from pycombat import CombatModel
-# def data_create(asv_path, chem_path, reg_list_big, exclude_ids, feature_transformer, label_data, unknown_drop):
-#     # ダミー実装
-#     return pd.DataFrame(np.random.rand(50, 100)), pd.Series(np.random.rand(50))
-# def ilr_data(df):
-#     # ダミー実装
-#     return df + 0.1
+def prepare_and_ilr_transform(asv_path, chem_path, reg_list_big, x_train, 
+                              exclude_ids=None, x_test=None, x_val=None):
+    """
+    データを読み込み、共通の特徴量を抽出し、ILR変換を行う関数。
 
-def combat_integration(asv_path, chem_path, reg_list_big, x_train, 
-                     y_train, x_test,
-                     #y_test,
-                     output_dir,
-                     x_val=None,
-                     #y_val=None,
-                     exclude_ids=None
-                     ):
+    Args:
+        asv_path (str): ASVデータのパス。
+        chem_path (str): 化学データのパス。
+        reg_list_big (list): 目的変数のリスト。
+        x_train (pd.DataFrame): 学習データの特徴量。
+        exclude_ids (list, optional): 除外するIDのリスト。Defaults to None.
+        x_test (pd.DataFrame, optional): テストデータの特徴量。Defaults to None.
+        x_val (pd.DataFrame, optional): 検証データの特徴量。Defaults to None.
+
+    Returns:
+        tuple: ILR変換されたデータフレーム (X_large_ilr, x_train_ilr, x_test_ilr, x_val_ilr) と
+               大規模データセットの目的変数 (Y_large)。
     """
-    2つのデータセットを統合し、バッチ効果を補正し、結果を可視化する関数。
-    """
+    print("ステップ1: データの読み込みと前処理を開始します。")
+    # 外部の大規模データセットを読み込む
     X_large, Y_large = data_create(asv_path, chem_path, reg_list_big, exclude_ids,
+                                     non_outlier = 'Q',
                                      feature_transformer='NON_TR',
-                                     label_data=None, unknown_drop=True,
-                                     )
+                                     label_data=None, unknown_drop=True)
 
-    #common_cols = x_train.columns.intersection(X_large.columns)
+    # 学習データと大規模データセットで共通する微生物種（カラム）を見つける
     common_cols = list(set(x_train.columns) & set(X_large.columns))
     if len(common_cols) == 0:
         raise ValueError("2つのデータフレームに共通のカラムが存在しません。")
-    print(f"ステップ1: {len(common_cols)}個の共通微生物種を抽出しました。")
+    print(f"ステップ2: {len(common_cols)}個の共通微生物種を抽出しました。")
 
+    # 共通カラムのみを抽出
     X_large_common = X_large[common_cols]
-    #print(X_large_common)
-    X_large_ilr = ilr_data(X_large_common)
     x_train_common = x_train[common_cols]
-    #print(x_train_common)
+
+    print("ステップ3: ILR変換を開始します。")
+    # 各データセットにILR変換を適用
+    X_large_ilr = ilr_data(X_large_common)
     x_train_ilr = ilr_data(x_train_common)
-    x_test_common = x_test[common_cols]
-    x_test_ilr = ilr_data(x_test_common)
 
-    # --- ComBatモデルによるバッチ効果補正 ---
-    # 学習用データの準備 (分割しなかったデータ + 学習データ)
-    #combat_train_data = pd.concat([X_large_ilr, x_train_ilr])
-    combat_train_data = pd.concat([X_large_ilr, x_train_ilr], ignore_index=False)
-    #print(combat_train_data)
+    x_test_ilr = None
+    if x_test is not None:
+        x_test_common = x_test[common_cols]
+        x_test_ilr = ilr_data(x_test_common)
 
-    # バッチラベルの作成 (0: X_large, 1: x_train由来)
-    batch_labels_train = np.array(
-        [0] * len(X_large_ilr) + [1] * len(x_train_ilr)
-    )
-
-    # ComBatモデルの学習と変換
-    combat_model = CombatModel()
-    print("ComBatモデルの学習と変換を開始します...")
-    X_train_combat = combat_model.fit_transform(
-        data=combat_train_data.values,
-        sites=batch_labels_train.reshape(-1, 1)
-    )
-    X_train = pd.DataFrame(X_train_combat, columns = combat_train_data.columns)
-
-    # テストデータの変換
-    batch_labels_test = np.array([1] * len(x_test_ilr))
-    print("テストデータを学習済みモデルで変換します...")
-    X_test_combat = combat_model.transform(
-        data=x_test_ilr.values,
-        sites=batch_labels_test.reshape(-1, 1)
-    )
-    X_test = pd.DataFrame(X_test_combat, columns = x_test_ilr.columns)
-
-    X_val_combat = None
+    x_val_ilr = None
     if x_val is not None:
         x_val_common = x_val[common_cols]
         x_val_ilr = ilr_data(x_val_common)
-        
-        # 検証データの変換
+    
+    print("ILR変換が完了しました。")
+    
+    #x_train_merge = pd.concat([X_large_ilr, x_train_ilr], ignore_index=False)
+
+    return X_large_ilr, x_train_ilr, x_test_ilr, x_val_ilr, Y_large
+
+
+def apply_combat_and_visualize(X_large_ilr, x_train_ilr, y_train, reg_list_big, Y_large,
+                               output_dir, x_test_ilr=None, x_val_ilr=None):
+    """
+    ILR変換済みのデータにComBatを適用し、バッチ効果を補正・可視化する関数。
+
+    Args:
+        X_large_ilr (pd.DataFrame): ILR変換された大規模データ。
+        x_train_ilr (pd.DataFrame): ILR変換された学習データ。
+        y_train (pd.DataFrame): 学習データの目的変数。
+        reg_list_big (list): 目的変数のリスト。
+        Y_large (pd.DataFrame): 大規模データの目的変数。
+        output_dir (str): 可視化結果の保存先ディレクトリ。
+        x_test_ilr (pd.DataFrame, optional): ILR変換されたテストデータ。Defaults to None.
+        x_val_ilr (pd.DataFrame, optional): ILR変換された検証データ。Defaults to None.
+
+    Returns:
+        tuple: ComBatで補正されたデータフレーム (X_train_combat, X_test_combat, X_val_combat) と
+               統合された学習データの目的変数 (Y_train_concat)。
+    """
+    print("ステップ4: ComBatによるバッチ効果補正を開始します。")
+    # --- ComBatモデルによるバッチ効果補正 ---
+    # ComBatの学習用データを作成 (大規模データ + 学習データ)
+    combat_train_data = pd.concat([X_large_ilr, x_train_ilr], ignore_index=False)
+
+    # バッチラベルを作成 (0: X_large由来, 1: x_train由来)
+    batch_labels_train = np.array([0] * len(X_large_ilr) + [1] * len(x_train_ilr))
+
+    # ComBatモデルの学習と変換
+    combat_model = CombatModel()
+    print("ComBatモデルの学習と変換を実行します...")
+    X_train_combat_values = combat_model.fit_transform(
+        data=combat_train_data.values,
+        sites=batch_labels_train.reshape(-1, 1)
+    )
+    X_train_combat = pd.DataFrame(X_train_combat_values, columns=combat_train_data.columns, index=combat_train_data.index)
+
+    # テストデータと検証データの変換
+    X_test_combat = None
+    if x_test_ilr is not None:
+        batch_labels_test = np.array([1] * len(x_test_ilr))
+        print("テストデータを学習済みモデルで変換します...")
+        X_test_combat_values = combat_model.transform(
+            data=x_test_ilr.values,
+            sites=batch_labels_test.reshape(-1, 1)
+        )
+        X_test_combat = pd.DataFrame(X_test_combat_values, columns=x_test_ilr.columns, index=x_test_ilr.index)
+
+    X_val_combat = None
+    if x_val_ilr is not None:
         batch_labels_val = np.array([1] * len(x_val_ilr))
         print("検証データを学習済みモデルで変換します...")
-        X_val_combat = combat_model.transform(
+        X_val_combat_values = combat_model.transform(
             data=x_val_ilr.values,
             sites=batch_labels_val.reshape(-1, 1)
         )
-        X_val = pd.DataFrame(X_val_combat, columns = x_val_ilr.columns)
+        X_val_combat = pd.DataFrame(X_val_combat_values, columns=x_val_ilr.columns, index=x_val_ilr.index)
 
-    print("t-SNEによる次元削減とプロットを開始します...")
-
-    # ステップ1: 全データを結合し、対応するラベルを作成
-    all_data_list = [X_train_combat, X_test_combat]
-    labels = (['X_large'] * len(X_large_ilr) + 
-              ['x_train'] * len(x_train_ilr) + 
-              ['x_test'] * len(x_test_ilr))
+    print("ステップ5: t-SNEによる次元削減とプロットを開始します。")
+    # --- 可視化 ---
+    plot_data_list = [X_large_ilr.values, x_train_ilr.values]
+    labels_list = ['X_large'] * len(X_large_ilr) + ['x_train'] * len(x_train_ilr)
     
-    if x_val is not None and X_val_combat is not None:
-        all_data_list.append(X_val_combat)
-        labels.extend(['x_val'] * len(x_val_ilr))
-
-    # NumPy配列を縦に結合
-    all_data_combat = np.vstack(all_data_list)
-
-    # ステップ2: t-SNEモデルで2次元に削減
-    # random_stateを固定することで、毎回同じ結果を得られます
+    if x_test_ilr is not None:
+        plot_data_list.append(x_test_ilr.values)
+        labels_list.extend(['x_test'] * len(x_test_ilr))
+    if x_val_ilr is not None:
+        plot_data_list.append(x_val_ilr.values)
+        labels_list.extend(['x_val'] * len(x_val_ilr))
+        
+    # ComBat補正後のデータを結合
+    all_data_combat_values = np.vstack([
+        X_train_combat_values,
+        X_test_combat_values if X_test_combat is not None else np.array([]).reshape(0, X_train_combat_values.shape[1]),
+        X_val_combat_values if X_val_combat is not None else np.array([]).reshape(0, X_train_combat_values.shape[1])
+    ])
+    
+    # t-SNEモデルで2次元に削減
     tsne = TSNE(n_components=2, random_state=42, perplexity=30, n_iter=1000)
-    tsne_results = tsne.fit_transform(all_data_combat)
+    tsne_results = tsne.fit_transform(all_data_combat_values)
 
-    # ステップ3: Matplotlibでプロット
     plt.figure(figsize=(12, 10))
-    
-    # 各グループの情報を定義
     plot_info = {
-        'X_large': {'marker': 'o', 'color': 'white', 'edgecolors': 'black', 'label': 'X_large'},
-        'x_train': {'marker': 'x', 'color': 'red', 'edgecolors': 'none', 'label': 'x_train'},
-        'x_test': {'marker': 'x', 'color': 'blue', 'edgecolors': 'none', 'label': 'x_test'},
-        'x_val': {'marker': 'x', 'color': 'yellow', 'edgecolors': 'none', 'label': 'x_val'}
+        'X_large': {'marker': 'o', 'color': 'white', 'edgecolors': 'black', 'label': 'X_large (Corrected)'},
+        'x_train': {'marker': 'x', 'color': 'red', 'label': 'x_train (Corrected)'},
+        'x_test': {'marker': 'x', 'color': 'blue', 'label': 'x_test (Corrected)'},
+        'x_val': {'marker': 'x', 'color': 'yellow', 'label': 'x_val (Corrected)'}
     }
-
-    unique_labels = np.unique(labels)
+    
+    unique_labels = sorted(list(set(labels_list)))
 
     # グループごとにプロット
+    current_pos = 0
     for label in unique_labels:
-        # 現在のラベルに一致するデータのインデックスを取得
-        indices = [i for i, l in enumerate(labels) if l == label]
         info = plot_info[label]
+        count = labels_list.count(label)
+        indices = range(current_pos, current_pos + count)
+        
         plt.scatter(
-            tsne_results[indices, 0],
-            tsne_results[indices, 1],
-            marker=info['marker'],
-            c=info['color'],
-            edgecolors=info['edgecolors'] if info['edgecolors'] != 'none' else None,
-            label=info['label'],
-            s=50  # マーカーのサイズ
+            tsne_results[indices, 0], tsne_results[indices, 1],
+            marker=info['marker'], c=info['color'], 
+            edgecolors=info.get('edgecolors', 'none'), label=info['label'], s=50
         )
+        current_pos += count
 
-    # グラフの装飾
-    plt.title('t-SNE Projection of Datasets after ComBat Correction', fontsize=16)
-    plt.xlabel('t-SNE Dimension 1', fontsize=12)
-    plt.ylabel('t-SNE Dimension 2', fontsize=12)
-    plt.legend(fontsize=12)
+    plt.title('t-SNE Projection of Datasets after ComBat Correction')
+    plt.xlabel('t-SNE Dimension 1')
+    plt.ylabel('t-SNE Dimension 2')
+    plt.legend()
     plt.grid(True)
-
-    # ステップ4: 図をファイルに保存
-    # output_dirが存在しない場合は作成
+    
     os.makedirs(output_dir, exist_ok=True)
     output_path = os.path.join(output_dir, 'data_plot_after_combat.png')
-    plt.savefig(output_path, dpi=300) # dpiで解像度を指定
-    plt.close() # メモリを解放
-
+    plt.savefig(output_path, dpi=300)
+    plt.close()
     print(f"t-SNEプロットを {output_path} に保存しました。")
 
-    Y_large = Y_large.rename(columns={'index': 'crop-id'})
+    print("ステップ6: 目的変数の整理と統合を開始します。")
     # --- 目的変数の整理 ---
-    for reg in reg_list_big:
-        if reg == 'pH_dry_soil':
-            Y_large = Y_large.rename(columns={'pH_dry_soil': 'pH'})
-        elif reg == 'EC_electric_conductivity':
-            Y_large = Y_large.rename(columns={'EC_electric_conductivity': 'EC'})
-        elif reg == 'EC_electric_conductivity':
-            Y_large = Y_large.rename(columns={'available_P': 'Available.P'})
+    Y_large = Y_large.rename(columns={'index': 'crop-id'})
+    column_mapping = {
+        'pH_dry_soil': 'pH',
+        'EC_electric_conductivity': 'EC',
+        'available_P': 'Available.P'
+    }
+    # reg_list_bigに含まれるカラムのみをリネーム
+    rename_dict = {k: v for k, v in column_mapping.items() if k in reg_list_big and k in Y_large.columns}
+    Y_large = Y_large.rename(columns=rename_dict)
 
     Y_train_concat = pd.concat([Y_large, y_train], ignore_index=True)
-
-    #print(Y_train_concat.shape)
-    #print(Y_train_concat['pH'])
+    print("すべての処理が完了しました。")
 
     # 処理済みのデータを返す
-    if x_val is not None:
-        return X_train, X_test, X_val, Y_train_concat
+    if x_val_ilr is not None:
+        return X_train_combat, X_test_combat, X_val_combat, Y_train_concat
+    elif x_test_ilr is not None:
+        return X_train_combat, X_test_combat, None, Y_train_concat
     else:
-        return X_train, X_test, Y_train_concat
+        return X_train_combat, None, None, Y_train_concat
+
+# from src.datasets.dataset import data_create
+# import pandas as pd
+# import numpy as np
+# import os
+# from sklearn.manifold import TSNE
+# import matplotlib.pyplot as plt
+
+# # data_create, ilr_data, CombatModel は事前に定義されていると仮定します。
+# # 以下はダミーの定義です。ご自身の定義を使用してください。
+# # from pycombat import CombatModel
+# # def data_create(asv_path, chem_path, reg_list_big, exclude_ids, feature_transformer, label_data, unknown_drop):
+# #     # ダミー実装
+# #     return pd.DataFrame(np.random.rand(50, 100)), pd.Series(np.random.rand(50))
+# # def ilr_data(df):
+# #     # ダミー実装
+# #     return df + 0.1
+
+# def combat_integration(asv_path, chem_path, reg_list_big, x_train, 
+#                      y_train, x_test,
+#                      #y_test,
+#                      output_dir,
+#                      x_val=None,
+#                      #y_val=None,
+#                      exclude_ids=None
+#                      ):
+#     """
+#     2つのデータセットを統合し、バッチ効果を補正し、結果を可視化する関数。
+#     """
+#     X_large, Y_large = data_create(asv_path, chem_path, reg_list_big, exclude_ids,
+#                                      feature_transformer='NON_TR',
+#                                      label_data=None, unknown_drop=True,
+#                                      )
+
+#     #common_cols = x_train.columns.intersection(X_large.columns)
+#     common_cols = list(set(x_train.columns) & set(X_large.columns))
+#     if len(common_cols) == 0:
+#         raise ValueError("2つのデータフレームに共通のカラムが存在しません。")
+#     print(f"ステップ1: {len(common_cols)}個の共通微生物種を抽出しました。")
+
+#     X_large_common = X_large[common_cols]
+#     #print(X_large_common)
+#     X_large_ilr = ilr_data(X_large_common)
+#     x_train_common = x_train[common_cols]
+#     #print(x_train_common)
+#     x_train_ilr = ilr_data(x_train_common)
+#     x_test_common = x_test[common_cols]
+#     x_test_ilr = ilr_data(x_test_common)
+
+#     # --- ComBatモデルによるバッチ効果補正 ---
+#     # 学習用データの準備 (分割しなかったデータ + 学習データ)
+#     #combat_train_data = pd.concat([X_large_ilr, x_train_ilr])
+#     combat_train_data = pd.concat([X_large_ilr, x_train_ilr], ignore_index=False)
+#     #print(combat_train_data)
+
+#     # バッチラベルの作成 (0: X_large, 1: x_train由来)
+#     batch_labels_train = np.array(
+#         [0] * len(X_large_ilr) + [1] * len(x_train_ilr)
+#     )
+
+#     # ComBatモデルの学習と変換
+#     combat_model = CombatModel()
+#     print("ComBatモデルの学習と変換を開始します...")
+#     X_train_combat = combat_model.fit_transform(
+#         data=combat_train_data.values,
+#         sites=batch_labels_train.reshape(-1, 1)
+#     )
+#     X_train = pd.DataFrame(X_train_combat, columns = combat_train_data.columns)
+
+#     # テストデータの変換
+#     batch_labels_test = np.array([1] * len(x_test_ilr))
+#     print("テストデータを学習済みモデルで変換します...")
+#     X_test_combat = combat_model.transform(
+#         data=x_test_ilr.values,
+#         sites=batch_labels_test.reshape(-1, 1)
+#     )
+#     X_test = pd.DataFrame(X_test_combat, columns = x_test_ilr.columns)
+
+#     X_val_combat = None
+#     if x_val is not None:
+#         x_val_common = x_val[common_cols]
+#         x_val_ilr = ilr_data(x_val_common)
+        
+#         # 検証データの変換
+#         batch_labels_val = np.array([1] * len(x_val_ilr))
+#         print("検証データを学習済みモデルで変換します...")
+#         X_val_combat = combat_model.transform(
+#             data=x_val_ilr.values,
+#             sites=batch_labels_val.reshape(-1, 1)
+#         )
+#         X_val = pd.DataFrame(X_val_combat, columns = x_val_ilr.columns)
+
+#     print("t-SNEによる次元削減とプロットを開始します...")
+
+#     # ステップ1: 全データを結合し、対応するラベルを作成
+#     all_data_list = [X_train_combat, X_test_combat]
+#     labels = (['X_large'] * len(X_large_ilr) + 
+#               ['x_train'] * len(x_train_ilr) + 
+#               ['x_test'] * len(x_test_ilr))
+    
+#     if x_val is not None and X_val_combat is not None:
+#         all_data_list.append(X_val_combat)
+#         labels.extend(['x_val'] * len(x_val_ilr))
+
+#     # NumPy配列を縦に結合
+#     all_data_combat = np.vstack(all_data_list)
+
+#     # ステップ2: t-SNEモデルで2次元に削減
+#     # random_stateを固定することで、毎回同じ結果を得られます
+#     tsne = TSNE(n_components=2, random_state=42, perplexity=30, n_iter=1000)
+#     tsne_results = tsne.fit_transform(all_data_combat)
+
+#     # ステップ3: Matplotlibでプロット
+#     plt.figure(figsize=(12, 10))
+    
+#     # 各グループの情報を定義
+#     plot_info = {
+#         'X_large': {'marker': 'o', 'color': 'white', 'edgecolors': 'black', 'label': 'X_large'},
+#         'x_train': {'marker': 'x', 'color': 'red', 'edgecolors': 'none', 'label': 'x_train'},
+#         'x_test': {'marker': 'x', 'color': 'blue', 'edgecolors': 'none', 'label': 'x_test'},
+#         'x_val': {'marker': 'x', 'color': 'yellow', 'edgecolors': 'none', 'label': 'x_val'}
+#     }
+
+#     unique_labels = np.unique(labels)
+
+#     # グループごとにプロット
+#     for label in unique_labels:
+#         # 現在のラベルに一致するデータのインデックスを取得
+#         indices = [i for i, l in enumerate(labels) if l == label]
+#         info = plot_info[label]
+#         plt.scatter(
+#             tsne_results[indices, 0],
+#             tsne_results[indices, 1],
+#             marker=info['marker'],
+#             c=info['color'],
+#             edgecolors=info['edgecolors'] if info['edgecolors'] != 'none' else None,
+#             label=info['label'],
+#             s=50  # マーカーのサイズ
+#         )
+
+#     # グラフの装飾
+#     plt.title('t-SNE Projection of Datasets after ComBat Correction', fontsize=16)
+#     plt.xlabel('t-SNE Dimension 1', fontsize=12)
+#     plt.ylabel('t-SNE Dimension 2', fontsize=12)
+#     plt.legend(fontsize=12)
+#     plt.grid(True)
+
+#     # ステップ4: 図をファイルに保存
+#     # output_dirが存在しない場合は作成
+#     os.makedirs(output_dir, exist_ok=True)
+#     output_path = os.path.join(output_dir, 'data_plot_after_combat.png')
+#     plt.savefig(output_path, dpi=300) # dpiで解像度を指定
+#     plt.close() # メモリを解放
+
+#     print(f"t-SNEプロットを {output_path} に保存しました。")
+
+#     Y_large = Y_large.rename(columns={'index': 'crop-id'})
+#     # --- 目的変数の整理 ---
+#     for reg in reg_list_big:
+#         if reg == 'pH_dry_soil':
+#             Y_large = Y_large.rename(columns={'pH_dry_soil': 'pH'})
+#         elif reg == 'EC_electric_conductivity':
+#             Y_large = Y_large.rename(columns={'EC_electric_conductivity': 'EC'})
+#         elif reg == 'EC_electric_conductivity':
+#             Y_large = Y_large.rename(columns={'available_P': 'Available.P'})
+
+#     Y_train_concat = pd.concat([Y_large, y_train], ignore_index=True)
+
+#     #print(Y_train_concat.shape)
+#     #print(Y_train_concat['pH'])
+
+#     # 処理済みのデータを返す
+#     if x_val is not None:
+#         return X_train, X_test, X_val, Y_train_concat
+#     else:
+#         return X_train, X_test, Y_train_concat
     

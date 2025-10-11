@@ -918,37 +918,47 @@ class CAGradOptimizer(optim.Optimizer):
 # ==============================================================================
 # トレースノルム計算関数の定義
 # ==============================================================================
-'''
-def calculate_trace_norm(model):
+def get_task_weight_matrix(model):
     """
-    モデルの共有層の重みのトレースノルムを計算する関数。
+    モデルから各タスクの最後の線形層の重みを取得し、
+    それらを結合して一つの大きな行列を作成します。
+    この行列がトレースノルム正則化の対象となります。
     """
-    trace_norm = 0.0
-    # 共有畳み込み層
-    for layer in model.sharedconv:
-        if isinstance(layer, nn.Conv1d):
-            weight = layer.weight
-            weight_matrix = weight.view(weight.size(0), -1)
-            trace_norm += torch.linalg.svdvals(weight_matrix).sum()
-    # 共有全結合層
-    for layer in model.shared_fc:
-        if isinstance(layer, nn.Linear):
-            weight = layer.weight
-            trace_norm += torch.linalg.svdvals(weight).sum()
-    return trace_norm
-'''
+    weights = []
+    for task_specific_layer in model.outputs:
+        # 各タスクの最後の層 (nn.Linear) の重みを取得
+        final_layer = task_specific_layer[-1]
+        weights.append(final_layer.weight)
+    return torch.cat(weights, dim=0)
 
-def calculate_trace_norm(model):
+def soft_threshold(x, threshold):
     """
-    モデルの固有層（タスクごと）の重みのトレースノルムを計算する関数。
+    特異値に対するソフトシュリンケージ操作。
+    閾値より小さい値を0にし、大きい値は閾値分だけ縮小させます。
     """
-    trace_norm = 0.0
-    for task_specific_block in model.outputs:
-        for layer in task_specific_block:
-            if isinstance(layer, nn.Linear):
-                weight = layer.weight
-                trace_norm += torch.linalg.svdvals(weight).sum()
-    return trace_norm
+    return torch.sign(x) * torch.relu(torch.abs(x) - threshold)
+
+def update_Z(W, U, lambda_trace, rho):
+    """
+    補助変数 Z を更新します (z-step)。
+    これがトレースノルムを適用する中心的な部分です。
+    SVD(特異値分解)を使い、特異値にソフトシュリンケージを適用します。
+    """
+    A = W + U
+    # 特異値分解 (SVD)
+    u, s, v = torch.svd(A)
+    # 特異値にソフトシュリンケージを適用
+    s_shrink = soft_threshold(s, lambda_trace / rho)
+    # Z を再構成
+    # s_shrink を対角行列にしてから u と v.t() で挟む
+    return u @ torch.diag(s_shrink) @ v.t()
+
+def update_U(U, W, Z):
+    """
+    双対変数 U を更新します (u-step)。
+    """
+    return U + W - Z
+
 
 def find_min_norm_element(grads):
     """

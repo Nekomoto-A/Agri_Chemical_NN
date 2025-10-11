@@ -279,6 +279,7 @@ from src.models.MT_CNN import MTCNNModel
 from src.models.MT_CNN_Attention import MTCNNModel_Attention
 from src.models.MT_CNN_catph import MTCNN_catph
 from src.models.MT_NN import MTNNModel
+from src.models.MT_NN_attention import AttentionMTNNModel
 from src.models.MT_CNN_soft import MTCNN_SPS
 from src.models.MT_CNN_SA import MTCNNModel_SA
 from src.models.MT_CNN_Di import MTCNNModel_Di
@@ -320,6 +321,7 @@ def write_result(r2_results, mse_results, columns_list, csv_dir, method, ind):
 def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predictions, trues, 
                   input_dim, method, index, reg_list, csv_dir, vis_dir, model_name, train_ids, test_ids, features,
                   device,  
+                  reg_loss_fanction, 
                   labels_train = None,
                   labels_val = None,
                   labels_test = None,
@@ -364,6 +366,8 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         model = MTBNNModel_MG(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
     elif model_name == 'NN':
         model = MTNNModel(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
+    elif model_name == 'NN_attention':
+        model = AttentionMTNNModel(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
     elif model_name == 'GP':
         if len(reg_list) > 1:
             likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(num_tasks=len(reg_list))
@@ -447,6 +451,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                     #optimizer = optimizer, 
                                     scalers = scalers,
                                     train_ids = train_ids,
+                                    reg_loss_fanction = reg_loss_fanction,
                                     output_dim=output_dims,
                                     reg_list = reg_list, output_dir = vis_dir, 
                                     model_name = model_name,
@@ -474,6 +479,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
 
 
     out = os.path.join(vis_dir, 'loss.html')
+    out_csv = os.path.join(vis_dir, 'loss.csv')
     # 1. FigureとAxesの準備（縦に3つ、x軸を共有）
     # figはグラフ全体、axesは各グラフ（ax1, ax2, ax3）をまとめたリスト
     fig, axes = plt.subplots(nrows=len(reg_list), ncols=1, figsize=(60, 8 * len(reg_list)), sharex=True)
@@ -481,10 +487,17 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
     # figに全体のタイトルを追加
     #fig.suptitle('Comparison of Multiple Datasets', fontsize=16, y=0.95)
     x_positions = np.arange(len(test_ids))
+
+    #test_df = pd.DataFrame(index=test_ids)
+    for reg in reg_list:
+        predictions.setdefault(method, {}).setdefault(reg, []).append(predicts[reg])
+        trues.setdefault(method, {}).setdefault(reg, []).append(true[reg])
+    
     if len(reg_list) > 1:
+        #out_csv = os.path.join(vis_dir, 'loss.csv')
         for reg, ax in zip(reg_list, axes):
-            predictions.setdefault(method, {}).setdefault(reg, []).append(predicts[reg])
-            trues.setdefault(method, {}).setdefault(reg, []).append(true[reg])
+            #predictions.setdefault(method, {}).setdefault(reg, []).append(predicts[reg])
+            #trues.setdefault(method, {}).setdefault(reg, []).append(true[reg])
 
             #if 'CNN' in model_name:
             #print(f'test_ids = {test_ids.to_numpy().ravel()}')
@@ -494,6 +507,8 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                 #color=colors[i], label=titles[i]
                 )
             ax.set_ylabel(f'{reg}_MAE') # 各グラフのy軸ラベル
+            
+            #test_df[reg] = loss.ravel()
 
         # axes[-1] が一番下のグラフのaxを指します
         last_ax = axes[-1]
@@ -506,6 +521,8 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         mpld3.save_html(fig, out)
         # メモリを解放するためにプロットを閉じます（多くのグラフを作成する場合に有効です）
         plt.close(fig)
+
+        #test_df.to_csv(out_csv)
 
             #ax.legend() # 各グラフの凡例を表示
             #ax.grid(axis='y', linestyle='--', alpha=0.7) # y軸のグリッド線
@@ -531,6 +548,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
             #ax.bar(test_ids.values(), loss.ravel())
             #ax.tick_params(axis='x', rotation=90) # x軸のラベルを90度回転
     else:
+        #out_csv = os.path.join(vis_dir, f'loss_{reg_list[0]}.csv')        
         loss = np.abs(predicts[reg_list[0]]-true[reg_list[0]])
         axes.bar(
             x_positions, loss.ravel(), 
@@ -550,6 +568,10 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         mpld3.save_html(fig, out)
         # メモリを解放するためにプロットを閉じます（多くのグラフを作成する場合に有効です）
         plt.close(fig)
+
+        #test_df[reg] = loss.ravel()
+        #test_df.to_csv(out_csv)
+
 
     # plt.figure(figsize=(18, 14))
     # plt.bar(test_ids.to_numpy().ravel(),loss.ravel())

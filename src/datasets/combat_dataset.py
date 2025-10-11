@@ -248,7 +248,7 @@ def ilr_transform(data_array):
     ilr_data = np.dot(clr_data, basis)
     return ilr_data
 
-def visualize_tsne_with_custom_combat_model(df1, df2, labels1, labels2, df1_name='DataFrame 1', df2_name='DataFrame 2'):
+def visualize_tsne_with_custom_combat_model(df1, df2, labels1, labels2, df1_name='DataFrame 1', df2_name='DataFrame 2', combat = True):
     """
     2つのデータフレームの共通カラムを抽出し、提供されたCombatModelでバッチエフェクトを除去した後、
     t-SNEで次元削減して結果を可視化する関数。
@@ -322,15 +322,18 @@ def visualize_tsne_with_custom_combat_model(df1, df2, labels1, labels2, df1_name
         print("カテゴリカルな共変量を準備しました。")
     
     #CombatModel のインポートとインスタンス化が必要です
-    combat_model = CombatModel()
-    X_corrected_array = combat_model.fit_transform(
-        data_combat,
-        sites_combat,
-        discrete_covs,
-        continuous_covs
-    )
-    # ダミーの処理（CombatModelが未定義のため）
-    #X_corrected_array = data_combat
+    if combat:
+        combat_model = CombatModel()
+        X_corrected_array = combat_model.fit_transform(
+            data_combat,
+            sites_combat,
+            discrete_covs,
+            continuous_covs
+        )
+        # ダミーの処理（CombatModelが未定義のため）
+        #X_corrected_array = data_combat
+    else:
+        X_corrected_array = data_combat
 
     X_corrected = pd.DataFrame(X_corrected_array, index=X.index, columns=X.columns)
     print("CombatModelの処理が完了しました。")
@@ -438,7 +441,7 @@ def visualize_tsne_with_custom_combat_model(df1, df2, labels1, labels2, df1_name
 
     # ファイルへの保存とプロットのクローズ
     # plt.show()
-    plt.savefig('datas/asv_lv6_pH.png')
+    plt.savefig('datas/asv_lv6_pH_nocombat.png')
     plt.close()
     print("\nプロットを 'datas/asv_lv6_pH.png' に保存しました。")
 
@@ -741,6 +744,7 @@ if __name__ == '__main__':
 
     visualize_tsne_with_custom_combat_model(df1 = riken, df2 = dra, 
                                 labels1 = r_chem['pH'].values, 
+                                combat = False,
                                 #labels2 = d_chem['pH_dry_soil'].str[:4].values, 
                                 labels2 = d_chem['pH_dry_soil'].values, 
                                 df1_name='riken data', df2_name='new data')

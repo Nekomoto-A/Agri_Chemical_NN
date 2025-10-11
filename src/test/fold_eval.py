@@ -19,6 +19,8 @@ script_name = os.path.basename(__file__)
 with open(yaml_path, "r") as file:
     config = yaml.safe_load(file)[script_name]
 
+import shutil
+
 
 def calculate_and_save_correlations(df, target_data, output_dir, reg_list):
     """
@@ -30,7 +32,7 @@ def calculate_and_save_correlations(df, target_data, output_dir, reg_list):
         target_data (pd.Series): 相関を計算したい基準となるデータ。
         output_filename (str): 保存するCSVファイル名。
     """
-    
+
     for reg in reg_list:
         correlations = df.corrwith(target_data[reg])
 
@@ -54,6 +56,7 @@ def calculate_and_save_correlations(df, target_data, output_dir, reg_list):
 
 
 def fold_evaluate(reg_list, output_dir, device, 
+                  transformer = config['transformer'],
                   feature_path = config['feature_path'], target_path = config['target_path'], exclude_ids = config['exclude_ids'],
                   k = config['k_fold'], 
                   #output_dir = config['result_dir'], 
@@ -65,14 +68,20 @@ def fold_evaluate(reg_list, output_dir, device,
                   feature_selection = config['feature_selection'],
                   num_features_to_select = config['num_selected_features'],
                   marginal_hist = config['marginal_hist'],
-                  data_inte = config['data_inte']
+                  data_inte = config['data_inte'],
+                  loss_fanctions = config['reg_loss_fanction']
                   ):
     #if feature_selection_all:
-    #    output_dir = os.path.join(fsdir, output_dir)
+    #   output_dir = os.path.join(fsdir, output_dir)
 
     os.makedirs(output_dir,exist_ok=True)
     sub_dir = os.path.join(output_dir, f'{reg_list}')
     os.makedirs(sub_dir,exist_ok=True)
+
+    dest_config_path = os.path.join(sub_dir, 'config_saved.yaml')
+    # shutil.copy() を使ってファイルをコピー
+    shutil.copy(yaml_path, dest_config_path)
+
     csv_dir = os.path.join(sub_dir, csv_path)
     
     final_dir = os.path.join(sub_dir, final_output)
@@ -118,13 +127,9 @@ def fold_evaluate(reg_list, output_dir, device,
     predictions = {}
     trues = {}
 
-    predictions_comp = {}
-    trues_comp = {}
-
-    reduced = {}
+    ids = []
 
     scores = {}
-
 
     #for fold, (train_index, test_index) in enumerate(kf.split(X, Y['prefandcrop'])):
     for fold, (train_index, test_index) in enumerate(kf.split(X)):
@@ -138,17 +143,23 @@ def fold_evaluate(reg_list, output_dir, device,
         fold_dir = os.path.join(sub_dir, index[0])
         os.makedirs(fold_dir,exist_ok=True)
         
-        X_train_tensor, X_val_tensor, X_test_tensor,features, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids,label_train_tensor,label_test_tensor,label_val_tensor = transform_after_split(X_train,X_test,Y_train,Y_test, reg_list = reg_list,fold = fold_dir,
+        X_train_tensor, X_val_tensor, X_test_tensor,features, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids,label_train_tensor,label_test_tensor,label_val_tensor = transform_after_split(X_train,X_test,Y_train,Y_test, reg_list = reg_list,
+                                                                                                                                                                                                                              transformer = transformer, 
+                                                                                                                                                                                                                              fold = fold_dir,
                                                                                                                                                                                                                               feature_selection = feature_selection,
                                                                                                                                                                                                                               num_selected_features = num_features_to_select,
                                                                                                                                                                                                                               data_name = config['feature_path'],
                                                                                                                                                                                                                               data_inte=data_inte)
+        
+        ids.append(test_ids)
+        
         input_dim = X_train_tensor.shape[1]
+
+        #test_df = pd.DataFrame(index=test_ids)
 
         if len(reg_list) > 1:
             vis_dir_main = os.path.join(fold_dir, method)
             os.makedirs(vis_dir_main,exist_ok=True)
-            
         
             #print(X_train_tensor.shape)
             predictions, trues, r2_results, mse_results,model_trained = train_and_test(
@@ -156,6 +167,7 @@ def fold_evaluate(reg_list, output_dir, device,
                 scalers, predictions, trues, input_dim, method, index , reg_list, csv_dir,
                 vis_dir = vis_dir_main, model_name = model_name, train_ids = train_ids, test_ids = test_ids, features= features,
                 device = device,
+                reg_loss_fanction = loss_fanctions,
                 labels_train=label_train_tensor,
                 labels_val=label_val_tensor,
                 labels_test=label_test_tensor,
@@ -180,6 +192,7 @@ def fold_evaluate(reg_list, output_dir, device,
                     vis_dir = vis_dir_comp, 
                     model_name = model_name, train_ids = train_ids, test_ids = test_ids, features = features,
                     device = device,
+                    reg_loss_fanction = loss_fanctions,
                     loss_sum = comp_method,
                     labels_train=label_train_tensor,
                     labels_val=label_val_tensor,
@@ -201,6 +214,8 @@ def fold_evaluate(reg_list, output_dir, device,
 
         for i,r in enumerate(reg_list):
             Y_train_single, Y_test_single ={r:Y_train_tensor[r]}, {r:Y_test_tensor[r]}
+            loss_fanction = [loss_fanctions[i]]
+
             if Y_val_tensor:
                 Y_val_single = {r:Y_val_tensor[r]}
             else:
@@ -211,8 +226,9 @@ def fold_evaluate(reg_list, output_dir, device,
             predictions, trues, r2_result, mse_result, model_trained_st = train_and_test(
             X_train = X_train_tensor, X_val = X_val_tensor, X_test = X_test_tensor, Y_train = Y_train_single, Y_val = Y_val_single, Y_test = Y_test_single, 
             scalers = scalers, predictions = predictions, trues = trues, input_dim = input_dim, method = method_st, index = index , reg_list = reg, csv_dir = csv_dir, 
-            vis_dir = vis_dir_st, model_name = model_name, train_ids = train_ids, est_ids = test_ids, features = features,
+            vis_dir = vis_dir_st, model_name = model_name, train_ids = train_ids, test_ids = test_ids, features = features,
             device = device,
+            reg_loss_fanction = loss_fanction,
             labels_train=label_train_tensor,
             labels_val=label_val_tensor,
             labels_test=label_test_tensor,
@@ -221,14 +237,6 @@ def fold_evaluate(reg_list, output_dir, device,
             #pprint.pprint(predictions)
 
             #reduced_features = reduce_feature(model = model_trained, X = X_test_tensor, model_name = model_name)
-            """
-            if model_name == 'CNN':
-                reduced_features = model_trained.sharedconv(X_test_tensor.unsqueeze(1)).detach().numpy()
-            elif model_name == 'NN':
-                reduced_features = model_trained.sharedfc(X_test_tensor).detach().numpy()
-            reduced_features = reduced_features.reshape(reduced_features.shape[0], -1)
-            reduced.setdefault(method_st, {}).setdefault(r, []).append(reduced_features)
-            """
 
             scores.setdefault('R', {}).setdefault(method_st, {}).setdefault(r, []).append(r2_result[0])
             scores.setdefault('MAE', {}).setdefault(method_st, {}).setdefault(r, []).append(mse_result[0])
@@ -242,8 +250,13 @@ def fold_evaluate(reg_list, output_dir, device,
                     for reg_name, value in regs.items():
                         scores.setdefault(metrics, {}).setdefault(method_name, {}).setdefault(reg_name, []).append(value[0])
 
+    ids = np.concatenate(ids)
+    test_df = pd.DataFrame(index = ids)
+
     for method, regs in predictions.items():
+        #print(method)
         for reg, values in regs.items():
+            #print(values.shape)
             final_hist_dir = os.path.join(sub_dir, 'final_hist')
             os.makedirs(final_hist_dir, exist_ok=True)
             all_hist_dir = os.path.join(final_hist_dir, 'all')
@@ -255,6 +268,10 @@ def fold_evaluate(reg_list, output_dir, device,
             out = np.concatenate(values)
 
             bins = np.linspace(0, np.max(target), 30)
+
+            loss = np.abs(target-out)
+
+            test_df[f'{reg}_{method}'] = loss
             
             plt.hist(out, bins=bins, alpha=0.5, label = 'Predicted',density=True)
             plt.hist(target, bins=bins, alpha=0.5, label = 'True',density=True)
@@ -311,9 +328,13 @@ def fold_evaluate(reg_list, output_dir, device,
                 plt.savefig(split_hist_path)
                 plt.close()
 
+    loss_dir = os.path.join(sub_dir, 'loss.csv')
+    test_df = test_df.sort_index(axis=1, ascending=True)
+    test_df.to_csv(loss_dir)
+
     #pprint.pprint(reduced)
-    #pprint.pprint(scores)
-    
+    #pprint.pprint(scores)    
+
     # 平均値を格納する辞書
     avg_std = {}
     avg_dict = {}

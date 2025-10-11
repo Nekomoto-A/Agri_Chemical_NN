@@ -113,6 +113,50 @@ class CustomDataset(Dataset):
         y_data = {key: self.y[key][idx] for key in self.reg_list}
         
         return x_data, y_data
+    
+# --- 1. カスタム損失関数の定義 (上で定義したものと同じ) ---
+class WeightedMSELoss(nn.Module):
+#class WeightedByTargetMSELoss(nn.Module):
+    """
+    目的変数の値で重み付けされ、欠損値をスキップする平均二乗誤差（MSE）。
+    
+    y_trueにNaNが含まれる場合、そのサンプルは損失計算から自動的に除外されます。
+    """
+    def __init__(self):
+        #super(WeightedByTargetMSELoss, self).__init__()
+        super(WeightedMSELoss, self).__init__()
+    def forward(self, y_pred, y_true):
+        """
+        順伝播の計算を行います。
+
+        Args:
+            y_pred (torch.Tensor): モデルの予測値。
+            y_true (torch.Tensor): 正解値。NaNを含む可能性があります。
+
+        Returns:
+            torch.Tensor: 計算された損失値。
+        """
+        # 1. y_true内の非欠損値（NaNでない）データのみを対象とするマスクを作成します。
+        #    torch.isnan(y_true) はNaNの箇所をTrue、それ以外をFalseにします。
+        #    `~` 演算子で論理を反転し、有効なデータのみをTrueにします。
+        mask = ~torch.isnan(y_true)
+        
+        # もし有効なデータが一つもなければ、損失を0として返します。（エラー防止）
+        if not torch.any(mask):
+            return torch.tensor(0.0, device=y_pred.device, requires_grad=True)
+
+        # 2. マスクを使って、y_predとy_trueから有効なデータのみを抽出します。
+        y_pred_filtered = y_pred[mask]
+        y_true_filtered = y_true[mask]
+
+        # 3. 抽出された有効なデータに対して、重み付きMSEを計算します。
+        weights = y_true_filtered.detach()
+        squared_errors = (y_pred_filtered - y_true_filtered) ** 2
+        weighted_squared_errors = weights * squared_errors
+        
+        loss = torch.mean(weighted_squared_errors)
+        
+        return loss
 
 from src.training.adversarial import Discriminator
 from src.training.adversarial import GradientReversalLayer
@@ -162,9 +206,31 @@ class CustomDatasetAdv(Dataset):
         # これら4つの情報をタプルとして返す
         return x_data, y_data, mask_data, pattern_label
 
+class PinballLoss(nn.Module):
+  """
+  Pinball loss function as a PyTorch Module.
+  """
+  def __init__(self, tau=0.5):
+    """
+    Args:
+      tau (float): The target quantile, between 0 and 1.
+    """
+    super().__init__()
+    if not 0 < tau < 1:
+      raise ValueError("Tau must be a value between 0 and 1.")
+    self.tau = tau
+
+  def forward(self, y_pred, y_true):
+    error = y_true - y_pred
+    loss = torch.where(error >= 0,
+                       self.tau * error,
+                       (1 - self.tau) * (-error))
+    return torch.mean(loss)
+
 def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, model_name,loss_sum, device, batch_size, #optimizer, 
                 scalers, 
                 train_ids, 
+                reg_loss_fanction,
                 label_encoders = None, #scheduler = None, 
                 epochs = config['epochs'], patience = config['patience'],early_stopping = config['early_stopping'],
                 #loss_sum = config['loss_sum'],
@@ -174,8 +240,9 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                 l2_shared = config['l2_shared'],lambda_l2 = config['lambda_l2'], lambda_l1 = config['lambda_l1'], 
                 alpha = config['GradNorm_alpha'],
                 #batch_size = config['batch_size'],
-                reg_loss_fanction = config['reg_loss_fanction'],
-                tr_loss = config['tr_loss']
+                tr_loss = config['tr_loss'],
+                rho = config['tracenorm_rho'],
+                lambda_trace = config['tracenorm_lambda'],
                 ):
     
     # TensorBoardのライターを初期化
@@ -246,70 +313,40 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
             grad_norm = optimizers.GradNorm(tasks=reg_list, alpha=alpha)
             optimizer = optim.Adam(model.parameters(), lr=lr)
             grad_norm.set_model_shared_params(model) # 共有層のパラメータを設定
+        elif loss_sum == 'TraceNorm':
+            # ADMMの変数 Z と U を初期化
+            # W (タスク重み行列) と同じサイズで作成します
+            W = optimizers.get_task_weight_matrix(model)
+            Z = torch.zeros_like(W, device=device)
+            U = torch.zeros_like(W, device=device)
+            optimizer = optim.Adam(model.parameters(), lr=lr)
         else:
             optimizer = optim.Adam(model.parameters() , lr=lr)
-    # else:
-    #     lr_list = {}
-    #     for l,reg in zip(lr,reg_list):
-    #         lr_list[reg] = l
-    #     if loss_sum == 'Normalized':
-    #         param_groups = []
-    #         for rate, reg_name in zip(lr, reg_list):
-    #             if reg_name in model.models:
-    #                 param_groups.append({
-    #                     'params': model.models[reg_name].parameters(),
-    #                     'lr': rate,
-    #                     'name': reg_name  # オプション：デバッグや識別のための名前
-    #                 })
-    #             else:
-    #                 print(f"Warning: Module '{reg_name}' not found in model.models. Skipping.")
-
-    #         optimizer = optim.Adam(param_groups)
-            
-    #         loss_fn = optimizers.NormalizedLoss(len(output_dim))
-    #     elif loss_sum == 'Uncertainlyweighted':
-    #         loss_fn = optimizers.UncertainlyweightedLoss(reg_list)
-    #         optimizer_params = []
-    #         for reg_name in reg_list:
-    #             if reg_name in model.models:
-    #                 # 各サブモデルのパラメータを取得
-    #                 # model.models[reg_name].parameters() は、そのサブモデル内のすべての学習可能なパラメータを返します。
-    #                 optimizer_params.append({
-    #                     'params': model.models[reg_name].parameters(),
-    #                     'lr': lr_list.get(reg_name, 0.001) # デフォルトの学習率を設定することも可能
-    #                 })
-    #                 optimizer = optim.Adam(param_groups)
-    #             else:
-    #                 print(f"警告: '{reg_name}' はモデルのModuleDictに存在しません。")
-    #     else:
-    #         optimizer_params = []
-    #         for reg_name in reg_list:
-    #             if reg_name in model.models:
-    #                 # 各サブモデルのパラメータを取得
-    #                 # model.models[reg_name].parameters() は、そのサブモデル内のすべての学習可能なパラメータを返します。
-    #                 optimizer_params.append({
-    #                     'params': model.models[reg_name].parameters(),
-    #                     'lr': lr_list[reg_name] # デフォルトの学習率を設定することも可能
-    #                 })
-    #             else:
-    #                 print(f"警告: '{reg_name}' はモデルのModuleDictに存在しません。")
-
-    #         # オプティマイザのインスタンス化
-    #         # ここではAdamオプティマイザを使用していますが、SGDなど他のオプティマイザも同様に機能します。
-    #         optimizer = optim.Adam(optimizer_params)
     
     #personal_losses = []
     personal_losses = {}
-    for reg,out in zip(reg_list,output_dim):
+    for reg,out,fn in zip(reg_list, output_dim, reg_loss_fanction):
+       # print(reg)
+       # print(out)
+       # print(fn)
         if out == 1:
-            #personal_losses.append(MSLELoss())
-            #personal_losses.append(nn.MSELoss())
-            #print(reg)
-            if reg_loss_fanction == 'mse':
+            if fn == 'mse':
                 personal_losses[reg] = nn.MSELoss()
-            elif reg_loss_fanction == 'hloss':
+            elif fn == 'mae':
+                personal_losses[reg] = nn.L1Loss()
+            elif fn == 'hloss':
                 personal_losses[reg] = nn.SmoothL1Loss()
-            
+            elif fn == 'wmse':
+                personal_losses[reg] = WeightedMSELoss()
+            elif fn == 'pinball':
+                personal_losses[reg] = PinballLoss(tau=0.5)
+            else:
+                # 案1：意図しない値が来たら、とりあえずデフォルトのMSEを設定する
+                print(f"警告: タスク '{reg}' に不明な損失関数名 '{fn}' が指定されました。デフォルトのMSELossを使用します。")
+                personal_losses[reg] = nn.MSELoss()
+                
+            # 案2：意図しない値が来たら、エラーを出してプログラムを停止させる（推奨）
+            # raise ValueError(f"タスク '{reg}' に不明な損失関数名 '{fn}' が指定されました。")
         elif '_rank' in reg:
             personal_losses[reg] = nn.KLDivLoss(reduction='batchmean')
         else:
@@ -587,10 +624,15 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                     reg_loss = model.calculate_sum_zero_penalty()
                     train_loss = sum(train_losses)
                     learning_loss = train_loss + lambda_norm * reg_loss
+                
                 elif loss_sum == 'TraceNorm':
                     train_loss = sum(train_losses.values())
-                    reg_loss = optimizers.calculate_trace_norm(model)
-                    learning_loss = train_loss + lambda_norm * reg_loss
+                    # ADMMの拡張ラグランジュ項の損失
+                    W = optimizers.get_task_weight_matrix(model)
+                    admm_loss = (rho / 2) * torch.norm(W - Z + U, p='fro')**2
+
+                    learning_loss = train_loss + admm_loss
+
                 elif loss_sum == 'ElasticNet':
                     train_loss = sum(train_losses.values())
                     l_elastic = calculate_shared_elastic_net(model = model, lambda_l1 = lambda_l1, lambda_l2 = lambda_l2)
@@ -610,6 +652,19 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                 optimizer.step()
                 #if scheduler != None:
                 #scheduler.step()
+
+        if loss_sum == 'TraceNorm':
+            # --- 2. 補助変数 Z の更新 (z-step) ---
+            # 勾配計算は不要
+            with torch.no_grad():
+                W = optimizers.get_task_weight_matrix(model)
+                Z = optimizers.update_Z(W, U, lambda_trace, rho)
+                #print(W)
+                #print(Z)
+            # --- 3. 双対変数 U の更新 (u-step) ---
+            with torch.no_grad():
+                W = optimizers.get_task_weight_matrix(model)
+                U = optimizers.update_U(U, W, Z)
 
         for reg in reg_list:
             if reg not in train_loss_history:
@@ -677,12 +732,14 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                                    )
             
             if tr_loss:
-                from src.training.tr_loss import predict_and_visualize_mae
+                from src.training.tr_loss import calculate_and_save_mae_plot_html
 
                 train_dir = os.path.join(output_dir, 'train')
                 os.makedirs(train_dir,exist_ok=True)
-
-                predict_and_visualize_mae(model = model, data_loader = train_loader, train_ids = train_ids, reg_list = reg_list, device = device, output_dir = train_dir, epoch = epoch+1)
+                loss_dir = os.path.join(train_dir, 'losses')
+                os.makedirs(loss_dir,exist_ok=True)
+                calculate_and_save_mae_plot_html(model = model, X_data = x_tr, y_data_dict = y_tr, task_names = reg_list, 
+                                                 device = device, output_dir = loss_dir, x_labels = train_ids, output_filename=f"{epoch+1}epoch.html")
                 
 
             if early_stopping == True:
@@ -902,10 +959,10 @@ def training_MT_BNN(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_di
         plt.legend()
         plt.grid()
         plt.tight_layout()
-        if reg == 'SUM':
-            plt.ylim(0,SUM_train_lim)
-        else:
-            plt.ylim(0,personal_train_lim)
+        #if reg == 'SUM':
+        #    plt.ylim(0,SUM_train_lim)
+        #else:
+        #    plt.ylim(0,personal_train_lim)
         #plt.show()
         plt.savefig(train_loss_history_dir)
         plt.close()
