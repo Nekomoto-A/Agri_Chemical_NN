@@ -272,6 +272,7 @@ def fold_evaluate(reg_list, output_dir, device,
             loss = np.abs(target-out)
 
             test_df[f'{reg}_{method}'] = loss
+            test_df[f'True_{reg}_{method}'] = target
             
             plt.hist(out, bins=bins, alpha=0.5, label = 'Predicted',density=True)
             plt.hist(target, bins=bins, alpha=0.5, label = 'True',density=True)

@@ -114,17 +114,18 @@ class CustomDataset(Dataset):
         
         return x_data, y_data
     
-# --- 1. カスタム損失関数の定義 (上で定義したものと同じ) ---
+import torch
+import torch.nn as nn
+
 class WeightedMSELoss(nn.Module):
-#class WeightedByTargetMSELoss(nn.Module):
     """
-    目的変数の値で重み付けされ、欠損値をスキップする平均二乗誤差（MSE）。
+    目的変数の「絶対値」で重み付けされ、欠損値をスキップする平均二乗誤差（MSE）。
     
     y_trueにNaNが含まれる場合、そのサンプルは損失計算から自動的に除外されます。
     """
     def __init__(self):
-        #super(WeightedByTargetMSELoss, self).__init__()
         super(WeightedMSELoss, self).__init__()
+
     def forward(self, y_pred, y_true):
         """
         順伝播の計算を行います。
@@ -137,11 +138,9 @@ class WeightedMSELoss(nn.Module):
             torch.Tensor: 計算された損失値。
         """
         # 1. y_true内の非欠損値（NaNでない）データのみを対象とするマスクを作成します。
-        #    torch.isnan(y_true) はNaNの箇所をTrue、それ以外をFalseにします。
-        #    `~` 演算子で論理を反転し、有効なデータのみをTrueにします。
         mask = ~torch.isnan(y_true)
         
-        # もし有効なデータが一つもなければ、損失を0として返します。（エラー防止）
+        # 有効なデータが一つもなければ、損失を0として返します。（エラー防止）
         if not torch.any(mask):
             return torch.tensor(0.0, device=y_pred.device, requires_grad=True)
 
@@ -150,13 +149,38 @@ class WeightedMSELoss(nn.Module):
         y_true_filtered = y_true[mask]
 
         # 3. 抽出された有効なデータに対して、重み付きMSEを計算します。
-        weights = y_true_filtered.detach()
+        #    torch.abs() を使って目的変数の絶対値を重みとして使用します。
+        weights = torch.abs(y_true_filtered.detach())
+        
         squared_errors = (y_pred_filtered - y_true_filtered) ** 2
         weighted_squared_errors = weights * squared_errors
         
         loss = torch.mean(weighted_squared_errors)
         
         return loss
+
+class RankWeightedMSELoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+        # 内部で使うMSELossを'none'で初期化
+        self.mse = nn.MSELoss(reduction='none')
+
+    def forward(self, outputs, targets):
+        # サンプルごとの損失
+        unweighted_loss = self.mse(outputs, targets)
+        
+        # ランクを計算して重みにする
+        with torch.no_grad(): # 重みの計算は勾配計算に不要
+            ranks = targets.squeeze().argsort().argsort() + 1
+            weights = ranks.float().unsqueeze(1)
+            # GPU対応
+            weights = weights.to(unweighted_loss.device)
+            
+        # 重みを適用
+        weighted_loss = unweighted_loss * weights
+        
+        # 平均を返す
+        return weighted_loss.mean()
 
 from src.training.adversarial import Discriminator
 from src.training.adversarial import GradientReversalLayer
@@ -227,6 +251,221 @@ class PinballLoss(nn.Module):
                        (1 - self.tau) * (-error))
     return torch.mean(loss)
 
+class NormalizedWeightedMSELoss(nn.Module):
+    """
+    目的変数を内部で正規化し、それを重みとして使用する平均二乗誤差(MSE)損失関数。
+    重みの最小値を指定することで、目的変数が最小値の場合でも学習に寄与できるようにする。
+    
+    Args:
+        y_min (float): 学習データにおける目的変数の最小値。
+        y_max (float): 学習データにおける目的変数の最大値。
+        min_weight (float, optional): 重みの最小値。デフォルトは 0.1。
+    """
+    def __init__(self, y_min, y_max, min_weight=0.1):
+        super(NormalizedWeightedMSELoss, self).__init__()
+        self.y_min = y_min
+        self.y_max = y_max
+        self.min_weight = min_weight
+        
+        # ゼロ除算を避けるための安全策
+        self.y_range = self.y_max - self.y_min
+        if self.y_range < 1e-8:
+            self.y_range = 1e-8
+
+    def forward(self, inputs, targets):
+        # 1. 損失は正規化されていない元の値で計算
+        loss = (inputs - targets) ** 2
+        
+        # 2. 目的変数を一旦0-1の範囲に正規化
+        normalized_weights = (targets.detach() - self.y_min) / self.y_range
+        normalized_weights = torch.clamp(normalized_weights, 0, 1)
+
+        # 3. 重みの範囲を [0, 1] から [min_weight, 1.0] にスケーリング
+        weights = self.min_weight + (1.0 - self.min_weight) * normalized_weights
+        
+        # 4. 誤差に重みを乗算
+        weighted_loss = loss * weights
+        
+        # 5. 重み付けされた損失の平均を返す
+        return weighted_loss.mean()
+
+class ScaledWeightedMSELoss(nn.Module):
+    """
+    事前に学習済みのStandardScalerを使い、内部で元の値に復元して
+    重みを動的に計算する平均二乗誤差（MSE）損失関数。
+    """
+    def __init__(self, scaler):
+        """
+        初期化メソッド。
+
+        引数:
+            scaler (sklearn.preprocessing.StandardScaler):
+                目的変数に対して事前にfitされたStandardScalerのインスタンス。
+        """
+        super(ScaledWeightedMSELoss, self).__init__()
+        self.scaler = scaler
+
+    def forward(self, y_pred, y_true):
+        """
+        順伝播メソッドで、損失を計算します。
+
+        引数:
+            y_pred (torch.Tensor): モデルの予測値（標準化されたスケール）。
+            y_true (torch.Tensor): 真の目的変数の値（標準化されたスケール）。
+
+        戻り値:
+            torch.Tensor: 計算された重み付き損失。
+        """
+        
+        # --- ステップ1: y_trueを元のスケールに復元して重みを計算 ---
+        # scikit-learnはNumPy配列で動作するため、テンソルを変換する
+        # .detach() は勾配計算のグラフから切り離すために重要
+        y_true_numpy = y_true.detach().cpu().numpy()
+        
+        # .inverse_transformで元の値に戻す
+        y_original_numpy = self.scaler.inverse_transform(y_true_numpy)
+        
+        # NumPy配列をPyTorchテンソルに変換し、重みとして使用
+        weights = torch.from_numpy(y_original_numpy).to(y_pred.device)
+        
+        # --- ステップ2: 重み付けされた損失を計算 ---
+        # 通常の二乗誤差を計算
+        squared_errors = (y_pred - y_true)**2
+        
+        # 誤差に重みを適用
+        weighted_squared_errors = squared_errors * weights
+        
+        # 重み付けされた誤差の平均を計算して最終的な損失とする
+        loss = torch.mean(weighted_squared_errors)
+        
+        return loss
+
+class AutoWeightedLinearMSELoss(nn.Module):
+    """
+    訓練データの最小値・最大値と、それに対応する重みに基づいて、
+    線形関数のパラメータ a, b を自動で計算する重み付きMSE損失。
+    
+    2点 (min_y, min_weight) と (max_y, max_weight) を通る直線を求め、
+    その直線に基づいて各サンプルの重みを決定します。
+    """
+    def __init__(self, min_y, max_y, min_weight, max_weight):
+        """
+        コンストラクタ
+
+        Args:
+            min_y (float): 訓練データセットにおけるターゲットの最小値。
+            max_y (float): 訓練データセットにおけるターゲットの最大値。
+            min_weight (float): min_y に対応させる重み。
+            max_weight (float): max_y に対応させる重み。
+        """
+        super(AutoWeightedLinearMSELoss, self).__init__()
+
+        # yの値の範囲がゼロ（全データが同じ値）の場合の例外処理
+        if max_y == min_y:
+            # 傾きを0とし、重みは指定された重みの平均値とする
+            a = 0.0
+            b = (min_weight + max_weight) / 2.0
+        else:
+            # 傾き a の計算: (y2 - y1) / (x2 - x1)
+            a = (max_weight - min_weight) / (max_y - min_y)
+            # 切片 b の計算: y1 - a * x1
+            b = min_weight - a * min_y
+        
+        # 計算された a と b をバッファとして登録
+        self.register_buffer('a', torch.tensor(a, dtype=torch.float32))
+        self.register_buffer('b', torch.tensor(b, dtype=torch.float32))
+        
+        print(f"損失関数を初期化しました。")
+        print(f"  - 訓練データの範囲: y=[{min_y}, {max_y}]")
+        print(f"  - 重みの範囲: weight=[{min_weight}, {max_weight}]")
+        print(f"  - 自動計算されたパラメータ: a={self.a.item():.4f}, b={self.b.item():.4f}")
+
+
+    def forward(self, input, target):
+        """
+        順伝播（損失計算）
+
+        Args:
+            input (torch.Tensor): モデルの予測値。
+            target (torch.Tensor): 実際のターゲット値（真値）。
+
+        Returns:
+            torch.Tensor: 計算された損失値。
+        """
+        # 1. 各データポイントの重みを計算 (w = a * y + b)
+        weights = self.a * target + self.b
+        
+        # 2. 重み付きの二乗誤差を計算
+        loss = weights * (input - target) ** 2
+        
+        # 3. バッチ全体の損失の平均を返す
+        return torch.mean(loss)
+
+from sklearn.neighbors import KernelDensity
+
+class KDEWeightedMSELoss(nn.Module):
+    """
+    ターゲット変数yのカーネル密度推定（KDE）に基づいて重み付けを行う
+    平均二乗誤差（MSE）損失関数。
+    """
+    def __init__(self, bandwidth=1.0, epsilon=1e-8):
+        """
+        Args:
+            bandwidth (float): KDEのバンド幅。データのスケールに合わせて調整が必要。
+            epsilon (float): ゼロ除算を避けるための微小な値。
+        """
+        super(KDEWeightedMSELoss, self).__init__()
+        # reduction='none'にすることで、サンプルごとの損失を計算できるようにします。
+        self.mse = nn.MSELoss(reduction='none')
+        self.bandwidth = bandwidth
+        self.epsilon = epsilon
+        print(f"KDEWeightedMSELossクラスが初期化されました。バンド幅: {self.bandwidth}")
+
+    def forward(self, y_pred, y_true):
+        """
+        損失を計算するフォワードパス。
+
+        Args:
+            y_pred (torch.Tensor): モデルの予測値。
+            y_true (torch.Tensor): 正解値。
+
+        Returns:
+            torch.Tensor: 計算されたスカラ値の損失。
+        """
+        # --- ステップ1: サンプルごとのMSEを計算 ---
+        unweighted_loss = self.mse(y_pred, y_true)
+
+        # --- ステップ2: カーネル密度を推定 ---
+        # scikit-learnはNumPy配列を要求するため、テンソルを変換します。
+        # 勾配計算は不要なので、.detach()を使用します。
+        y_true_numpy = y_true.detach().cpu().numpy().reshape(-1, 1)
+
+        # KDEモデルを作成し、y_trueで学習
+        kde = KernelDensity(kernel='gaussian', bandwidth=self.bandwidth).fit(y_true_numpy)
+        
+        # 各y_trueの値の対数密度を計算し、指数関数で密度に戻す
+        log_density = kde.score_samples(y_true_numpy)
+        density = np.exp(log_density)
+
+        # --- ステップ3: 重みを計算 ---
+        # 密度の逆数を重みとします。ゼロ除算を避けるためにepsilonを加算します。
+        weights = 1.0 / (density + self.epsilon)
+        
+        # NumPy配列からPyTorchテンソルに変換し、元のテンソルと同じデバイスに配置します。
+        weights_tensor = torch.from_numpy(weights).to(y_true.device).float()
+        
+        # 重みがy_predやy_trueと同じ形状になるように調整します。
+        # (y_trueが[N, 1]や[N]の形状の場合に対応するため)
+        if y_pred.dim() > 1 and weights_tensor.dim() == 1:
+            weights_tensor = weights_tensor.view_as(y_true)
+
+        # --- ステップ4: 損失に重みを適用 ---
+        weighted_loss = unweighted_loss * weights_tensor
+
+        # --- ステップ5: 最終的な損失を計算 ---
+        # 重み付けされた損失の平均を返します。
+        return torch.mean(weighted_loss)
+
 def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, model_name,loss_sum, device, batch_size, #optimizer, 
                 scalers, 
                 train_ids, 
@@ -248,7 +487,6 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
     # TensorBoardのライターを初期化
     #tensor_dir = os.path.join(output_dir, 'runs/gradient_monitoring_experiment')
     #writer = SummaryWriter(tensor_dir)
-
 
     if len(lr) == 1:
         lr = lr[0]
@@ -340,6 +578,32 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                 personal_losses[reg] = WeightedMSELoss()
             elif fn == 'pinball':
                 personal_losses[reg] = PinballLoss(tau=0.5)
+            elif fn == 'rwmse':
+                personal_losses[reg] = RankWeightedMSELoss()
+            elif fn == 'nwmse':
+                #print(f'mokutekihennsuu{y_tr[reg]}')
+                #y_tr_min = torch.nanmin(y_tr[reg])
+                target_tensor = y_tr[reg]
+                tr_notnan = target_tensor[~torch.isnan(target_tensor)]
+                y_tr_min = torch.min(tr_notnan)
+                print(f'最小値：{y_tr_min}')
+                y_tr_max = torch.max(tr_notnan)
+                print(f'最dai値：{y_tr_max}')
+                personal_losses[reg] = NormalizedWeightedMSELoss(y_tr_min, y_tr_max)
+            elif fn == 'swmse':
+                personal_losses[reg] = ScaledWeightedMSELoss(scalers[reg])
+            elif fn == 'lwmse':
+                target_tensor = y_tr[reg]
+                tr_notnan = target_tensor[~torch.isnan(target_tensor)]
+                y_tr_min = torch.min(tr_notnan)
+                print(f'最小値：{y_tr_min}')
+                y_tr_max = torch.max(tr_notnan)
+                print(f'最dai値：{y_tr_max}')
+
+                personal_losses[reg] = AutoWeightedLinearMSELoss(min_y=y_tr_min, max_y=y_tr_max, min_weight=0.5, max_weight=1.0)
+            elif fn == 'kdewmse':
+                personal_losses[reg] = KDEWeightedMSELoss()
+
             else:
                 # 案1：意図しない値が来たら、とりあえずデフォルトのMSEを設定する
                 print(f"警告: タスク '{reg}' に不明な損失関数名 '{fn}' が指定されました。デフォルトのMSELossを使用します。")

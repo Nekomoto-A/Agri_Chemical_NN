@@ -88,7 +88,7 @@ fold_eval.py:
   reduced_feature: 'reduced_feature'
   comp_method: 'SUM'
   exclude_ids: [
-    '042_20_Sait_Eggp','235_21_Miyz_Spin', '360_22_Miee_Soyb' #☓
+    '042_20_Sait_Eggp','235_21_Miyz_Spin', '360_22_Miee_Soyb', '121_20_Miyz_Spin', '125_20_Miyz_Spin' #☓
     #'042_20_Sait_Eggp', '121_20_Miyz_Spin', '125_20_Miyz_Spin', '069_20_Naga_Rice', '141_21_Miyz_Spin', '163_21_Miyz_Spin', '273_22_Naga_Rice', 
     #'172_21_Miyz_Spin', '214_21_Miyz_Edam', '362_22_Miee_Soyb', '364_22_Miee_Soyb', '213_21_Miyz_Edam', '150_21_Miyz_Spin', '165_21_Miyz_Spin',
     #'163_21_Miyz_Spin', '164_21_Miyz_Spin', '363_22_Miee_Soyb'
@@ -112,7 +112,7 @@ fold_eval.py:
   transformer: ['SS', 'SS', ]
   reg_loss_fanction: ['mse','mse']
 main.py:
-  result_dir: 'result_semi'
+  result_dir: 'result_1016'
   reg_list: [
             #'pH','Available.P'
             [
@@ -127,4 +127,3 @@ main.py:
             #['pH_dry_soil'], ['available_P'], ['EC_electric_conductivity'], ['Total_C'], ['Total_N'],
             #['pH_dry_soil', 'available_P', 'EC_electric_conductivity', 'Total_C', 'Total_N']
   ]
-
