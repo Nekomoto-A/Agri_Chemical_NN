@@ -78,6 +78,36 @@ def calculate_and_save_shap_importance(model, X_test, feature_names, output_dir)
 
     print("SHAP分析が正常に完了しました！")
 
+def normalized_medae_iqr(y_true, y_pred):
+    """
+    中央絶対誤差（MedAE）を四分位範囲（IQR）で正規化した、
+    非常に頑健な評価指標を計算します。
+
+    Args:
+        y_true (array-like): 実際の観測値。
+        y_pred (array-like): モデルによる予測値。
+
+    Returns:
+        float: 正規化されたMedAEの値。
+    """
+    y_true = np.asarray(y_true)
+    y_pred = np.asarray(y_pred)
+
+    # 1. 中央絶対誤差（MedAE）の計算
+    #medae = median_absolute_error(y_true, y_pred)
+    medae = mean_absolute_error(y_true, y_pred)
+
+    # 2. 四分位範囲（IQR）の計算
+    q1 = np.percentile(y_true, 25)
+    q3 = np.percentile(y_true, 75)
+    iqr = q3 - q1
+
+    # 3. 正規化（ゼロ除算を回避）
+    if iqr == 0:
+        return np.inf if medae > 0 else 0.0
+    
+    return medae / iqr
+
 def statsmodel_test(X, Y, models, scalers, reg, result_dir,index, feature_names):
     X = X.numpy()
     X_df = pd.DataFrame(X, columns=feature_names)
@@ -130,7 +160,8 @@ def statsmodel_test(X, Y, models, scalers, reg, result_dir,index, feature_names)
             # 相関係数（xとyの間の値）は [0, 1] または [1, 0] の位置
             r2 = corr_matrix[0, 1]
             #mse = mean_squared_error(pred,Y_pp)
-            mse = mean_absolute_error(pred,Y_pp)
+            #mse = mean_absolute_error(pred,Y_pp)
+            mse = normalized_medae_iqr(pred, Y_pp)
             print(f'{name}：')
             print(f'決定係数：{r2}')
             print(f'MAE：{mse}')

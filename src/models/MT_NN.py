@@ -5,7 +5,7 @@ class MTNNModel(nn.Module):
     """
     共有層とタスク特化層の数を任意に設定できるマルチタスクニューラルネットワークモデル。
     """
-    def __init__(self, input_dim, output_dims, reg_list, shared_layers=[256, 128], task_specific_layers=[64]):
+    def __init__(self, input_dim, output_dims, reg_list, shared_layers=[512, 256, 128], task_specific_layers=[64]):
         """
         Args:
             input_dim (int): 入力データの特徴量の数。
@@ -74,3 +74,47 @@ class MTNNModel(nn.Module):
             
         return outputs, shared_features
     
+    def predict_with_mc_dropout(self, x, n_samples=100):
+        """
+        MC Dropoutを用いて予測を行い、予測値の平均と標準偏差（不確実性）を計算します。
+
+        Args:
+            x (torch.Tensor): 入力テンソル (バッチサイズ, 入力次元数)。
+            n_samples (int): ドロップアウトを有効にした状態でのサンプリング回数。
+
+        Returns:
+            dict: 各タスクの予測の平均と標準偏差を格納した辞書。
+                  例: {'task1': {'mean': tensor, 'std': tensor}, 'task2': ...}
+        """
+        # --- 1. Dropout層のみを訓練モードに設定 ---
+        # 通常、model.eval()はDropoutを無効にしますが、MC Dropoutでは推論時も有効にします。
+        # ただし、BatchNorm層は学習時の統計情報を使いたいため、評価モードのままにします。
+        self.eval()  # まずは全ての層を評価モードに設定
+        for m in self.modules():
+            if m.__class__.__name__.startswith('Dropout'):
+                m.train() # Dropout層だけを訓練モードに戻す
+
+        # --- 2. n_samples回、順伝播を実行して予測結果を収集 ---
+        predictions = {reg: [] for reg in self.reg_list}
+        with torch.no_grad():  # 勾配計算は不要なため、計算コストを削減します
+            for _ in range(n_samples):
+                outputs, _ = self.forward(x)
+                for reg in self.reg_list:
+                    predictions[reg].append(outputs[reg])
+
+        # --- 3. 収集した予測結果から平均と標準偏差を計算 ---
+        mc_outputs = {}
+        for reg in self.reg_list:
+            # リストに格納されたテンソルを1つのテンソルにスタックします。
+            # preds_tensorの形状: (n_samples, バッチサイズ, 出力次元数)
+            preds_tensor = torch.stack(predictions[reg])
+            
+            # 平均値を計算 (予測値として使用)
+            mean_preds = torch.mean(preds_tensor, dim=0)
+            
+            # 標準偏差を計算 (不確実性の指標として使用)
+            std_preds = torch.std(preds_tensor, dim=0)
+            
+            mc_outputs[reg] = {'mean': mean_preds, 'std': std_preds}
+            
+        return mc_outputs

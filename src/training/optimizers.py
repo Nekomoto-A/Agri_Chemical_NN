@@ -997,3 +997,35 @@ def find_min_norm_element(grads):
     min_norm_sq = sol.fun
     
     return min_norm_sq, weights
+
+
+def calculate_loss_weights(task_data_counts):
+    """
+    タスクごとのデータ数に基づいて損失の重みを計算する関数。
+    データ数の逆数をとり、合計が1になるように正規化します。
+    
+    Args:
+        task_data_counts (dict): 各タスクのデータ数を格納した辞書。
+                                 例: {'task_A': 1000, 'task_B': 100}
+    
+    Returns:
+        dict: 各タスクの損失の重みを格納した辞書。
+    """
+    total_samples = sum(task_data_counts.values())
+    num_tasks = len(task_data_counts)
+    
+    # データ数の逆数に比例する重みを計算
+    weights = {}
+    for task, count in task_data_counts.items():
+        # countが0の場合のゼロ除算を避ける
+        if count == 0:
+            weights[task] = 0
+        else:
+            weights[task] = total_samples / (num_tasks * count)
+
+    # # シンプルに逆数を正規化する方法もあります
+    # inv_counts = {task: 1.0 / count if count > 0 else 0 for task, count in task_data_counts.items()}
+    # total_inv_count = sum(inv_counts.values())
+    # weights = {task: inv_count / total_inv_count for task, inv_count in inv_counts.items()}
+    
+    return weights

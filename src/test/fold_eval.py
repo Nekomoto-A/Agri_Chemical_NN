@@ -179,7 +179,7 @@ def fold_evaluate(reg_list, output_dir, device,
                 scores.setdefault('R', {}).setdefault(method, {}).setdefault(t, []).append(r2)
                 scores.setdefault('MAE', {}).setdefault(method, {}).setdefault(t, []).append(mse)
             
-            if comp_method is not None:
+            if comp_method:
                 vis_dir_comp = os.path.join(fold_dir, method_comp)
                 os.makedirs(vis_dir_comp,exist_ok=True)
 
@@ -206,6 +206,8 @@ def fold_evaluate(reg_list, output_dir, device,
                     t = reg_list[i]
                     scores.setdefault('R', {}).setdefault(method_comp, {}).setdefault(t, []).append(r2)
                     scores.setdefault('MAE', {}).setdefault(method_comp, {}).setdefault(t, []).append(mse)
+                else:
+                    pass
             else:
                 pass
 
@@ -273,7 +275,8 @@ def fold_evaluate(reg_list, output_dir, device,
 
             test_df[f'{reg}_{method}'] = loss
             test_df[f'True_{reg}_{method}'] = target
-            
+            test_df[f'Pred_{reg}_{method}'] = out
+
             plt.hist(out, bins=bins, alpha=0.5, label = 'Predicted',density=True)
             plt.hist(target, bins=bins, alpha=0.5, label = 'True',density=True)
 

@@ -35,8 +35,8 @@ def statsmodel_train(X,Y,scalers,reg):
                 ),
             "LGB": lgb.LGBMRegressor(
                 #n_job = -1
-                )
-            #"SVR": SVR(),
+                ),
+            "SVR": SVR(),
             #"LR": LinearRegression()
         }
     else:

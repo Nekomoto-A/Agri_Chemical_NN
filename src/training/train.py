@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, TensorDataset, Dataset
+from torch.utils.data import DataLoader, TensorDataset, Dataset, WeightedRandomSampler
 from src.experiments.visualize import visualize_tsne
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
@@ -466,6 +466,105 @@ class KDEWeightedMSELoss(nn.Module):
         # 重み付けされた損失の平均を返します。
         return torch.mean(weighted_loss)
 
+import torch
+import torch.nn as nn
+
+class PriorKnowledgePenaltyLoss(nn.Module):
+    """
+    事前知識に基づくペナルティを計算する損失関数クラス。
+    L_prior = I(y_hat_A in [a, b]) * max(0, T - y_hat_B)
+    """
+    def __init__(self, task_A_name, task_B_name, a, b, T):
+        """
+        Args:
+            task_A_name (str): 条件を判定するタスクAの名前 (例: 'task_A')
+            task_B_name (str): ペナルティを課すタスクBの名前 (例: 'task_B')
+            a (float): タスクAの範囲の下限値
+            b (float): タスクAの範囲の上限値
+            T (float): タスクBの閾値
+        """
+        super(PriorKnowledgePenaltyLoss, self).__init__()
+        self.task_A_name = task_A_name
+        self.task_B_name = task_B_name
+        self.a = a
+        self.b = b
+        self.T = T
+
+    def forward(self, predictions):
+        """
+        順伝播で損失を計算します。
+
+        Args:
+            predictions (dict): モデルの出力。{'タスク名': テンソル} の形式。
+
+        Returns:
+            torch.Tensor: 計算されたペナルティ損失（スカラー値）。
+        """
+        # 辞書から各タスクの予測値を取得
+        y_hat_A = predictions[self.task_A_name]
+        y_hat_B = predictions[self.task_B_name]
+        
+        # --- 1. 指示関数 I(y_hat_A in [a, b]) の計算 ---
+        # y_hat_A が [a, b] の範囲内にあるかどうかのブール型テンソルを作成
+        condition = (y_hat_A >= self.a) & (y_hat_A <= self.b)
+        # ブール値を 1.0 (真) または 0.0 (偽) に変換
+        indicator = condition.float()
+
+        # --- 2. ヒンジ損失 max(0, T - y_hat_B) の計算 ---
+        # T - y_hat_B を計算し、0未満の値を0にクリップする
+        hinge_loss = torch.clamp(self.T - y_hat_B, min=0)
+
+        # --- 3. ペナルティの計算とバッチ平均 ---
+        # 指示関数とヒンジ損失を要素ごとに掛け合わせる
+        penalty = indicator * hinge_loss
+        
+        # バッチ全体の平均を計算して最終的な損失とする
+        return penalty.mean()
+
+class CustomUncertaintyLoss(nn.Module):
+    """
+    不確実性を考慮したカスタム損失関数。
+    L = sigma^2 * ||y - mu||^2 - lambda * log(sigma^2)
+    """
+    def __init__(self, lambda_val=0.01):
+        """
+        Args:
+            lambda_val (float): 正則化項の重みを調整するハイパーパラメータ lambda。
+        """
+        super(CustomUncertaintyLoss, self).__init__()
+        self.lambda_val = lambda_val
+
+    def forward(self, y_pred, y_true):
+        """
+        損失を計算します。
+        Args:
+            y_pred (tuple): モデルの出力。(mu, log_sigma_sq) のタプル。
+                            mu (torch.Tensor): 予測値。
+                            log_sigma_sq (torch.Tensor): 予測の不確実性 (log(sigma^2))。
+            y_true (torch.Tensor): 真の値。
+        Returns:
+            torch.Tensor: 計算された損失値 (スカラー)。
+        """
+        # モデルの出力を分解
+        mu, log_sigma_sq = y_pred
+        
+        # log(sigma^2) から sigma^2 を計算
+        sigma_sq = torch.exp(log_sigma_sq)
+        
+        # 第1項: sigma^2 * ||y - mu||^2
+        # 平均二乗誤差を計算
+        mse = (y_true - mu) ** 2
+        term1 = sigma_sq * mse
+        
+        # 第2項: -lambda * log(sigma^2)
+        term2 = -self.lambda_val * log_sigma_sq
+        
+        # サンプルごとの損失を合計
+        loss_per_sample = term1 + term2
+        
+        # バッチ全体の損失の平均を返す
+        return torch.mean(loss_per_sample)
+
 def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, model_name,loss_sum, device, batch_size, #optimizer, 
                 scalers, 
                 train_ids, 
@@ -546,6 +645,21 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
             grad_norm = optimizers.GradNorm(tasks=reg_list, alpha=alpha)
             grad_norm.set_model_shared_params(model) # 共有層のパラメータを設定
             #grad_norm = optimizers.GradNorm(tasks=reg_list, alpha=alpha)
+        elif loss_sum == 'Num_weight':
+            optimizer = optim.Adam(model.parameters(), lr=lr)
+            task_data_counts = {}
+            for task_name, tensor in y_tr.items():
+                if tensor.ndim == 1:
+                    # 【1次元の場合】NaNでない要素の数を数える
+                    # torch.isnan(tensor) でNaNの位置をTrueで示し、~で反転、.sum()でTrueの数（有効なデータ数）を数える
+                    valid_samples = (~torch.isnan(tensor)).sum().item()
+                else:
+                    # 【多次元の場合】NaNを含む行を除外して数える
+                    # .any(dim=1)で行ごとにNaNがあるか判定し、~で反転、.sum()で有効な行数を数える
+                    valid_samples = (~torch.isnan(tensor).any(dim=1)).sum().item()
+
+                task_data_counts[task_name] = int(valid_samples) # 結果を整数に変換
+            loss_weights = optimizers.calculate_loss_weights(task_data_counts)
         elif loss_sum =='GradNorm':
             # GradNorm のインスタンス化
             grad_norm = optimizers.GradNorm(tasks=reg_list, alpha=alpha)
@@ -558,6 +672,18 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
             Z = torch.zeros_like(W, device=device)
             U = torch.zeros_like(W, device=device)
             optimizer = optim.Adam(model.parameters(), lr=lr)
+        elif loss_sum == 'PLoss':
+            optimizer = optim.Adam(model.parameters(), lr=lr)
+            #learning_loss = sum(train_losses.values())
+            #train_loss = sum(train_losses.values())
+            penalty_params = {
+                'task_A_name': 'pH',
+                'task_B_name': 'Available_P',
+                'a': 0.0,
+                'b': 2.0,
+                'T': 0.0
+            }
+            criterion_prior = PriorKnowledgePenaltyLoss(**penalty_params)                   
         else:
             optimizer = optim.Adam(model.parameters() , lr=lr)
     
@@ -603,7 +729,8 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                 personal_losses[reg] = AutoWeightedLinearMSELoss(min_y=y_tr_min, max_y=y_tr_max, min_weight=0.5, max_weight=1.0)
             elif fn == 'kdewmse':
                 personal_losses[reg] = KDEWeightedMSELoss()
-
+            elif fn == 'Uncertainly':
+                personal_losses[reg] = CustomUncertaintyLoss()
             else:
                 # 案1：意図しない値が来たら、とりあえずデフォルトのMSEを設定する
                 print(f"警告: タスク '{reg}' に不明な損失関数名 '{fn}' が指定されました。デフォルトのMSELossを使用します。")
@@ -632,8 +759,37 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
     
     #train_dataset = TensorDataset(x_tr, y_tr_tensor)
     #train_dataset = CustomDataset(x_tr, y_tr)
+    # if 'NO3_N' in reg_list:
+    #     numpy_array = y_tr['NO3_N'].squeeze().cpu().numpy()
+    #     bins = pd.qcut(numpy_array, q=3, labels=False, duplicates='drop')
+
+    #     # 各ビンのサンプル数をカウント
+    #     bin_counts = np.bincount(bins)
+
+    #     # 各ビンの重みを計算 (逆頻度)
+    #     bin_weights = 1. / bin_counts
+
+    #     # 各サンプルに対応する重みを割り当てる
+    #     sample_weights = bin_weights[bins]
+    #     sample_weights_tensor = torch.from_numpy(sample_weights).double()
+
+
+    #     # 重み付きサンプラーの作成
+    #     sampler = WeightedRandomSampler(weights=sample_weights_tensor,
+    #                                     num_samples=len(sample_weights_tensor),
+    #                                     replacement=True)
+
+    #     train_dataset = CustomDatasetAdv(x_tr, y_tr)
+    #     train_loader = DataLoader(train_dataset, batch_size=batch_size, 
+    #                             #shuffle=True,
+    #                             sampler=sampler
+    #                             )
+    # else:
     train_dataset = CustomDatasetAdv(x_tr, y_tr)
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, 
+                            shuffle=True,
+                            #sampler=sampler
+                            )
 
     # 検証用 (シャッフルは必須ではない)
     #val_dataset = TensorDataset(x_val, y_val_tensor)
@@ -669,24 +825,62 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
 
             mmd_loss = torch.tensor(0.0, device=device) # deviceは適宜設定してください
 
-            for i,reg in enumerate(reg_list):
-                true_tr = y_batch[reg]#.to(device)
-                output = outputs[reg]
+            # for i,reg in enumerate(reg_list):
+            #     true_tr = y_batch[reg]#.to(device)
+            #     output = outputs[reg]
 
-                mask = ~torch.isnan(true_tr).squeeze()
+            #     mask = ~torch.isnan(true_tr).squeeze()
 
-                #loss = personal_losses[reg](outputs[reg], true_tr)
-                valid_preds = output[mask]
-                valid_labels = true_tr[mask]
+            #     #loss = personal_losses[reg](outputs[reg], true_tr)
+            #     #valid_preds = output[mask]
+            #     valid_preds = output[mask.expand_as(output)]
+            #     valid_labels = true_tr[mask]
 
-                if valid_labels.numel() > 0:
-                    # マスク処理後の個別の損失を計算
-                    loss = personal_losses[reg](valid_preds, valid_labels).mean()
+            #     if valid_labels.numel() > 0:
+            #         # マスク処理後の個別の損失を計算
+            #         loss = personal_losses[reg](valid_preds, valid_labels).mean()
+            #         train_losses[reg] = loss
+            #         #print(f'{reg}損失:{loss.item()}')
+            #     else:
+            #         # このバッチに有効なラベルがない場合、損失を0とする
+            #         train_losses[reg] = torch.tensor(0.0)
+            for reg in reg_list:
+                # ❶ 正解ラベルとモデルの出力を取得
+                true_tr = y_batch[reg].to(device)
+                output = outputs[reg] 
+
+                # ❷ 欠損値マスクを作成 (NaNでない要素がTrueになる)
+                # true_trが[batch, 1]のような形状でも、[batch]のような形状でも機能します。
+                mask = ~torch.isnan(true_tr)
+
+                # ❸ バッチ内に有効なラベルが1つでも存在するかチェック
+                if torch.any(mask):
+                    # 有効なラベルのみを抽出
+                    valid_labels = true_tr[mask]
+
+                    # ❹ モデルの出力形式を判定し、マスクを適用
+                    if isinstance(output, tuple):
+                        # 不確実性ありの場合: outputは (mu, log_sigma_sq)
+                        mu, log_sigma_sq = output
+                        
+                        # 正解ラベルと同じ形状のマスクを適用して、有効なデータ点に対応する値のみを抽出
+                        valid_mu = mu[mask]
+                        valid_log_sigma_sq = log_sigma_sq[mask]
+                        
+                        # 損失関数に渡すためにタプルにまとめる
+                        valid_preds = (valid_mu, valid_log_sigma_sq)
+                    else:
+                        # 不確実性なしの場合: outputは予測テンソル
+                        valid_preds = output[mask]
+
+                    # ❺ 欠損値が除外されたデータのみで損失を計算
+                    loss = personal_losses[reg](valid_preds, valid_labels)
                     train_losses[reg] = loss
-                    #print(f'{reg}損失:{loss.item()}')
+                    #total_loss += loss # 各タスクの損失を合計
                 else:
-                    # このバッチに有効なラベルがない場合、損失を0とする
-                    train_losses[reg] = torch.tensor(0.0)
+                    # このバッチに有効なラベルが一つもない場合、損失を0とする
+                    train_losses[reg] = torch.tensor(0.0, device=device)
+                    
                 #print(f'{reg}:{loss}')
                 #train_losses.append(loss)
                 #train_losses[reg] = loss
@@ -697,15 +891,15 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                 # 1. マスクを使って共有特徴量を2つのグループに分割
                 #    - features_present: ラベルが存在するサンプルの特徴量
                 #    - features_absent:  ラベルが欠損しているサンプルの特徴量
-                features_present = shared[mask]
-                features_absent = shared[~mask]
+                # features_present = shared[mask]
+                # features_absent = shared[~mask]
                 
                 # 2. 両方のグループにデータが存在する場合のみMMD損失を計算
                 #    (バッチ内に片方のグループしかない場合は計算できないため)
-                if features_present.shape[0] > 0 and features_absent.shape[0] > 0:
-                    # 3. mmd_rbf関数を呼び出し、タスクごとのMMD損失を累積
-                    mmd_loss += mmd_rbf(features_present, features_absent, sigma=1.0)
-        # sigma値はデータに応じて調整するハイパーパラメータ
+                # if features_present.shape[0] > 0 and features_absent.shape[0] > 0:
+                #     # 3. mmd_rbf関数を呼び出し、タスクごとのMMD損失を累積
+                #     mmd_loss += mmd_rbf(features_present, features_absent, sigma=1.0)
+                # sigma値はデータに応じて調整するハイパーパラメータ
 
             #print(train_losses)
 
@@ -853,6 +1047,19 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                 elif loss_sum == 'SUM':
                     learning_loss = sum(train_losses.values())
                     train_loss = sum(train_losses.values())
+                elif loss_sum == 'Num_weight':
+                    train_loss = sum(train_losses.values())
+                    learning_loss = 0
+                    for task in reg_list:
+                        learning_loss += train_losses[task] * loss_weights[task]
+                elif loss_sum == 'PLoss':
+                    learning_loss = sum(train_losses.values())
+                    train_loss = sum(train_losses.values())
+                    loss_prior = criterion_prior(outputs)
+                    #print(loss_prior)
+
+                    learning_loss += 0.1 * loss_prior
+
                 elif loss_sum == 'mmd':
                     #from src.training.mmd import mmd_rbf
                     train_loss = sum(train_losses.values())
@@ -1004,7 +1211,6 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                 os.makedirs(loss_dir,exist_ok=True)
                 calculate_and_save_mae_plot_html(model = model, X_data = x_tr, y_data_dict = y_tr, task_names = reg_list, 
                                                  device = device, output_dir = loss_dir, x_labels = train_ids, output_filename=f"{epoch+1}epoch.html")
-                
 
             if early_stopping == True:
                 if epoch >= least_epoch:
@@ -1056,10 +1262,16 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
         for x_tr_batch, y_tr_batch, _, _ in train_loader:
             x_tr_batch = x_tr_batch.to(device)
             outputs,_ = model(x_tr_batch)
-            
-            for target in reg_list:
-                true.setdefault(target, []).append(y_tr_batch[target].cpu().numpy())
-                pred.setdefault(target, []).append(outputs[target].cpu().numpy())
+            first_output_value = next(iter(outputs.values()))
+            if isinstance(first_output_value, tuple):
+                for reg, (mu, log_sigma_sq) in outputs.items():
+                    #outputs[reg] = mu
+                    true.setdefault(reg, []).append(y_tr_batch[reg].cpu().numpy())
+                    pred.setdefault(reg, []).append(mu.cpu().numpy())
+            else:
+                for target in reg_list:
+                    true.setdefault(target, []).append(y_tr_batch[target].cpu().numpy())
+                    pred.setdefault(target, []).append(outputs[target].cpu().numpy())
         
         for r in reg_list:
             save_dir = os.path.join(train_dir, r)

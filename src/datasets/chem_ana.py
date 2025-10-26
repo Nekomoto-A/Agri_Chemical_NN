@@ -260,30 +260,151 @@ def calculate_and_save_density(df: pd.DataFrame, columns: list, id_column: str, 
 
     return result_df
 
+import os
+import itertools
+
+def analyze_and_plot(df: pd.DataFrame, variable_columns: list, label_column: str, output_folder: str, id_column: str = None):
+    """
+    データフレームを受け取り、各種プロットを指定されたフォルダに保存する関数。
+    散布図にはオプションでIDラベルを付与できる。
+    """
+    print("処理を開始します...")
+    os.makedirs(output_folder, exist_ok=True)
+    print(f"グラフは '{output_folder}' フォルダに保存されます。")
+    if id_column:
+        print(f"IDカラム「{id_column}」が指定されました。散布図にIDを表示します。")
+
+    data_counts = df[label_column].value_counts().to_dict()
+    
+    # --- 1. ラベルごとの相関プロット（ヒートマップ & 散布図）の作成と保存 ---
+    print("\n## ステップ1: ラベルごとの相関プロットを作成・保存します。 ##")
+    unique_labels = df[label_column].unique()
+
+    for label in unique_labels:
+        print(f"\n-- ラベル「{label}」の処理を開始 --")
+        
+        n_samples = data_counts.get(label, 0)
+        if n_samples <= 2:
+            print(f" -> ⚠️ データ数が {n_samples} 個のため、相関プロットをスキップします。")
+            continue
+        else:
+            label_dir = os.path.join(output_folder, label) 
+            os.makedirs(label_dir, exist_ok=True)
+
+        subset_df = df[df[label_column] == label]
+        
+        # 1-1. 相関ヒートマップの作成
+        correlation_matrix = subset_df[variable_columns].corr()
+        plt.figure(figsize=(10, 8))
+        sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt='.2f', vmin=-1, vmax=1)
+        plt.title(f'crrelation of {label} (n={n_samples})', fontsize=16)
+        filename = f'correlation_heatmap_{label}.png'
+        filepath = os.path.join(output_folder, filename)
+        plt.savefig(filepath, bbox_inches='tight')
+        print(f" -> ✅ ヒートマップを '{filepath}' として保存しました。")
+        plt.close()
+
+        # 1-2. 2変数ごとの散布図を作成
+        print(f" -> 散布図を作成中...")
+        for var1, var2 in itertools.combinations(variable_columns, 2):
+            plt.figure(figsize=(8, 6))
+            plt.scatter(subset_df[var1], subset_df[var2], alpha=0.7)
+            
+            # << 追加: IDカラムが指定されている場合、各点にIDラベルを付与 >>
+            if id_column and id_column in df.columns:
+                for _, row in subset_df.iterrows():
+                    # テキストが点に重なりすぎないように少し調整
+                    plt.text(x=row[var1], y=row[var2], s=str(row[id_column]), 
+                             fontdict={'size': 7, 'color': 'darkslategray'},
+                             ha='left', va='bottom')
+
+            plt.title(f'「{label}」: {var1} vs {var2} (n={n_samples})', fontsize=14)
+            plt.xlabel(var1)
+            plt.ylabel(var2)
+            plt.grid(True)
+            
+            safe_var1 = str(var1).replace('(','').replace(')','').replace('/','')
+            safe_var2 = str(var2).replace('(','').replace(')','').replace('/','')
+            filename = f'scatterplot_{safe_var1}_vs_{safe_var2}.png'
+            filepath = os.path.join(label_dir, filename)
+            plt.savefig(filepath, bbox_inches='tight')
+            plt.close()
+        print(f" -> ✅ 散布図の作成が完了しました。")
+
+    print("-" * 40)
+
+    # --- 2. 各変数の箱ひげ図（変数ごとに分割）の作成と保存 ---
+    print("\n## ステップ2: 変数ごとの箱ひげ比較図（分割保存）を作成・保存します。 ##")
+    counts_str = ", ".join([f"{name}: {count}" for name, count in data_counts.items()])
+    
+    for variable in variable_columns:
+        plt.figure(figsize=(8, 6))
+        sns.boxplot(x=label_column, y=variable, data=df)
+        plt.title(f'{variable} : (num{counts_str})', fontsize=16)
+        plt.tight_layout()
+        
+        safe_variable = str(variable).replace('(','').replace(')','').replace('/','')
+        filename = f'boxplot_comparison_{safe_variable}.png'
+        filepath = os.path.join(output_folder, filename)
+        plt.savefig(filepath, bbox_inches='tight')
+        print(f" -> ✅ グラフを '{filepath}' として保存しました。")
+        plt.close()
+    
+    print("\nすべての処理が完了しました！ 🎉")
+
+def classify_crop(crop_name):
+  """
+  作物の名前を受け取り、カテゴリを返す関数
+  - 'Rice' -> 'Rice'
+  - 'Pear', 'Appl' -> 'Fruit'
+  - それ以外 -> 'Vegetable'
+  """
+  if crop_name == 'Rice':
+    return 'Rice'
+  elif crop_name in ['Pear', 'Appl']:
+    return 'Fruit'
+  else:
+    return 'Vegetable'
+
 if __name__ == '__main__':
     df = pd.read_excel('/home/nomura/Agri_Chemical_NN/data/raw/riken/chem_data.xlsx')
-
-    exclude_ids = [
-    '042_20_Sait_Eggp','235_21_Miyz_Spin', '360_22_Miee_Soyb', '121_20_Miyz_Spin', '125_20_Miyz_Spin' #☓
-    ]
+    #df = pd.read_excel('/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/chem_data.xlsx')
 
     # 今回は4つの特徴量すべてを使います。
     target_features = [
         'pH',
-        #'EC',
-        #'Available.P',
+        'EC',
+        'Available.P',
         'NO3.N',
-        #'NH4.N',
-        #'Exchangeable.K'
+        'NH4.N',
+        'Exchangeable.K',
+        #'EC_ene'
     ]
+    #target_features = ['pH_dry_soil', 'EC_electric_conductivity', 'Total_C', 'Total_N', 'available_P']
+
+
+    #df['EC_ene'] = df['NO3.N'] + df['NH4.N'] + df['Exchangeable.K'] 
+
+    
 
     exclude_ids = ['042_20_Sait_Eggp',
                    '235_21_Miyz_Spin', '360_22_Miee_Soyb', '121_20_Miyz_Spin', '125_20_Miyz_Spin',
+                   '273_22_Naga_Rice', '334_22_Yama_Rice'
                    ]
 
     if exclude_ids != None:
         mask = ~df['crop-id'].isin(exclude_ids)
         df = df[mask]
+
+        
+    #df['category'] = df['crop'].apply(classify_crop)
+    df['a'] = 'a'
+
+    label = 'a'
+
+    id_column = None
+
+    analyze_and_plot(df = df, variable_columns = target_features, label_column = label, output_folder = f'/home/nomura/Agri_Chemical_NN/datas/{label}', id_column = id_column)
 
     # 3. 作成した関数を実行！
     # reduce_model, results = visualize_kmeans_pca_with_labels(df, target_features, 4,  
@@ -294,6 +415,7 @@ if __name__ == '__main__':
     # analyze_factor_loadings(reduce_model, target_features)
     #results.to_csv(f'/home/nomura/Agri_Chemical_NN/datas/pca_result_{target_features}.csv')
 
-    plot_kde_pairplot(df=df, columns=target_features)
-    kde = calculate_and_save_density(df=df, columns=target_features, id_column='crop-id', output_filename='/home/nomura/Agri_Chemical_NN/datas/kde.csv')
+    #plot_kde_pairplot(df=df, columns=target_features)
+    #kde = calculate_and_save_density(df=df, columns=target_features, id_column='crop-id', output_filename='/home/nomura/Agri_Chemical_NN/datas/kde.csv')
     #kde.to_csv('/home/nomura/Agri_Chemical_NN/datas/kde.csv')
+
