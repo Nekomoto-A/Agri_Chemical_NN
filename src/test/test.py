@@ -563,11 +563,27 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         model = MTCNNModel_Di(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
     elif model_name == 'BNN_MG':
         model = MTBNNModel_MG(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
+    elif model_name == 'NN_AE':
+        from src.models.AE import Autoencoder, FineTuningModel
+        ae_model = Autoencoder(input_dim=input_dim)
+        ae_model = ae_model.to(device)
+        from src.training.train_FT import train_pretraining
+        ae_model = train_pretraining(model = ae_model, x_tr = X_train, x_val = X_val, device = device, output_dir = vis_dir)
+        import copy
+        pretrained_encoder = copy.deepcopy(ae_model.get_encoder())
+        model = FineTuningModel(pretrained_encoder = pretrained_encoder,last_shared_layer_dim = 128, output_dims = output_dims,reg_list = reg_list)
+        
+        stacked_Y = torch.stack(list(Y_train.values()), dim=1)
+        has_nan_mask = torch.isnan(stacked_Y).any(dim=1)
+        keep_mask = ~has_nan_mask
+        X_train = X_train[keep_mask.squeeze()]
+        Y_train = {reg: Y_train[reg][keep_mask.squeeze()] for reg in reg_list}
+
     elif model_name == 'NN_Uncertainly':
         from src.models.MT_NN_Uncertainly import MTNNModelWithUncertainty
         model = MTNNModelWithUncertainty(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
     elif 'NN' in model_name:
-        model = MTNNModel(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
+        model = MTNNModel(input_dim = input_dim, output_dims = output_dims,reg_list = reg_list)
     elif model_name == 'GP':
         if len(reg_list) > 1:
             likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(num_tasks=len(reg_list))

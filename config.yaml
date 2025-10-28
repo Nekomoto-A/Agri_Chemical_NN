@@ -22,7 +22,7 @@ dataset.py:
   unknown_drop: True
   asv_path: '/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/lv6.csv' #'data/raw/riken/taxon_data/lv6.csv' # # #
   chem_path:  '/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/chem_data.xlsx' #'data/raw/riken/chem_data.xlsx' # # #
-  reg_list2: ['pH_dry_soil'] #[] #['pH_dry_soil'] #[] #
+  reg_list2: [] #['pH_dry_soil'] #[] #['pH_dry_soil'] #[] #
   exclude_ids2: []
   combat: True
 train.py:
@@ -68,8 +68,14 @@ train_lf.py:
   early_stopping: True
   patience: 10
   meta_model_type: 'Ridge'
+train_FT.py:
+  lr: 0.0001
+  batch_size: 256
+  num_epochs: 200
+  early_stopping: False
+  patience: 10
 test.py:
-  loss_sum: 'Num_weight'
+  loss_sum: 'SUM'
   num_predictive_samples: 100
   shap_eval: False
   save_feature: False
@@ -89,7 +95,7 @@ fold_eval.py:
   carr_calc: False
   marginal_hist: False
   k_fold: 5
-  model_name: 'NN'
+  model_name: 'NN_AE'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
@@ -116,16 +122,16 @@ fold_eval.py:
   feature_path: 'data/raw/riken/taxon_data/lv6.csv' #'/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/lv6.csv' # # #
   target_path:  'data/raw/riken/chem_data.xlsx' #'/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/chem_data.xlsx' # # #
   data_inte: True
-  transformer: ['SS', 'SS'] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
-  reg_loss_fanction: ['mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
+  transformer: ['SS', 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
+  reg_loss_fanction: ['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
 main.py:
-  result_dir: 'result_1024_bignn'
+  result_dir: 'result_AE'
   reg_list: [
             #'pH','Available.P'
             #['pH', 'NO3.N',]
             #['pH', 'NO3.N',],
-            'pH'
-            #['pH', 'Available.P',],
+            #'pH'
+            ['pH', 'Available.P',],
             #['pH','EC',],
             #['pH','NH4.N',],
             #['pH',CEC',],
