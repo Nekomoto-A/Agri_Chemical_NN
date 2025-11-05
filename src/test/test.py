@@ -96,104 +96,6 @@ def test_shap(x_tr, x_te,model,reg_list, features, output_dir):
             sorted_df_for_task.to_excel(writer, sheet_name=task_name, index=True)
     return feature_importance_dict
 
-# def test_MT(x_te,y_te,model,reg_list,scalers,output_dir,device, features, shap_eval = config['shap_eval']):
-#     model.eval()  # モデルを評価モードに
-#     # 出力ごとの予測と実際のデータをリストに格納
-#     r2_scores = []
-#     mse_scores = []
-
-#     predicts = {}
-#     trues = {}
-#     with torch.no_grad():
-#         #outputs,sigmas = model(x_te)  # 予測値を取得
-#         x_te = x_te.to(device)
-#         outputs,_ = model(x_te)  # 予測値を取得
-
-#         #print(outputs)
-#         # 各出力の予測結果と実際の値をリストに格納
-#         for i,reg in enumerate(reg_list):
-#             if '_rank' in reg:
-#                 #print(outputs[reg])
-#                 output = torch.argmax(outputs[reg], dim=1).cpu().numpy()
-#                 true = torch.argmax(y_te[reg], dim=1).cpu().numpy()
-                
-#                 #print()
-#                 #print(output)
-#                 #print(true)
-
-#                 predicts[reg] = output
-#                 trues[reg] = true
-
-#                 r2 = accuracy_score(true,output)
-#                 #print(r2)
-#                 r2_scores.append(r2)
-#                 mse = f1_score(true,output, average='macro')
-#                 #print(mse)
-#                 mse_scores.append(mse)
-
-#             elif torch.is_floating_point(y_te[reg]) == True:
-#                 if reg in scalers:
-#                     output = scalers[reg].inverse_transform(outputs[reg].cpu().numpy())
-#                     true = scalers[reg].inverse_transform(y_te[reg].cpu().numpy())
-#                 else:
-#                     output = outputs[reg].cpu().numpy()
-#                     true = y_te[reg].cpu().numpy()
-
-#                 predicts[reg] = output
-#                 trues[reg] = true
-                
-#                 result_dir = os.path.join(output_dir, reg)
-#                 os.makedirs(result_dir,exist_ok=True)
-#                 TP_dir = os.path.join(result_dir, 'true_predict.png')
-#                 plt.figure()
-#                 plt.scatter(true,output)
-#                 min_val = min(true.min(), output.min())
-#                 max_val = max(true.max(), output.max())
-#                 plt.plot([min_val, max_val], [min_val, max_val], 'r--', label = 'x=y')
-
-#                 plt.xlabel('true_data')
-#                 plt.ylabel('predicted_data')
-#                 plt.savefig(TP_dir)
-#                 plt.close()
-
-#                 hist_dir = os.path.join(result_dir, 'loss_hist.png')
-#                 plt.hist(true-output, bins=30, color='skyblue', edgecolor='black')  # bins=階級数
-#                 plt.title("Histogram of Normally Distributed Data")
-#                 plt.xlabel("MAE")
-#                 plt.ylabel("Frequency")
-#                 plt.grid(True)
-#                 #plt.show()
-#                 plt.savefig(hist_dir)
-#                 plt.close()
-
-#                 #r2 = r2_score(true,output)
-#                 corr_matrix = np.corrcoef(true.ravel(),output.ravel())
-
-#                 # 相関係数（xとyの間の値）は [0, 1] または [1, 0] の位置
-#                 r2 = corr_matrix[0, 1]
-#                 #print(r2)
-#                 r2_scores.append(r2)
-#                 #mse = mean_squared_error(true,output)
-#                 mse = mean_absolute_error(true,output)
-#                 #mse = mean_absolute_percentage_error(true,output)
-#                 #mse = smape(true,output)
-#                 #print(mse)
-#                 mse_scores.append(mse)
-#             else:
-#                 output = torch.argmax(outputs[reg], dim=-1).cpu().numpy()
-#                 true = y_te[reg].numpy()
-                
-#                 predicts[reg] = output
-#                 trues[reg] = true
-
-#                 r2 = accuracy_score(true,output)
-#                 #print(r2)
-#                 r2_scores.append(r2)
-#                 mse = f1_score(true,output, average='macro')
-#                 #print(mse)
-#                 mse_scores.append(mse)
-#     return predicts, trues, r2_scores, mse_scores
-
 def normalized_medae_iqr(y_true, y_pred):
     """
     中央絶対誤差（MedAE）を四分位範囲（IQR）で正規化した、
@@ -231,130 +133,411 @@ import os
 import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score, f1_score, mean_absolute_error
 
-def test_MT(x_te, y_te, model, reg_list, scalers, output_dir, device, features, n_samples_mc=100, shap_eval=False):
-    """
-    モデルのテストを実行し、不確実性（Aleatoric or MC Dropout）が利用可能な場合は予測区間も計算・可視化する。
+# (上記 import が実行されている前提)
 
-    Args:
-        x_te (torch.Tensor): テスト用の入力データ
-        y_te (dict): テスト用の正解ラベルデータ
-        model (nn.Module): 評価対象の学習済みモデル
-        reg_list (list): タスク名のリスト
-        scalers (dict): 各タスクのStandardScalerまたはMinMaxScaler
-        output_dir (str): 結果の保存先ディレクトリ
-        device (torch.device): 'cpu' または 'cuda'
-        features (list): 特徴量の名前リスト (SHAP評価用)
-        n_samples_mc (int): MC Dropoutのサンプリング回数
-        shap_eval (bool): SHAP評価を実行するかどうか
+import numpy as np
+
+def correct_log1p_bias(y_val_true_log, 
+                         y_val_pred_log, 
+                         y_test_pred_log, 
+                         method='nonparametric'):
     """
-    # --- 1. MC Dropoutがモデルに実装されているか自動で判定 ---
+    log1p変換された予測値のバイアス補正（Smearing Correction）を行います。
+
+    注意: 入力はすべて対数変換後 (log1p) の値である必要があります。
+
+    Parameters:
+    ----------
+    y_val_true_log : array-like
+        【検証データ】の【真の値】 (対数空間)
+        
+    y_val_pred_log : array-like
+        【検証データ】の【予測値】 (対数空間)
+        
+    y_test_pred_log : array-like
+        【テストデータ】の【予測値】 (対数空間) ※これが補正対象
+        
+    method : str, optional
+        補正方法 ('nonparametric' または 'parametric'), by default 'nonparametric'
+
+    Returns:
+    -------
+    numpy.ndarray
+        バイアス補正された【テストデータ】の予測値 (元のスケール)
+    """
+    
+    # 1. 検証データの残差を計算 (対数空間)
+    #    (N, 1) 形状などを考慮し, 1D配列に
+    residuals_log = np.array(y_val_true_log).flatten() - np.array(y_val_pred_log).flatten()
+    
+    # 2. テストデータの予測値も 1D配列に
+    y_test_pred_log_flat = np.array(y_test_pred_log).flatten()
+    
+    
+    if method == 'parametric':
+        # --- パラメトリック法 ---
+        # 1. 残差の分散 (σ^2) を計算
+        sigma_sq = np.var(residuals_log, ddof=1)
+        
+        # 2. 対数空間で補正項 (σ^2 / 2) を加算
+        y_test_pred_log_corrected = y_test_pred_log_flat + (sigma_sq / 2)
+        
+        # 3. 元のスケールに逆変換 (expm1)
+        y_test_pred_final = np.expm1(y_test_pred_log_corrected)
+
+    elif method == 'nonparametric':
+        # --- ノンパラメトリック法 ---
+        # 1. 補正係数 C = E[exp(ε)] を計算
+        correction_factor_c = np.mean(np.exp(residuals_log))
+        
+        # 2. テスト予測値を exp() で戻す (まだ -1 しない)
+        exp_z_hat = np.exp(y_test_pred_log_flat)
+        
+        # 3. 補正係数を乗算し、-1 で逆変換を完了
+        y_test_pred_final = (exp_z_hat * correction_factor_c) - 1
+        
+    else:
+        raise ValueError("Method must be 'parametric' or 'nonparametric'")
+            
+    return y_test_pred_final
+
+def test_MT(x_te, y_te, x_val, y_val, model, reg_list, scalers, output_dir, device, test_ids, n_samples_mc=100):
+    """
+    モデルのテストを実行し、モデルタイプを自動判定して評価と可視化を行う。
+    (変更) log1p スケーラーのバイアス補正 (Smearing Correction) 機能を追加。
+    """
+    
+    # --- 1. モデルタイプの判定 ---
     has_mc_dropout = hasattr(model, 'predict_with_mc_dropout') and callable(getattr(model, 'predict_with_mc_dropout'))
+    has_quantile_regression = hasattr(model, 'quantiles')
+    has_aleatoric_uncertainty = False
+
+    # --- (★追加) 1-B. バイアス補正係数の事前計算 ---
+    print("INFO: バイアス補正係数の計算を開始します...")
+    bias_correction_factors = {}
+    
+    # 検証用データが存在する場合のみ実行
+    if x_val is not None and y_val is not None:
+        try:
+            x_val_tensor = x_val.to(device)
+            
+            # 検証データの予測値を計算 (対数空間)
+            val_outputs_log = {}
+            model.eval() # 予測のため評価モードに
+            
+            if has_mc_dropout:
+                # MC Dropoutの場合、平均値を予測値として使用
+                print("INFO: (Bias Correction) 検証データ予測に MC Dropout (mean) を使用します。")
+                mc_val_outputs = model.predict_with_mc_dropout(x_val_tensor, n_samples=n_samples_mc)
+                val_outputs_log = {reg: mc['mean'] for reg, mc in mc_val_outputs.items()}
+            
+            elif has_quantile_regression:
+                 print("INFO: (Bias Correction) 検証データ予測に分位点回帰（中央値）を使用します。")
+                 with torch.no_grad():
+                     raw_val_outputs, _ = model(x_val_tensor)
+                 
+                 # 分位点回帰の場合、補正係数計算のために中央値(0.5)を使用する
+                 try:
+                     quantiles_list = model.quantiles.cpu().numpy().flatten().tolist()
+                     median_index = quantiles_list.index(0.5)
+                 except (ValueError, AttributeError):
+                     median_index = 0 # フォールバック
+                 
+                 for reg in reg_list:
+                     if reg in raw_val_outputs:
+                         val_outputs_log[reg] = raw_val_outputs[reg][:, median_index:median_index+1]
+
+            else:
+                # 通常予測またはAleatoric予測 (平均値 mu を使用)
+                print("INFO: (Bias Correction) 検証データ予測に通常の予測値 (mean) を使用します。")
+                with torch.no_grad():
+                    raw_val_outputs, _ = model(x_val_tensor)
+                
+                for reg in reg_list:
+                    if reg in raw_val_outputs:
+                        output_val = raw_val_outputs[reg]
+                        if isinstance(output_val, tuple) and len(output_val) == 2:
+                            # Aleatoric (mu, log_sigma_sq)
+                            val_outputs_log[reg] = output_val[0] # mu
+                        else:
+                            # 通常予測
+                            val_outputs_log[reg] = output_val
+
+            # 各タスクの補正係数を計算
+            for reg in reg_list:
+                if reg in scalers and reg in y_val:
+                    scaler = scalers[reg]
+                    # (★判定) スケーラーが log1p かどうか
+                    from sklearn.preprocessing import FunctionTransformer
+                    is_log1p_scaler = (isinstance(scaler, FunctionTransformer) and 
+                                       scaler.func == np.log1p)
+                                       
+                    if is_log1p_scaler and reg in val_outputs_log:
+                        print(f"INFO: タスク {reg} は log1p スケーラーです。バイアス補正係数を計算します。")
+                        
+                        # 1. 検証データの真の値 (対数空間)
+                        # y_val[reg] は元のスケールと仮定 (Torchテンソルを想定)
+                        y_val_true_original = y_val[reg].cpu().detach().numpy()
+                        # transform (log1p)
+                        y_val_true_log = scaler.transform(y_val_true_original)
+                        y_val_true_log = torch.tensor(y_val_true_log, device=device, dtype=torch.float32)
+
+                        # 2. 検証データの予測値 (対数空間)
+                        y_val_pred_log = val_outputs_log[reg] # すでに対数空間
+
+                        # 3. 残差 (対数空間)
+                        # 形状を合わせる (N,)
+                        residuals_log = y_val_true_log.flatten() - y_val_pred_log.flatten()
+                        
+                        # 4. 補正係数 C = E[exp(ε)] (ノンパラメトリック法)
+                        # CPUに移動して計算
+                        correction_factor_c = torch.mean(torch.exp(residuals_log)).cpu().item()
+                        
+                        bias_correction_factors[reg] = correction_factor_c
+                        print(f"INFO: タスク {reg} の補正係数 C = {correction_factor_c:.4f}")
+
+        except Exception as e:
+            print(f"WARN: バイアス補正係数の計算中にエラーが発生しました。補正はスキップされます。 Error: {e}")
+            import traceback
+            traceback.print_exc()
+            bias_correction_factors = {} # 念のためクリア
+    else:
+        print("INFO: 検証データ (x_val, y_val) が提供されなかったため、バイアス補正はスキップされます。")
 
     x_te = x_te.to(device)
     predicts, trues = {}, {}
+    stds = None # 標準偏差 (MC or Aleatoric) 用
     
     # --- 2. 予測方法を切り替えて実行 ---
-    has_aleatoric_uncertainty = False # Aleatoric Uncertaintyフラグを初期化
-    
+    # ( ... 元のコードと同じ ... )
     if has_mc_dropout:
         print("INFO: MC Dropoutを有効にして予測区間を計算します。")
         mc_outputs = model.predict_with_mc_dropout(x_te, n_samples=n_samples_mc)
         outputs = {reg: mc['mean'] for reg, mc in mc_outputs.items()}
         stds = {reg: mc['std'] for reg, mc in mc_outputs.items()}
+        
+        if has_quantile_regression:
+            print("INFO: MC Dropout (mean) は分位点回帰の出力形式です。")
+    
     else:
         print("INFO: 通常の予測を実行します。")
         model.eval()
         with torch.no_grad():
             raw_outputs, _ = model(x_te)
         
-        ### 変更/追加 ###
-        # 2-1. 出力が (mu, log_sigma_sq) のタプル形式か判定
-        # 辞書の最初の要素をチェックして、全体の形式を判断します。
-        first_output_value = next(iter(raw_outputs.values()))
-        if isinstance(first_output_value, tuple):
-            print("INFO: 予測と不確実性(Aleatoric Uncertainty)が出力されました。")
-            has_aleatoric_uncertainty = True
-            
-            outputs = {}
-            stds = {}
-            for reg, (mu, log_sigma_sq) in raw_outputs.items():
-                outputs[reg] = mu
-                # sigma = sqrt(exp(log_sigma_sq)) を計算してstdsに格納
-                stds[reg] = torch.sqrt(torch.exp(log_sigma_sq))
+        if has_quantile_regression:
+            print("INFO: 分位点回帰モデルとして予測値を出力します。")
+            outputs = raw_outputs 
+        
         else:
-            print("INFO: 予測値のみが出力されました。")
-            outputs = raw_outputs
-            stds = None
+            first_output_value = next(iter(raw_outputs.values()))
+            if isinstance(first_output_value, tuple) and len(first_output_value) == 2:
+                print("INFO: 予測と不確実性(Aleatoric Uncertainty)が出力されました。")
+                has_aleatoric_uncertainty = True
+                
+                outputs = {}
+                stds = {}
+                for reg, (mu, log_sigma_sq) in raw_outputs.items():
+                    outputs[reg] = mu
+                    stds[reg] = torch.sqrt(torch.exp(log_sigma_sq))
+            else:
+                print("INFO: 予測値のみが出力されました。")
+                outputs = raw_outputs
 
     r2_scores, mse_scores = [], []
     
     # --- 3. タスクごとに結果を処理 ---
     for reg in reg_list:
-        # 分類タスクの処理 (変更なし)
+        # 分類タスクの処理 (省略)
         if '_rank' in reg or not torch.is_floating_point(y_te[reg]):
-            # (省略) ... 元のコードと同じ ...
-            pass
+            pass # ...
 
         # 回帰タスクの処理
         elif torch.is_floating_point(y_te[reg]):
             true_tensor = y_te[reg]
-            pred_tensor = outputs[reg]
             
-            y_error = None
-            
-            ### 変更/追加 ###
-            # 不確実性(MC Dropout または Aleatoric)が利用可能かどうかのフラグ
-            uncertainty_available = (has_mc_dropout or has_aleatoric_uncertainty) and stds is not None
+            pred_tensor_for_eval = None # MAE評価用の予測値 (中央値 or 平均値)
+            lower_bound_tensor = None  # 予測区間の下限
+            upper_bound_tensor = None  # 予測区間の上限
 
-            # スケーラーが存在する場合、元のスケールに戻す
+            # --- 3-1. モデルタイプに応じて予測値と区間を決定 ---
+            # ( ... 元のコードと同じ ... )
+            if has_quantile_regression:
+                pred_tensor_all_quantiles = outputs[reg] # 形状 [N, num_quantiles]
+                
+                try:
+                    quantiles_list = model.quantiles.cpu().numpy().flatten().tolist()
+                    median_index = quantiles_list.index(0.5)
+                except (ValueError, AttributeError):
+                    print(f"WARN: タスク {reg} のMAE評価に 0.5 (中央値) が見つかりません。最初の分位点を使用します。")
+                    median_index = 0
+                
+                pred_tensor_for_eval = pred_tensor_all_quantiles[:, median_index:median_index+1]
+
+                if model.num_quantiles > 1:
+                    lower_quantile_index = np.argmin(quantiles_list)
+                    upper_quantile_index = np.argmax(quantiles_list)
+                    lower_bound_tensor = pred_tensor_all_quantiles[:, lower_quantile_index:lower_quantile_index+1]
+                    upper_bound_tensor = pred_tensor_all_quantiles[:, upper_quantile_index:upper_quantile_index+1]
+            
+            elif (has_mc_dropout or has_aleatoric_uncertainty) and stds is not None:
+                pred_tensor_for_eval = outputs[reg] # 平均値 (mu)
+                std_tensor = stds[reg]
+                lower_bound_tensor = pred_tensor_for_eval - 1.96 * std_tensor
+                upper_bound_tensor = pred_tensor_for_eval + 1.96 * std_tensor
+                
+            else:
+                pred_tensor_for_eval = outputs[reg]
+
+            # --- 3-2. スケーリング処理とエラーバーの計算 ---
+            
+            y_error_asymmetric = None # 非対称エラーバー [2, N] (plt.errorbar用)
+            lower_bound_unscaled = None
+            upper_bound_unscaled = None
+
             if reg in scalers:
                 scaler = scalers[reg]
-                pred = scaler.inverse_transform(pred_tensor.cpu().detach().numpy())
-                true = scaler.inverse_transform(true_tensor.cpu().detach().numpy())
                 
-                # 不確実性が利用可能なら、予測区間も元のスケールに戻す
-                if uncertainty_available:
-                    std_tensor = stds[reg]
-                    upper_bound_scaled = pred_tensor + 1.96 * std_tensor
-                    lower_bound_scaled = pred_tensor - 1.96 * std_tensor
+                # (★変更) バイアス補正対象か確認
+                use_bias_correction = reg in bias_correction_factors
+                
+                if use_bias_correction:
+                    # --- (★) log1p バイアス補正を実行 ---
+                    correction_factor_c = bias_correction_factors[reg]
+                    print(f"INFO: タスク {reg} の予測値にバイアス補正 (C={correction_factor_c:.4f}) を適用します。")
                     
-                    upper_bound_unscaled = scaler.inverse_transform(upper_bound_scaled.cpu().detach().numpy())
-                    lower_bound_unscaled = scaler.inverse_transform(lower_bound_scaled.cpu().detach().numpy())
+                    # 評価用の予測値 (中央値 or 平均値)
+                    # 1. exp(z_hat)
+                    exp_z_hat = torch.exp(pred_tensor_for_eval).cpu().detach().numpy()
+                    # 2. (exp(z_hat) * C) - 1
+                    pred = (exp_z_hat * correction_factor_c) - 1
                     
-                    # エラーバーの長さは (上限 - 下限) / 2
-                    y_error = (upper_bound_unscaled - lower_bound_unscaled) / 2.0
-            else:
-                pred = pred_tensor.cpu().detach().numpy()
-                true = true_tensor.cpu().detach().numpy()
-                if uncertainty_available:
-                    # 95%信頼区間のエラーバーの長さを計算 (1.96 * std)
-                    y_error = 1.96 * stds[reg].cpu().detach().numpy()
+                    # 真の値 (これは補正対象外)
+                    true = scaler.inverse_transform(true_tensor.cpu().detach().numpy())
 
+                    # 予測区間が利用可能な場合
+                    if lower_bound_tensor is not None and upper_bound_tensor is not None:
+                        # 1. exp(lower) / exp(upper)
+                        exp_lower = torch.exp(lower_bound_tensor).cpu().detach().numpy()
+                        exp_upper = torch.exp(upper_bound_tensor).cpu().detach().numpy()
+                        
+                        # 2. 補正
+                        lower_bound_unscaled = (exp_lower * correction_factor_c) - 1
+                        upper_bound_unscaled = (exp_upper * correction_factor_c) - 1
+                    
+                else:
+                    # --- 通常のスケーリング解除 ---
+                    pred = scaler.inverse_transform(pred_tensor_for_eval.cpu().detach().numpy())
+                    true = scaler.inverse_transform(true_tensor.cpu().detach().numpy())
+                    
+                    if lower_bound_tensor is not None and upper_bound_tensor is not None:
+                        lower_bound_unscaled = scaler.inverse_transform(lower_bound_tensor.cpu().detach().numpy())
+                        upper_bound_unscaled = scaler.inverse_transform(upper_bound_tensor.cpu().detach().numpy())
+            
+            else:
+                # スケーラーなし
+                pred = pred_tensor_for_eval.cpu().detach().numpy()
+                true = true_tensor.cpu().detach().numpy()
+                
+                if lower_bound_tensor is not None and upper_bound_tensor is not None:
+                    lower_bound_unscaled = lower_bound_tensor.cpu().detach().numpy()
+                    upper_bound_unscaled = upper_bound_tensor.cpu().detach().numpy()
+            
+            # (変更) 非対称エラーバーの計算 (スケーリング後に行う)
+            if lower_bound_unscaled is not None and upper_bound_unscaled is not None:
+                lower_error = pred - lower_bound_unscaled
+                upper_error = upper_bound_unscaled - pred
+                
+                lower_error = np.maximum(lower_error, 0)
+                upper_error = np.maximum(upper_error, 0)
+                
+                y_error_asymmetric = np.stack([lower_error.flatten(), upper_error.flatten()], axis=0)
+
+            # --- 3-3. (★) MC Dropout 結果のCSV保存 ---
+            # ( ... 元のコードと同じ ... )
+            # test_ids を numpy 配列に変換
+            ids_flat = np.asarray(test_ids).flatten()
+            true_flat = true.flatten()
+            pred_flat = pred.flatten()
+            
+            if has_mc_dropout and stds is not None and reg in stds:
+                try:
+                    # バイアス補正を使った場合、元の標準偏差は直接使えない
+                    # 再計算 (upper_bound_unscaled を使う)
+                    uncertainty_unscaled_raw = (upper_bound_unscaled - pred) / 1.96
+
+                    uncertainty_flat = uncertainty_unscaled_raw.flatten()
+
+                    df_data = {}
+                    
+                    if len(ids_flat) == len(true_flat):
+                        df_data = {
+                            'id': ids_flat,
+                            'true': true_flat,
+                            'predicted_mean': pred_flat,
+                            'uncertainty_std': uncertainty_flat
+                        }
+                    else:
+                        print(f"WARN: タスク {reg} の test_ids (len {len(ids_flat)}) と予測 (len {len(true_flat)}) の長さが異なります。IDなしで保存します。")
+                        df_data = {
+                            'true': true_flat,
+                            'predicted_mean': pred_flat,
+                            'uncertainty_std': uncertainty_flat
+                        }
+                    
+                    df = pd.DataFrame(df_data)
+                    result_dir_csv = os.path.join(output_dir, reg)
+                    os.makedirs(result_dir_csv, exist_ok=True)
+                    csv_path = os.path.join(result_dir_csv, f'{reg}_predictions_mc_uncertainty.csv')
+                    df.to_csv(csv_path, index=False)
+                    print(f"INFO: MC Dropout の結果を {csv_path} に保存しました。")
+
+                except Exception as e:
+                    print(f"ERROR: タスク {reg} の MC Dropout 結果CSV保存中にエラーが発生しました: {e}")
+            
             predicts[reg], trues[reg] = pred, true
             
             # --- 4. 結果のプロット（エラーバー付き） ---
-            # このブロックは変更ありませんが、y_errorが適切に計算されるようになっています
+            # ( ... 元のコードと同じ ... )
             result_dir = os.path.join(output_dir, reg)
             os.makedirs(result_dir, exist_ok=True)
             
-            plt.figure(figsize=(8, 8))
-            if y_error is not None:
-                plt.errorbar(true.flatten(), pred.flatten(), yerr=y_error.flatten(), fmt='o', color='royalblue', ecolor='lightgray', capsize=3, markersize=4, alpha=0.7, label='Prediction with 95% CI')
+            plt.figure(figsize=(12, 12))
+            
+            if y_error_asymmetric is not None:
+                plt.errorbar(true.flatten(), pred.flatten(), yerr=y_error_asymmetric, fmt='o', color='royalblue', ecolor='lightgray', capsize=3, markersize=4, alpha=0.7, label='Prediction with 95% CI or Quantile Range')
             else:
                 plt.scatter(true.flatten(), pred.flatten(), color='royalblue', alpha=0.7)
             
-            min_val = min(true.min(), pred.min())
-            max_val = max(true.max(), pred.max())
+            # IDのアノテーション
+            if len(ids_flat) == len(true_flat):
+                # (★注意) データが多いと重なるため、件数が多い場合はコメントアウトを推奨
+                # print(f"INFO: タスク {reg} のプロットに {len(ids_flat)} 件のアノテーションを追加します。")
+                if len(ids_flat) <= 200: # 例: 200件以下ならアノテーション
+                    for i in range(len(ids_flat)):
+                        plt.annotate(
+                            ids_flat[i], (true_flat[i], pred_flat[i]),
+                            textcoords="offset points", xytext=(0, 5),
+                            ha='center', fontsize=6, alpha=0.5
+                        )
+                else:
+                    print(f"INFO: タスク {reg} のデータ件数 ({len(ids_flat)}) が多いため、アノテーションをスキップします。")
+            else:
+                 print(f"WARN: タスク {reg} の test_ids (len {len(ids_flat)}) と予測 (len {len(true_flat)}) の長さが異なります。アノテーションをスキップします。")
+
+            min_val = min(np.min(true), np.min(pred))
+            max_val = max(np.max(true), np.max(pred))
             plt.plot([min_val, max_val], [min_val, max_val], 'r--', label='y=x')
             plt.xlabel('True Values')
             plt.ylabel('Predicted Values')
             plt.title(f'True vs Predicted for {reg}')
             plt.legend()
             plt.grid(True)
+
             plt.savefig(os.path.join(result_dir, 'true_predict_with_ci.png'))
             plt.close()
             
-            # 誤差のヒストグラム
+            # 誤差のヒストグラム (変更なし)
             plt.figure()
             plt.hist((true - pred).flatten(), bins=30, color='skyblue', edgecolor='black')
             plt.title("Histogram of Prediction Error")
@@ -364,108 +547,500 @@ def test_MT(x_te, y_te, model, reg_list, scalers, output_dir, device, features, 
             plt.savefig(os.path.join(result_dir, 'loss_hist.png'))
             plt.close()
 
-            # 評価指標の計算
+            # 評価指標の計算 (変更なし)
             corr_matrix = np.corrcoef(true.flatten(), pred.flatten())
             r2 = corr_matrix[0, 1]
             r2_scores.append(r2)
-            #mae = mean_absolute_error(true, pred)
-            mae = normalized_medae_iqr(true, pred)
+            
+            try:
+                mae = normalized_medae_iqr(true, pred) # カスタム指標
+            except NameError:
+                print(f"WARN: normalized_medae_iqr が定義されていません。タスク {reg} の評価に MAE (mean_absolute_error) を使用します。")
+                mae = mean_absolute_error(true, pred)
             mse_scores.append(mae)
 
     return predicts, trues, r2_scores, mse_scores
 
-# ▲▲▲▲▲ ここまでが修正後の関数です ▲▲▲▲▲
+#def test_MT(x_te, y_te, model, reg_list, scalers, output_dir, device, test_ids, n_samples_mc=100):
+    # """
+    # モデルのテストを実行し、モデルタイプ(通常/Aleatoric/分位点回帰/MC Dropout)を
+    # 自動判定して評価と可視化を行う。
+    # (変更) MC Dropout時は結果をCSVに保存する機能を追加。
+    # """
+    # # --- 1. モデルタイプの判定 ---
+    
+    # # MC Dropoutが実装されているか
+    # has_mc_dropout = hasattr(model, 'predict_with_mc_dropout') and callable(getattr(model, 'predict_with_mc_dropout'))
+    
+    # # (変更) 分位点回帰モデルか (self.quantiles属性を持つか)
+    # has_quantile_regression = hasattr(model, 'quantiles')
+    
+    # # Aleatoric Uncertaintyフラグを初期化
+    # has_aleatoric_uncertainty = False 
 
-def test_MT_BNN(x_te,y_te,model,reg_list,scalers,output_dir,num_predictive_samples = config['num_predictive_samples']):
-    model.eval()  # モデルを評価モードに
-    # 出力ごとの予測と実際のデータをリストに格納
-    r2_scores = []
-    mse_scores = []
-
-    predicts = {}
-    trues = {}
-    all_task_predictions = {task_name: [] for task_name in reg_list}
-
-    with torch.no_grad(): # 勾配計算を無効にします。推論時には不要です。
-        for _ in range(num_predictive_samples):
-            predictions = model(x_te) # テストデータ全体に対して予測を取得
-            for task_name, pred_output in predictions.items():
-                #if OUTPUT_DIMS[task_name] == 1: # 回帰タスク
-                if torch.is_floating_point(y_te[task_name]) == True:
-                    all_task_predictions[task_name].append(pred_output.squeeze().numpy())
-                else: # 分類タスク
-                    # 分類タスクはソフトマックスを適用して確率を得る
-                    all_task_predictions[task_name].append(torch.softmax(pred_output, dim=-1).numpy())
-        #print(outputs)
-        # 各出力の予測結果と実際の値をリストに格納
-        for reg in reg_list:
-            #print(y_te)
-            #true_target = all_task_predictions[reg].squeeze().numpy()
-            if torch.is_floating_point(y_te[reg]) == True:
-                avg_predictions = np.mean(all_task_predictions[reg], axis=0).reshape(y_te[reg].numpy().shape)
-                if reg in scalers:
-                    output = scalers[reg].inverse_transform(avg_predictions)
-                    true = scalers[reg].inverse_transform(y_te[reg].numpy())
-                else:
-                    output = np.mean(all_task_predictions[reg], axis=0)
-                    true = y_te[reg].numpy()
-
-                predicts[reg] = output
-                trues[reg] = true
+    # x_te = x_te.to(device)
+    # predicts, trues = {}, {}
+    # stds = None # 標準偏差 (MC or Aleatoric) 用
+    
+    # # --- 2. 予測方法を切り替えて実行 ---
+    
+    # if has_mc_dropout:
+    #     print("INFO: MC Dropoutを有効にして予測区間を計算します。")
+    #     mc_outputs = model.predict_with_mc_dropout(x_te, n_samples=n_samples_mc)
+    #     outputs = {reg: mc['mean'] for reg, mc in mc_outputs.items()}
+    #     stds = {reg: mc['std'] for reg, mc in mc_outputs.items()}
+        
+    #     # MC Dropoutの出力が分位点回帰の形式 (平均値が [N, num_quantiles]) かも確認
+    #     if has_quantile_regression:
+    #          print("INFO: MC Dropout (mean) は分位点回帰の出力形式です。")
+        
+    # else:
+    #     print("INFO: 通常の予測を実行します。")
+    #     model.eval()
+    #     with torch.no_grad():
+    #         raw_outputs, _ = model(x_te)
+        
+    #     # (変更) 分位点回帰モデルの場合
+    #     if has_quantile_regression:
+    #         print("INFO: 分位点回帰モデルとして予測値を出力します。")
+    #         outputs = raw_outputs # outputsの形状は {task: [batch, num_quantiles]}
+    #         # stds は None (標準偏差は出力されないため)
+            
+    #     else:
+    #         # 分位点回帰ではない場合、Aleatoric Uncertaintyか確認
+    #         first_output_value = next(iter(raw_outputs.values()))
+    #         if isinstance(first_output_value, tuple) and len(first_output_value) == 2:
+    #             print("INFO: 予測と不確実性(Aleatoric Uncertainty)が出力されました。")
+    #             has_aleatoric_uncertainty = True
                 
-                result_dir = os.path.join(output_dir, reg)
-                os.makedirs(output_dir,exist_ok=True)
-                TP_dir = os.path.join(result_dir, 'true_predict.png')
-                plt.figure()
-                plt.scatter(true,output)
+    #             outputs = {}
+    #             stds = {}
+    #             for reg, (mu, log_sigma_sq) in raw_outputs.items():
+    #                 outputs[reg] = mu
+    #                 stds[reg] = torch.sqrt(torch.exp(log_sigma_sq))
+    #         else:
+    #             print("INFO: 予測値のみが出力されました。")
+    #             outputs = raw_outputs
+    #             # stds は None のまま
 
-                min_val = min(true.min(), output.min())
-                max_val = max(true.max(), output.max())
-                plt.plot([min_val, max_val], [min_val, max_val], 'r--')
+    # r2_scores, mse_scores = [], []
+    
+    # # --- 3. タスクごとに結果を処理 ---
+    # for reg in reg_list:
+    #     # 分類タスクの処理 (変更なし)
+    #     if '_rank' in reg or not torch.is_floating_point(y_te[reg]):
+    #         # ... (省略) 元のコードと同じ ...
+    #         pass
 
-                plt.xlabel('true_data')
-                plt.ylabel('predicted_data')
-                plt.savefig(TP_dir)
-                plt.close()
+    #     # 回帰タスクの処理
+    #     elif torch.is_floating_point(y_te[reg]):
+    #         true_tensor = y_te[reg]
+            
+    #         pred_tensor_for_eval = None # MAE評価用の予測値 (中央値 or 平均値)
+    #         lower_bound_tensor = None  # 予測区間の下限
+    #         upper_bound_tensor = None  # 予測区間の上限
 
-                hist_dir = os.path.join(result_dir, 'mae_hist.png')
-                plt.hist(np.abs(true-output), bins=30, color='skyblue', edgecolor='black')  # bins=階級数
-                plt.title("Histogram of Normally Distributed Data")
-                plt.xlabel("MAE")
-                plt.ylabel("Frequency")
-                plt.grid(True)
-                #plt.show()
-                plt.savefig(hist_dir)
-                plt.close()
+    #         # --- 3-1. モデルタイプに応じて予測値と区間を決定 ---
 
-                #r2 = r2_score(true,output)
-                corr_matrix = np.corrcoef(true.ravel(),output.ravel())
+    #         # (変更) 分位点回帰モデルの処理
+    #         if has_quantile_regression:
+    #             pred_tensor_all_quantiles = outputs[reg] # 形状 [N, num_quantiles]
+                
+    #             # MAE評価のための中央値(0.5)のインデックスを探す
+    #             try:
+    #                 # model.quantiles は登録バッファ(テンソル)の想定
+    #                 quantiles_list = model.quantiles.cpu().numpy().flatten().tolist()
+    #                 median_index = quantiles_list.index(0.5)
+    #             except (ValueError, AttributeError):
+    #                 print(f"WARN: タスク {reg} のMAE評価に 0.5 (中央値) が見つかりません。最初の分位点を使用します。")
+    #                 median_index = 0
+                
+    #             # MAE評価には中央値の予測を使用
+    #             pred_tensor_for_eval = pred_tensor_all_quantiles[:, median_index:median_index+1]
 
-                # 相関係数（xとyの間の値）は [0, 1] または [1, 0] の位置
-                r2 = corr_matrix[0, 1]
-                #print(r2)
-                r2_scores.append(r2)
-                #mse = mean_squared_error(true,output)
-                mse = mean_absolute_error(true,output)
-                #print(mse)
-                mse_scores.append(mse)
-            else:
-                avg_probs = np.mean(all_task_predictions[reg], axis=0)
-                output = np.argmax(avg_probs, axis=1)
-                true = y_te[reg].numpy()
+    #             # 予測区間 (エラーバー) の計算 (最小と最大の分位点を使用)
+    #             if model.num_quantiles > 1:
+    #                 lower_quantile_index = np.argmin(quantiles_list)
+    #                 upper_quantile_index = np.argmax(quantiles_list)
+                    
+    #                 lower_bound_tensor = pred_tensor_all_quantiles[:, lower_quantile_index:lower_quantile_index+1]
+    #                 upper_bound_tensor = pred_tensor_all_quantiles[:, upper_quantile_index:upper_quantile_index+1]
+            
+    #         # MC Dropout または Aleatoric Uncertainty の処理
+    #         elif (has_mc_dropout or has_aleatoric_uncertainty) and stds is not None:
+    #             pred_tensor_for_eval = outputs[reg] # 平均値 (mu)
+    #             std_tensor = stds[reg]
+                
+    #             # 予測区間 (95% CI)
+    #             lower_bound_tensor = pred_tensor_for_eval - 1.96 * std_tensor
+    #             upper_bound_tensor = pred_tensor_for_eval + 1.96 * std_tensor
+                
+    #         # 不確実性なしの通常予測
+    #         else:
+    #             pred_tensor_for_eval = outputs[reg]
+    #             # lower_bound_tensor, upper_bound_tensor は None のまま
 
-                predicts[reg] = output
-                trues[reg] = true
+    #         # --- 3-2. スケーリング処理とエラーバーの計算 ---
+            
+    #         y_error_asymmetric = None # 非対称エラーバー [2, N] (plt.errorbar用)
+            
+    #         # (★変更) スケーリング解除後の値を保持するため初期化
+    #         lower_bound_unscaled = None
+    #         upper_bound_unscaled = None
 
-                r2 = accuracy_score(true,output)
-                #print(r2)
-                r2_scores.append(r2)
-                mse = f1_score(true,output, average='macro')
-                #print(mse)
-                mse_scores.append(mse)
-    return predicts, trues, r2_scores, mse_scores
+    #         if reg in scalers:
+    #             scaler = scalers[reg]
+    #             # 評価用の予測値 (中央値 or 平均値) をスケール戻し
+    #             pred = scaler.inverse_transform(pred_tensor_for_eval.cpu().detach().numpy())
+    #             true = scaler.inverse_transform(true_tensor.cpu().detach().numpy())
+                
+    #             # 予測区間が利用可能な場合
+    #             if lower_bound_tensor is not None and upper_bound_tensor is not None:
+    #                 lower_bound_unscaled = scaler.inverse_transform(lower_bound_tensor.cpu().detach().numpy())
+    #                 upper_bound_unscaled = scaler.inverse_transform(upper_bound_tensor.cpu().detach().numpy())
+    #         else:
+    #             # スケーラーなし
+    #             pred = pred_tensor_for_eval.cpu().detach().numpy()
+    #             true = true_tensor.cpu().detach().numpy()
+                
+    #             if lower_bound_tensor is not None and upper_bound_tensor is not None:
+    #                 lower_bound_unscaled = lower_bound_tensor.cpu().detach().numpy()
+    #                 upper_bound_unscaled = upper_bound_tensor.cpu().detach().numpy()
+            
+    #         # (変更) 非対称エラーバーの計算 (スケーリング後に行う)
+    #         if lower_bound_unscaled is not None and upper_bound_unscaled is not None:
+    #             # yerr = [下方向の長さ, 上方向の長さ]
+    #             # predは中央値(0.5)または平均値(mu)
+    #             lower_error = pred - lower_bound_unscaled
+    #             upper_error = upper_bound_unscaled - pred
+                
+    #             # 誤差が負になるのを防ぐ (予測順序が逆転した場合など)
+    #             lower_error = np.maximum(lower_error, 0)
+    #             upper_error = np.maximum(upper_error, 0)
+                
+    #             # plt.errorbar の yerr 引数の形式 (2, N) に合わせる
+    #             y_error_asymmetric = np.stack([lower_error.flatten(), upper_error.flatten()], axis=0)
 
-from src.training.train import training_MT,training_MT_BNN
+    #             # --- 3-3. (★追加) MC Dropout 結果のCSV保存 ---
+    #             # MC Dropoutが有効で、不確実性(stds)が計算されている場合
+    #             if has_mc_dropout and stds is not None and reg in stds:
+    #                 try:
+    #                     # スケーリング解除後の標準偏差（不確実性）を計算
+    #                     # upper_bound_unscaled = pred + 1.96 * std_unscaled
+    #                     # (upper_error は 0 でクリップされているため、クリップ前の値を使う)
+    #                     uncertainty_unscaled_raw = (upper_bound_unscaled - pred) / 1.96
+
+    #                     # 形状を (N, 1) から (N,) に統一
+    #                     #ids_flat = test_ids.flatten()
+    #                     ids_flat = np.asarray(test_ids).flatten()
+    #                     true_flat = true.flatten()
+    #                     pred_flat = pred.flatten()
+    #                     uncertainty_flat = uncertainty_unscaled_raw.flatten()
+
+    #                     df_data = {}
+                        
+    #                     # test_ids の長さと予測値の長さが一致するか確認
+    #                     if len(ids_flat) == len(true_flat):
+    #                         df_data = {
+    #                             'id': ids_flat,
+    #                             'true': true_flat,
+    #                             'predicted_mean': pred_flat,
+    #                             'uncertainty_std': uncertainty_flat
+    #                         }
+    #                     else:
+    #                         print(f"WARN: タスク {reg} の test_ids (len {len(ids_flat)}) と予測 (len {len(true_flat)}) の長さが異なります。IDなしで保存します。")
+    #                         df_data = {
+    #                             'true': true_flat,
+    #                             'predicted_mean': pred_flat,
+    #                             'uncertainty_std': uncertainty_flat
+    #                         }
+                        
+    #                     df = pd.DataFrame(df_data)
+                        
+    #                     # (★変更) 保存先のディレクトリをここで定義・作成
+    #                     result_dir_csv = os.path.join(output_dir, reg)
+    #                     os.makedirs(result_dir_csv, exist_ok=True)
+                        
+    #                     csv_path = os.path.join(result_dir_csv, f'{reg}_predictions_mc_uncertainty.csv')
+    #                     df.to_csv(csv_path, index=False)
+    #                     print(f"INFO: MC Dropout の結果を {csv_path} に保存しました。")
+
+    #                 except Exception as e:
+    #                     print(f"ERROR: タスク {reg} の MC Dropout 結果CSV保存中にエラーが発生しました: {e}")
+            
+    #         # --- ここまでが追加/変更箇所 ---
+
+    #         predicts[reg], trues[reg] = pred, true
+            
+    #         # --- 4. 結果のプロット（エラーバー付き） ---
+    #         result_dir = os.path.join(output_dir, reg)
+    #         os.makedirs(result_dir, exist_ok=True) # (★) CSV保存ロジックと重複するが、プロットのために残す
+            
+    #         plt.figure(figsize=(12, 12))
+            
+    #         # (変更) y_error_asymmetric を yerr に指定
+    #         if y_error_asymmetric is not None:
+    #             plt.errorbar(true.flatten(), pred.flatten(), yerr=y_error_asymmetric, fmt='o', color='royalblue', ecolor='lightgray', capsize=3, markersize=4, alpha=0.7, label='Prediction with 95% CI or Quantile Range')
+    #         else:
+    #             plt.scatter(true.flatten(), pred.flatten(), color='royalblue', alpha=0.7)
+            
+    #         if len(ids_flat) == len(true_flat):
+    #             # (★注意) データが多いとラベルが重なりすぎます
+    #             print(f"INFO: タスク {reg} のプロットに {len(ids_flat)} 件のアノテーションを追加します。")
+    #             for i in range(len(ids_flat)):
+    #                 plt.annotate(
+    #                     ids_flat[i], # 表示するテキスト (ID)
+    #                     (true_flat[i], pred_flat[i]), # テキストを配置する座標 (x, y)
+    #                     textcoords="offset points", # オフセットの指定方法
+    #                     xytext=(0, 5), # (x, y) の位置から (0, 5) ポイント上にテキストを配置
+    #                     ha='center', # 水平方向の配置 (中央揃え)
+    #                     fontsize=6,  # フォントサイズ (小さめに設定)
+    #                     alpha=0.5    # 透明度 (重なりを考慮)
+    #                 )
+    #         else:
+    #             print(f"WARN: タスク {reg} の test_ids (len {len(ids_flat)}) と予測 (len {len(true_flat)}) の長さが異なります。アノテーションをスキップします。")
+
+    #         min_val = min(np.min(true), np.min(pred))
+    #         max_val = max(np.max(true), np.max(pred))
+    #         plt.plot([min_val, max_val], [min_val, max_val], 'r--', label='y=x')
+    #         plt.xlabel('True Values')
+    #         plt.ylabel('Predicted Values')
+    #         plt.title(f'True vs Predicted for {reg}')
+    #         plt.legend()
+    #         plt.grid(True)
+
+    #         plt.savefig(os.path.join(result_dir, 'true_predict_with_ci.png'))
+    #         plt.close()
+            
+    #         # 誤差のヒストグラム (変更なし)
+    #         plt.figure()
+    #         plt.hist((true - pred).flatten(), bins=30, color='skyblue', edgecolor='black')
+    #         plt.title("Histogram of Prediction Error")
+    #         plt.xlabel("True - Predicted")
+    #         plt.ylabel("Frequency")
+    #         plt.grid(True)
+    #         plt.savefig(os.path.join(result_dir, 'loss_hist.png'))
+    #         plt.close()
+
+    #         # 評価指標の計算 (変更なし)
+    #         corr_matrix = np.corrcoef(true.flatten(), pred.flatten())
+    #         r2 = corr_matrix[0, 1]
+    #         r2_scores.append(r2)
+            
+    #         # (★変更) normalized_medae_iqr が未定義の場合に備えてフォールバック
+    #         try:
+    #             mae = normalized_medae_iqr(true, pred) # カスタム指標
+    #         except NameError:
+    #             print(f"WARN: normalized_medae_iqr が定義されていません。タスク {reg} の評価に MAE (mean_absolute_error) を使用します。")
+    #             mae = mean_absolute_error(true, pred)
+    #         mse_scores.append(mae)
+
+    # return predicts, trues, r2_scores, mse_scores
+
+# def test_MT(x_te, y_te, model, reg_list, scalers, output_dir, device, test_ids, n_samples_mc=100, shap_eval=False):
+#     """
+#     モデルのテストを実行し、モデルタイプ(通常/Aleatoric/分位点回帰/MC Dropout)を
+#     自動判定して評価と可視化を行う。
+#     """
+    
+#     # --- 1. モデルタイプの判定 ---
+    
+#     # MC Dropoutが実装されているか
+#     has_mc_dropout = hasattr(model, 'predict_with_mc_dropout') and callable(getattr(model, 'predict_with_mc_dropout'))
+    
+#     # (変更) 分位点回帰モデルか (self.quantiles属性を持つか)
+#     has_quantile_regression = hasattr(model, 'quantiles')
+    
+#     # Aleatoric Uncertaintyフラグを初期化
+#     has_aleatoric_uncertainty = False 
+
+#     x_te = x_te.to(device)
+#     predicts, trues = {}, {}
+#     stds = None # 標準偏差 (MC or Aleatoric) 用
+    
+#     # --- 2. 予測方法を切り替えて実行 ---
+    
+#     if has_mc_dropout:
+#         print("INFO: MC Dropoutを有効にして予測区間を計算します。")
+#         mc_outputs = model.predict_with_mc_dropout(x_te, n_samples=n_samples_mc)
+#         outputs = {reg: mc['mean'] for reg, mc in mc_outputs.items()}
+#         stds = {reg: mc['std'] for reg, mc in mc_outputs.items()}
+        
+#         # MC Dropoutの出力が分位点回帰の形式 (平均値が [N, num_quantiles]) かも確認
+#         if has_quantile_regression:
+#              print("INFO: MC Dropout (mean) は分位点回帰の出力形式です。")
+        
+#     else:
+#         print("INFO: 通常の予測を実行します。")
+#         model.eval()
+#         with torch.no_grad():
+#             raw_outputs, _ = model(x_te)
+        
+#         # (変更) 分位点回帰モデルの場合
+#         if has_quantile_regression:
+#             print("INFO: 分位点回帰モデルとして予測値を出力します。")
+#             outputs = raw_outputs # outputsの形状は {task: [batch, num_quantiles]}
+#             # stds は None (標準偏差は出力されないため)
+            
+#         else:
+#             # 分位点回帰ではない場合、Aleatoric Uncertaintyか確認
+#             first_output_value = next(iter(raw_outputs.values()))
+#             if isinstance(first_output_value, tuple) and len(first_output_value) == 2:
+#                 print("INFO: 予測と不確実性(Aleatoric Uncertainty)が出力されました。")
+#                 has_aleatoric_uncertainty = True
+                
+#                 outputs = {}
+#                 stds = {}
+#                 for reg, (mu, log_sigma_sq) in raw_outputs.items():
+#                     outputs[reg] = mu
+#                     stds[reg] = torch.sqrt(torch.exp(log_sigma_sq))
+#             else:
+#                 print("INFO: 予測値のみが出力されました。")
+#                 outputs = raw_outputs
+#                 # stds は None のまま
+
+#     r2_scores, mse_scores = [], []
+    
+#     # --- 3. タスクごとに結果を処理 ---
+#     for reg in reg_list:
+#         # 分類タスクの処理 (変更なし)
+#         if '_rank' in reg or not torch.is_floating_point(y_te[reg]):
+#             # ... (省略) 元のコードと同じ ...
+#             pass
+
+#         # 回帰タスクの処理
+#         elif torch.is_floating_point(y_te[reg]):
+#             true_tensor = y_te[reg]
+            
+#             pred_tensor_for_eval = None # MAE評価用の予測値 (中央値 or 平均値)
+#             lower_bound_tensor = None   # 予測区間の下限
+#             upper_bound_tensor = None   # 予測区間の上限
+
+#             # --- 3-1. モデルタイプに応じて予測値と区間を決定 ---
+
+#             # (変更) 分位点回帰モデルの処理
+#             if has_quantile_regression:
+#                 pred_tensor_all_quantiles = outputs[reg] # 形状 [N, num_quantiles]
+                
+#                 # MAE評価のための中央値(0.5)のインデックスを探す
+#                 try:
+#                     # model.quantiles は登録バッファ(テンソル)の想定
+#                     quantiles_list = model.quantiles.cpu().numpy().flatten().tolist()
+#                     median_index = quantiles_list.index(0.5)
+#                 except (ValueError, AttributeError):
+#                     print(f"WARN: タスク {reg} のMAE評価に 0.5 (中央値) が見つかりません。最初の分位点を使用します。")
+#                     median_index = 0
+                
+#                 # MAE評価には中央値の予測を使用
+#                 pred_tensor_for_eval = pred_tensor_all_quantiles[:, median_index:median_index+1]
+
+#                 # 予測区間 (エラーバー) の計算 (最小と最大の分位点を使用)
+#                 if model.num_quantiles > 1:
+#                     lower_quantile_index = np.argmin(quantiles_list)
+#                     upper_quantile_index = np.argmax(quantiles_list)
+                    
+#                     lower_bound_tensor = pred_tensor_all_quantiles[:, lower_quantile_index:lower_quantile_index+1]
+#                     upper_bound_tensor = pred_tensor_all_quantiles[:, upper_quantile_index:upper_quantile_index+1]
+                
+#             # MC Dropout または Aleatoric Uncertainty の処理
+#             elif (has_mc_dropout or has_aleatoric_uncertainty) and stds is not None:
+#                 pred_tensor_for_eval = outputs[reg] # 平均値 (mu)
+#                 std_tensor = stds[reg]
+                
+#                 # 予測区間 (95% CI)
+#                 lower_bound_tensor = pred_tensor_for_eval - 1.96 * std_tensor
+#                 upper_bound_tensor = pred_tensor_for_eval + 1.96 * std_tensor
+                
+#             # 不確実性なしの通常予測
+#             else:
+#                 pred_tensor_for_eval = outputs[reg]
+#                 # lower_bound_tensor, upper_bound_tensor は None のまま
+
+#             # --- 3-2. スケーリング処理とエラーバーの計算 ---
+            
+#             y_error_asymmetric = None # 非対称エラーバー [2, N] (plt.errorbar用)
+            
+#             if reg in scalers:
+#                 scaler = scalers[reg]
+#                 # 評価用の予測値 (中央値 or 平均値) をスケール戻し
+#                 pred = scaler.inverse_transform(pred_tensor_for_eval.cpu().detach().numpy())
+#                 true = scaler.inverse_transform(true_tensor.cpu().detach().numpy())
+                
+#                 # 予測区間が利用可能な場合
+#                 if lower_bound_tensor is not None and upper_bound_tensor is not None:
+#                     lower_bound_unscaled = scaler.inverse_transform(lower_bound_tensor.cpu().detach().numpy())
+#                     upper_bound_unscaled = scaler.inverse_transform(upper_bound_tensor.cpu().detach().numpy())
+#             else:
+#                 # スケーラーなし
+#                 pred = pred_tensor_for_eval.cpu().detach().numpy()
+#                 true = true_tensor.cpu().detach().numpy()
+                
+#                 if lower_bound_tensor is not None and upper_bound_tensor is not None:
+#                     lower_bound_unscaled = lower_bound_tensor.cpu().detach().numpy()
+#                     upper_bound_unscaled = upper_bound_tensor.cpu().detach().numpy()
+            
+#             # (変更) 非対称エラーバーの計算 (スケーリング後に行う)
+#             if lower_bound_tensor is not None and upper_bound_tensor is not None:
+#                 # yerr = [下方向の長さ, 上方向の長さ]
+#                 # predは中央値(0.5)または平均値(mu)
+#                 lower_error = pred - lower_bound_unscaled
+#                 upper_error = upper_bound_unscaled - pred
+                
+#                 # 誤差が負になるのを防ぐ (予測順序が逆転した場合など)
+#                 lower_error = np.maximum(lower_error, 0)
+#                 upper_error = np.maximum(upper_error, 0)
+                
+#                 # plt.errorbar の yerr 引数の形式 (2, N) に合わせる
+#                 y_error_asymmetric = np.stack([lower_error.flatten(), upper_error.flatten()], axis=0)
+
+#             predicts[reg], trues[reg] = pred, true
+            
+#             # --- 4. 結果のプロット（エラーバー付き） ---
+#             result_dir = os.path.join(output_dir, reg)
+#             os.makedirs(result_dir, exist_ok=True)
+            
+#             plt.figure(figsize=(8, 8))
+            
+#             # (変更) y_error_asymmetric を yerr に指定
+#             if y_error_asymmetric is not None:
+#                 plt.errorbar(true.flatten(), pred.flatten(), yerr=y_error_asymmetric, fmt='o', color='royalblue', ecolor='lightgray', capsize=3, markersize=4, alpha=0.7, label='Prediction with 95% CI or Quantile Range')
+#             else:
+#                 plt.scatter(true.flatten(), pred.flatten(), color='royalblue', alpha=0.7)
+            
+#             min_val = min(np.min(true), np.min(pred))
+#             max_val = max(np.max(true), np.max(pred))
+#             plt.plot([min_val, max_val], [min_val, max_val], 'r--', label='y=x')
+#             plt.xlabel('True Values')
+#             plt.ylabel('Predicted Values')
+#             plt.title(f'True vs Predicted for {reg}')
+#             plt.legend()
+#             plt.grid(True)
+#             plt.savefig(os.path.join(result_dir, 'true_predict_with_ci.png'))
+#             plt.close()
+            
+#             # 誤差のヒストグラム (変更なし)
+#             plt.figure()
+#             plt.hist((true - pred).flatten(), bins=30, color='skyblue', edgecolor='black')
+#             plt.title("Histogram of Prediction Error")
+#             plt.xlabel("True - Predicted")
+#             plt.ylabel("Frequency")
+#             plt.grid(True)
+#             plt.savefig(os.path.join(result_dir, 'loss_hist.png'))
+#             plt.close()
+
+#             # 評価指標の計算 (変更なし)
+#             # MAE (normalized_medae_iqr) は `pred` (中央値 or 平均値) と `true` で計算されます
+#             corr_matrix = np.corrcoef(true.flatten(), pred.flatten())
+#             r2 = corr_matrix[0, 1]
+#             r2_scores.append(r2)
+#             #mae = mean_absolute_error(true, pred)
+#             mae = normalized_medae_iqr(true, pred) # カスタム指標
+#             mse_scores.append(mae)
+
+#     return predicts, trues, r2_scores, mse_scores
+
+
+from src.training.train import training_MT
 from src.training.train_GP import training_MT_GP
 from src.test.test_GP import test_MT_GP
 
@@ -561,29 +1136,57 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         model = MTCNNModel_SA(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
     elif model_name == 'CNN_Di':
         model = MTCNNModel_Di(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
+    elif model_name == 'BNN':
+        from src.models.MT_BNN import BNNMTModel
+        print(reg_list)
+        model = BNNMTModel(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
     elif model_name == 'BNN_MG':
         model = MTBNNModel_MG(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
-    elif model_name == 'NN_AE':
-        from src.models.AE import Autoencoder, FineTuningModel
+    elif 'AE' in model_name:
+        from src.models.AE import Autoencoder, FineTuningModel, FineTuningModel_PEFT
         ae_model = Autoencoder(input_dim=input_dim)
         ae_model = ae_model.to(device)
         from src.training.train_FT import train_pretraining
         ae_model = train_pretraining(model = ae_model, x_tr = X_train, x_val = X_val, device = device, output_dir = vis_dir)
         import copy
         pretrained_encoder = copy.deepcopy(ae_model.get_encoder())
-        model = FineTuningModel(pretrained_encoder = pretrained_encoder,last_shared_layer_dim = 128, output_dims = output_dims,reg_list = reg_list)
+        if 'PEFT' in model_name:
+            model = FineTuningModel_PEFT(pretrained_encoder = pretrained_encoder,last_shared_layer_dim = 128, output_dims = output_dims,reg_list = reg_list)
+        else:
+            model = FineTuningModel(pretrained_encoder = pretrained_encoder,last_shared_layer_dim = 128, output_dims = output_dims,reg_list = reg_list)
         
         stacked_Y = torch.stack(list(Y_train.values()), dim=1)
         has_nan_mask = torch.isnan(stacked_Y).any(dim=1)
         keep_mask = ~has_nan_mask
         X_train = X_train[keep_mask.squeeze()]
         Y_train = {reg: Y_train[reg][keep_mask.squeeze()] for reg in reg_list}
-
+    elif model_name == 'MoE':
+        from src.models.MoE import MoEModel
+        model = MoEModel(input_dim=input_dim, output_dims = output_dims, reg_list=reg_list, num_experts = 8, top_k = 4, )
+    elif model_name == 'NN_Q':
+        from src.models.MT_NN_Q import MTNNQuantileModel
+        quantiles = [0.1, 0.5, 0.9]
+        model = MTNNQuantileModel(input_dim=input_dim, reg_list=reg_list, quantiles=quantiles, )
+    elif model_name == 'PNN':
+        from src.models.MT_PNN import ProbabilisticMTNNModel
+        model = ProbabilisticMTNNModel(input_dim=input_dim, output_dims=output_dims, reg_list=reg_list)
+    elif model_name == 'PNN_t':
+        from src.models.MT_PNN_t import t_ProbabilisticMTNNModel
+        model = t_ProbabilisticMTNNModel(input_dim=input_dim, output_dims=output_dims, reg_list=reg_list, task_dfs=[5.0])
+    elif model_name == 'PNN_gamma':
+        from src.models.MT_PNN_gamma import Gamma_ProbabilisticMTNNModel
+        model = Gamma_ProbabilisticMTNNModel(input_dim=input_dim, output_dims=output_dims, reg_list=reg_list)
+    elif model_name == 'MDN':
+        from src.models.MT_MDN import MDN_MTNNModel
+        model = MDN_MTNNModel(input_dim = input_dim, output_dims = output_dims, reg_list = reg_list, n_components = 1)
     elif model_name == 'NN_Uncertainly':
         from src.models.MT_NN_Uncertainly import MTNNModelWithUncertainty
         model = MTNNModelWithUncertainty(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
-    elif 'NN' in model_name:
+    elif model_name == 'NN':
         model = MTNNModel(input_dim = input_dim, output_dims = output_dims,reg_list = reg_list)
+    elif model_name == 'NN_gate':
+        from src.models.MT_NN_gate import gate_MTNNModel
+        model = gate_MTNNModel(input_dim = input_dim, output_dims = output_dims,reg_list = reg_list, gated_tasks = ['Available_P'])
     elif model_name == 'GP':
         if len(reg_list) > 1:
             likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(num_tasks=len(reg_list))
@@ -628,16 +1231,21 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
     print('テストデータ数:',len(X_test))
 
         #nuts_kernel = NUTS(MT_HBM, jit_compile=True)
-    if 'BNN' in model_name:
-        model_trained = training_MT_BNN(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model,
-                                    #optimizer = optimizer, 
-                                    scalers = scalers,
-                                    output_dim=output_dims,
-                                    reg_list = reg_list, output_dir = vis_dir, 
-                                    model_name = model_name,
-                                    loss_sum = loss_sum
-                                    )
-        predicts, true, r2_results, mse_results = test_MT_BNN(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir)
+    if model_name == 'BNN':
+        from src.training.train_BNN import training_BNN_MT
+        print(reg_list)
+        model_trained = training_BNN_MT(x_tr = X_train, x_val = X_val, y_tr = Y_train, y_val = Y_val,
+                                        model = model, # これは BNNMTModel のインスタンス
+                                        output_dim = output_dims, reg_list = reg_list, 
+                                        output_dir = vis_dir, model_name = model_name,
+                                        device = device, batch_size = batch_size,
+                                        scalers = scalers, # (元のコードの引数。BNNでは主に可視化用)
+                                        train_ids = train_ids, # (元のコードの引数。BNNでは主に可視化用)
+                                        reg_loss_fanction = reg_loss_fanction, # 回帰/分類の判別用
+                                            )
+
+        from src.test.test_BNN import test_BNN_MT
+        predicts, true, r2_results, mse_results = test_BNN_MT(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir)
 
     elif 'GP' in model_name:
         model_trained,likelihood_trained  = training_MT_GP(x_tr = X_train, y_tr = y_train, model = model,likelihood = likelihood, 
@@ -671,6 +1279,71 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         predicts, true, r2_results, mse_results = test_stacking(x_te = X_test, y_te = Y_test, final_models = final_models, meta_model = meta_model, reg_list = reg_list, 
                                                                 scalers = scalers, output_dir = vis_dir, device = device)
         model_trained = {'metamodel':meta_model, 'base_models':final_models}
+    elif 'MoE' in model_name:
+        from src.training.train_MoE import training_MoE
+        model_trained = training_MoE(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model,
+                                     output_dim = output_dims, reg_list = reg_list, output_dir = vis_dir, device = device, batch_size = batch_size,
+                                  scalers = scalers, train_ids = train_ids, reg_loss_fanction = reg_loss_fanction,
+                                )
+        from src.test.test_MoE import test_MoE
+        test_MoE(x_te = X_test,y_te = Y_test, model = model_trained, reg_list = reg_list, 
+                 scalers = scalers, output_dir = vis_dir, device = device, )
+    elif model_name == 'PNN':
+        from src.training.train_PNN import training_MT_PNN
+        model_trained = training_MT_PNN(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model, 
+                                        reg_list = reg_list, output_dir = vis_dir, model_name = model_name, device = device, batch_size = batch_size, train_ids = train_ids,) 
+        from src.test.test_PNN import test_MT_PNN
+        predicts, true, r2_results, mse_results = test_MT_PNN(x_te = X_test, y_te = Y_test, model = model_trained, reg_list = reg_list, 
+                                                                #scalers, 
+                                                                output_dir = vis_dir, device = device, 
+                                                                #features, n_samples_mc=100, shap_eval=False
+                                                                )
+    elif model_name == 'PNN_t':
+        from src.training.train_PNN_t import training_MT_PNN_t
+        model_trained = training_MT_PNN_t(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model, 
+                                        reg_list = reg_list, output_dir = vis_dir, model_name = model_name, device = device, batch_size = batch_size, train_ids = train_ids,) 
+        from src.test.test_PNN_t import test_MT_PNN_t
+        predicts, true, r2_results, mse_results = test_MT_PNN_t(x_te = X_test, y_te = Y_test, model = model_trained, reg_list = reg_list, 
+                                                                #scalers, 
+                                                                output_dir = vis_dir, device = device, 
+                                                                #features, n_samples_mc=100, shap_eval=False
+                                                                )
+    elif model_name == 'PNN_gamma':
+        from src.training.train_PNN_gamma import training_MT_PNN_gamma
+        model_trained = training_MT_PNN_gamma(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model, 
+                                        reg_list = reg_list, output_dir = vis_dir, model_name = model_name, device = device, batch_size = batch_size, train_ids = train_ids,) 
+        from src.test.test_PNN_gamma import test_MT_PNN_gamma
+        predicts, true, r2_results, mse_results = test_MT_PNN_gamma(x_te = X_test, y_te = Y_test, model = model_trained, reg_list = reg_list, 
+                                                                #scalers, 
+                                                                output_dir = vis_dir, device = device, 
+                                                                #features, n_samples_mc=100, shap_eval=False
+                                                                )
+    elif model_name == 'MDN':
+        from src.training.train_MDN import training_MT_MDN
+        model_trained = training_MT_MDN(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model, 
+                                        reg_list = reg_list, output_dir = vis_dir, model_name = model_name, device = device, batch_size = batch_size, train_ids = train_ids,) 
+        from src.test.test_MDN import test_MT_MDN
+        predicts, true, r2_results, mse_results = test_MT_MDN(x_te = X_test, y_te = Y_test, model = model_trained, reg_list = reg_list, 
+                                                                #scalers, 
+                                                                output_dir = vis_dir, device = device, 
+                                                                #features, n_samples_mc=100, shap_eval=False
+                                                                )
+    elif model_name == 'NN_gate':
+        from src.training.train_gate import training_MT_gate
+        model_trained = training_MT_gate(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model, 
+                                    #optimizer = optimizer, 
+                                    scalers = scalers,
+                                    train_ids = train_ids,
+                                    reg_loss_fanction = reg_loss_fanction,
+                                    output_dim=output_dims,
+                                    reg_list = reg_list, output_dir = vis_dir, 
+                                    model_name = model_name,
+                                    loss_sum = loss_sum,
+                                    device = device,
+                                    batch_size = batch_size
+                                    )
+        from src.test.test_gate import test_MT_gate
+        predicts, true, r2_results, mse_results = test_MT_gate(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir,device = device)
     else:
         #optimizer = optim.Adam(model.parameters(), lr=0.001)
         model_trained = training_MT(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model, 
@@ -686,7 +1359,8 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                     batch_size = batch_size
                                     )
         
-        predicts, true, r2_results, mse_results = test_MT(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir,device = device, features = features)
+        predicts, true, r2_results, mse_results = test_MT(X_test,Y_test, X_val, Y_val, 
+                                                          model_trained,reg_list,scalers,output_dir=vis_dir,device = device, test_ids = test_ids)
         
         if save_feature:
             from src.experiments.shared_deature_save import save_features
@@ -747,32 +1421,6 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         mpld3.save_html(fig, out)
         # メモリを解放するためにプロットを閉じます（多くのグラフを作成する場合に有効です）
         plt.close(fig)
-
-        #test_df.to_csv(out_csv)
-
-            #ax.legend() # 各グラフの凡例を表示
-            #ax.grid(axis='y', linestyle='--', alpha=0.7) # y軸のグリッド線
-            #print(loss)
-            #loss_dir = os.path.join(vis_dir, reg)
-            #os.makedirs(loss_dir,exist_ok=True)
-            #out = os.path.join(loss_dir, 'loss.png')
-            #out = os.path.join(loss_dir, 'loss.html')
-
-            # 1. グラフの準備 (figとaxを取得)
-            # figsizeでグラフ全体のサイズを指定します。幅を広く(30)、高さを標準(8)に設定してみましょう。
-            #fig, ax = plt.subplots(figsize=(90, 8))
-
-            #print(f'ids:{test_ids}')
-            # 2. グラフの描画
-            # 元のコードと同じように棒グラフを作成します。
-            #ax.bar(test_ids.to_numpy().ravel(), loss.ravel())
-            # 2. 【変更点】x軸の位置を数値で作成
-
-            #ax.bar(test_ids, loss.ravel())
-            # 3. 【変更点】数値の位置を使ってグラフを描画
-            #ax.bar(x_positions, loss.ravel())
-            #ax.bar(test_ids.values(), loss.ravel())
-            #ax.tick_params(axis='x', rotation=90) # x軸のラベルを90度回転
     else:
         #out_csv = os.path.join(vis_dir, f'loss_{reg_list[0]}.csv')        
         loss = np.abs(predicts[reg_list[0]]-true[reg_list[0]])

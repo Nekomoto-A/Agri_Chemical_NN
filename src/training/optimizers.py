@@ -66,45 +66,39 @@ class NormalizedLoss(nn.Module):
 
 # このモジュールは、各タスクの損失を受け取り、
 # 学習可能な不確実性パラメータ（対数分散）に基づいて重み付けされた合計損失を計算します。
-class UncertainlyweightedLoss(nn.Module):
+class UncertaintyWeightedLoss(nn.Module):
+    """
+    不確実性（偶然的不確実性）に基づいてマルチタスクの損失を重み付けするカスタム損失関数。
+    (回帰タスク (MSE) を想定)
+    """
     def __init__(self, reg_list):
-        """
-        MultiTaskLossモジュールのコンストラクタ。
-        Args:
-            num_tasks (int): 学習するタスクの数。
-        """
-        super(UncertainlyweightedLoss, self).__init__()
-        # 各タスクの不確実性（対数分散）を学習可能なパラメータとして定義します。
-        # log_varが大きいほど、そのタスクの損失に対する重みが小さくなります。
-        # 初期値はすべて0に設定されます。
+        super(UncertaintyWeightedLoss, self).__init__()
         self.reg_list = reg_list
-        self.log_vars = nn.Parameter(torch.zeros(len(reg_list)))
+        self.mse = nn.MSELoss(reduction='mean')
 
-    def forward(self, losses):
+    def forward(self, predictions, targets, log_vars):
         """
-        重み付けされた合計損失を計算します。
         Args:
-            losses (list or torch.Tensor): 各タスクの損失のリストまたはテンソル。
-                                           例: [loss_task1, loss_task2, ...]
-        Returns:
-            torch.Tensor: 不確実性に基づいて重み付けされた合計損失。
+            predictions (dict): モデルの予測出力 (タスク名 -> テンソル)
+            targets (dict): 教師データ (タスク名 -> テンソル)
+            log_vars (dict or nn.ParameterDict): log(sigma^2) (タスク名 -> テンソル)
         """
-        # lossesは各タスクの損失のリストまたはテンソルです。
-        # log_varsの各要素は、対応するタスクの対数分散です。
-        # 重みはexp(-log_var) / (2 * exp(log_var)) = 1 / (2 * exp(log_var)) となります。
-        # 損失の合計は、各損失を不確実性に基づいて重み付けしたものです。
-        # この実装は、論文「Multi-Task Learning Using Uncertainty to Weigh Losses for Scene Geometry and Semantics」
-        # (Kendall et al., 2018) に基づいています。
         total_loss = 0
-        for i, loss in enumerate(losses.values()):
-            # 精度 (precision) は分散の逆数として定義されます。
-            # exp(-log_var) は 1 / exp(log_var) と等しく、分散の逆数に対応します。
-            precision = torch.exp(-self.log_vars[i])
-            # 各タスクの損失に精度を掛け、さらにlog_varを加算します。
-            # log_varの項は正則化の役割を果たし、モデルが不確実性を過度に大きくするのを防ぎます。
-            total_loss += precision * loss + self.log_vars[i]
-            print(f'{self.reg_list[i]}:{self.log_vars[i]}')
-        return total_loss
+        
+        for reg in self.reg_list:
+            pred = predictions[reg]
+            target = targets[reg]
+            log_var = log_vars[reg]
+            
+            precision = torch.exp(-log_var)
+            task_mse = self.mse(pred, target)
+            
+            # (1 / (2 * sigma^2)) * MSE + 0.5 * log(sigma^2)
+            weighted_loss = 0.5 * precision * task_mse + 0.5 * log_var
+            
+            total_loss += weighted_loss
+            
+        return total_loss.squeeze()
 
 class LearnableTaskWeightedLoss(nn.Module):
     def __init__(self, reg_list):

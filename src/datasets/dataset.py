@@ -488,19 +488,20 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
             val_ids = torch.tensor([])
     #print(test_ids)
 
-    #print(f'データ拡張前：{x_train_split.shape}')
+    print(f'データ拡張前：{x_train_split.shape}')
 
     if data_augumentation == 'ctgan':
         #x_train_split, y_train_split = augment_with_ctgan(x_train_split, y_train_split, reg_list, labels = labels,n_samples=num_augumentation, epochs=num_epochs, output_dir = fold,data_vis = data_vis)
         x_train_split, y_train_split = augment_with_ctgan(x_train_split, y_train_split, reg_list, labels = labels, epochs=num_epochs,batch_size = batch_size, output_dir = fold,data_vis = data_vis)
     elif data_augumentation == 'smoter':
-        x_train_split, y_train_split = augment_with_smoter(x_train_split, y_train_split, reg_list, output_dir = fold, data_vis = data_vis, k_neighbors=5, random_state=42)
+        x_train_split, y_train_split = augment_with_smoter(x_train_split, y_train_split[reg_list], reg_list, output_dir = fold, data_vis = data_vis, 
+                                                           #k_neighbors=5, random_state=42
+                                                           )
     elif data_augumentation == 'gaussian_copula':
         x_train_split, y_train_split = augment_with_gaussian_copula(x_train_split, y_train_split, reg_list, output_dir = fold, data_vis = data_vis, num_synthetic_samples = num_augumentation)
     elif data_augumentation == 'copulagan':
         x_train_split, y_train_split = augment_with_copulagan(X = x_train_split, y = y_train_split, reg_list = reg_list, output_dir = fold, data_vis = data_vis, num_to_generate = num_augumentation)
-    
-    #print(f'データ拡張後：{x_train_split.shape}')
+    print(f'データ拡張後：{x_train_split.shape}')
 
     if marginal_hist_train:
         from src.experiments.merginal_hist import save_marginal_histograms
@@ -585,6 +586,15 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
             elif tr == 'log':
                 from sklearn.preprocessing import FunctionTransformer
                 pp = FunctionTransformer(func=np.log1p, inverse_func=np.expm1)
+                pp = pp.fit(y_train_split[reg].values.reshape(-1, 1))
+                y_train_split_pp = pp.transform(y_train_split[reg].values.reshape(-1, 1))
+                if isinstance(val_size, (int, float)):
+                    y_val_pp = pp.transform(y_val[reg].values.reshape(-1, 1))
+                y_test_pp = pp.transform(y_test[reg].values.reshape(-1, 1))
+                scalers[reg] = pp  # スケーラーを保存
+            elif tr == 'QT':
+                from sklearn.preprocessing import QuantileTransformer
+                pp = QuantileTransformer(output_distribution='normal')
                 pp = pp.fit(y_train_split[reg].values.reshape(-1, 1))
                 y_train_split_pp = pp.transform(y_train_split[reg].values.reshape(-1, 1))
                 if isinstance(val_size, (int, float)):

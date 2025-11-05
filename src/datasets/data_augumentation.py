@@ -14,7 +14,7 @@ from rdt.transformers import NullTransformer
 
 import math
 
-def augment_with_ctgan(X, y, reg_list, output_dir, data_vis, labels=None, epochs=10, batch_size=32):
+def augment_with_ctgan(X, y, reg_list, output_dir, data_vis, labels=None):
     """
     CTGANを使用して表形式データを拡張し、t-SNEで可視化する関数。
     - yの連続値を3クラスに分類し、学習データに加えます。
@@ -804,3 +804,243 @@ def augment_with_copulagan(X, y, reg_list, output_dir, data_vis, num_to_generate
     #     plt.close()
 
     return synthetic_features, synthetic_targets
+
+import pandas as pd
+import numpy as np
+import os
+import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
+import smogn  # SMOTER (smogn) ライブラリをインポート
+
+def augment_with_smoter(X, y, reg_list, output_dir, data_vis, labels=None):
+    """
+    SMOTERを使用して表形式データを拡張し、t-SNEで可視化する関数。
+    (augment_with_ctgan 関数を SMOTER 用に書き換え)
+
+    [重要] SMOTERの仕様上の注意点:
+    - reg_listに複数のターゲットが含まれていても、最初のターゲット (reg_list[0]) のみに基づいて拡張を行います。
+    - labels引数はデータ拡張の条件付けには使用されず (SMOTERがサポートしないため)、
+      拡張前後のt-SNE可視化の色分けにのみ使用されます。
+    
+    拡張後のプロットでは、元のデータを〇、生成データを△で表示します。
+
+    Args:
+        X (pd.DataFrame): 特徴量のデータフレーム。
+        y (pd.DataFrame): ターゲット変数とラベルを含むデータフレーム。
+        reg_list (list): ターゲット変数の列名のリスト (拡張には最初の要素のみ使用)。
+        output_dir (str): 結果を保存するディレクトリのパス。
+        data_vis (str): 可視化結果を保存するサブディレクトリ名。
+        labels (list, optional): 可視化に使用するカテゴリカルな列名のリスト。Defaults to None.
+
+    Returns:
+        tuple: (拡張後の特徴量, 拡張後のターゲット/ラベルDF) のタプル。
+    """
+    
+    # --- 0. 初期設定 ---
+    
+    # labelsがNoneの場合に空リストを割り当てて、後の処理を簡潔にする
+    if labels is None:
+        labels = []
+
+    # 拡張の基準となるターゲット変数を決定 (reg_listの最初の要素)
+    if not reg_list:
+        raise ValueError("reg_list must contain at least one target column name.")
+        
+    reg_target = reg_list[0]
+    
+    print(f"--- SMOTER Augmentation ---")
+    print(f"Target for augmentation: {reg_target}")
+    if len(reg_list) > 1:
+        print(f"Warning: reg_list has multiple items. Only '{reg_target}' will be used for SMOTER logic.")
+    if labels:
+        print(f"Info: 'labels' argument ({labels}) will be used for visualization only, not for conditional augmentation.")
+
+    result_dir = os.path.join(output_dir, data_vis)
+    os.makedirs(result_dir, exist_ok=True)
+
+    # =================================================================
+    # 1. 拡張前のデータをt-SNEで可視化 (CTGAN関数から流用)
+    # =================================================================
+    print("Visualizing data before augmentation...")
+    
+    # t-SNEのperplexityはデータ数未満である必要があるため調整
+    perplexity_val = min(30, len(X)-1)
+    if perplexity_val <= 0:
+        print("Warning: Not enough data points for t-SNE. Skipping augmentation.")
+        return X, y # データが少なすぎる場合はそのまま返す
+
+    tsne_before = TSNE(n_components=2, random_state=42, perplexity=perplexity_val)
+    X_embedded = tsne_before.fit_transform(X.values)
+    df_embedded = pd.DataFrame(X_embedded, columns=["tsne1", "tsne2"])
+
+    # --- ターゲット変数(y)で可視化 (reg_listの全てを可視化) ---
+    for reg in reg_list:
+        ba_path = os.path.join(result_dir, f'{reg}_before_augument.png')
+        df_embedded["target"] = y[reg].values
+        plt.figure(figsize=(8, 6))
+        sc = plt.scatter(
+            df_embedded["tsne1"], df_embedded["tsne2"],
+            c=df_embedded["target"], cmap="viridis", alpha=0.8
+        )
+        plt.colorbar(sc, label="target")
+        plt.xlabel("t-SNE 1")
+        plt.ylabel("t-SNE 2")
+        plt.title(f"t-SNE before Augmentation (target: {reg})")
+        plt.tight_layout()
+        plt.savefig(ba_path)
+        plt.close()
+
+    # --- ラベル(labels)で可視化 (CTGAN関数から流用) ---
+    for label in labels:
+        ba_path = os.path.join(result_dir, f'{label}_before_augument.png')
+        df_embedded["target"] = y[label].values
+        # ラベルのユニーク値を取得（ソートして色の順序を固定）
+        unique_labels = sorted(df_embedded["target"].dropna().unique())
+        
+        # 色のマッピングを固定
+        colors = plt.cm.get_cmap('tab10', max(10, len(unique_labels)))
+        color_map = {val: colors(i % 10) for i, val in enumerate(unique_labels)}
+
+        plt.figure(figsize=(10, 6))
+        for val in unique_labels:
+            subset = df_embedded[df_embedded["target"] == val]
+            plt.scatter(
+                subset["tsne1"], subset["tsne2"],
+                color=color_map[val], alpha=0.8, label=val
+            )
+        plt.xlabel("t-SNE 1")
+        plt.ylabel("t-SNE 2")
+        plt.title(f"t-SNE before Augmentation (colored by {label})")
+        plt.legend(title=label, bbox_to_anchor=(1.05, 1), loc='upper left')
+        plt.tight_layout()
+        plt.savefig(ba_path, bbox_inches='tight')
+        plt.close()
+
+    # =================================================================
+    # 2. SMOTERの学習準備
+    # =================================================================
+    print("Preparing data for SMOTER...")
+    
+    # smognはXとyが結合されたDataFrameを入力として要求します
+    # y[labels] も含めて、後で分離・可視化するために全情報を結合します
+    df_for_training = pd.concat([X, y], axis=1)
+    
+    # 元のデータ数を記録
+    n_original = len(df_for_training)
+
+    # =================================================================
+    # 3. SMOTERによるデータ生成
+    # =================================================================
+    print(f"Applying SMOTER based on target: {reg_target}...")
+    
+    try:
+        # smogn.smoter() を実行
+        # 'data'に全DataFrameを、'y'に拡張の基準となるターゲット列名を指定
+        augmented_df_full = smogn.smoter(
+            data=df_for_training,
+            y=reg_target
+            # 必要に応じて smogn の他のパラメータ (k, pert など) を追加
+        )
+        print(f"Generated {len(augmented_df_full) - n_original} synthetic samples.")
+        
+    except Exception as e:
+        print(f"Error during SMOTER execution: {e}")
+        print("Skipping augmentation and returning original data.")
+        return X, y
+
+    # =================================================================
+    # 4. 拡張後のデータをt-SNEで可視化 (CTGAN関数から流用)
+    # =================================================================
+    print("Visualizing data after augmentation...")
+    
+    # --- 拡張後の完全なデータフレームから特徴量とターゲットを分離 ---
+    synthetic_features = augmented_df_full[X.columns]
+    synthetic_targets_df = augmented_df_full[y.columns] # yの全列(reg_list + labels)
+    
+    # --- t-SNEの計算 ---
+    perplexity_val_aug = min(30, len(synthetic_features)-1)
+    if perplexity_val_aug <= 0:
+        print("Warning: Not enough data points for post-augmentation t-SNE. Skipping visualization.")
+        return synthetic_features, synthetic_targets_df
+
+    tsne_after = TSNE(n_components=2, random_state=42, perplexity=perplexity_val_aug)
+    X_augmented_embedded = tsne_after.fit_transform(synthetic_features.values)
+    df_augmented_embedded = pd.DataFrame(X_augmented_embedded, columns=["tsne1", "tsne2"])
+
+    # --- ターゲット変数(y)で可視化 (reg_listの全て) ---
+    for reg in reg_list:
+        aa_path = os.path.join(result_dir, f'{reg}_after_augument.png')
+        df_augmented_embedded["target"] = synthetic_targets_df[reg].values
+        
+        plt.figure(figsize=(8, 6))
+        # 元のデータ (マーカー: 〇)
+        plt.scatter(
+            df_augmented_embedded["tsne1"][:n_original], df_augmented_embedded["tsne2"][:n_original],
+            c=df_augmented_embedded["target"][:n_original], cmap="viridis", alpha=0.8, marker='o'
+        )
+        # 生成データ (マーカー: △)
+        sc = plt.scatter(
+            df_augmented_embedded["tsne1"][n_original:], df_augmented_embedded["tsne2"][n_original:],
+            c=df_augmented_embedded["target"][n_original:], cmap="viridis", alpha=0.8, marker='^'
+        )
+        
+        plt.colorbar(sc, label="target")
+        plt.xlabel("t-SNE 1")
+        plt.ylabel("t-SNE 2")
+        plt.title(f"t-SNE after Augmentation (target: {reg})")
+        # 凡例を手動で追加
+        legend_elements = [Line2D([0], [0], marker='o', color='w', label='Original', markerfacecolor='grey', markersize=10),
+                           Line2D([0], [0], marker='^', color='w', label='Generated', markerfacecolor='grey', markersize=10)]
+        plt.legend(handles=legend_elements)
+        plt.tight_layout()
+        plt.savefig(aa_path)
+        plt.close()
+
+    # --- ラベル(labels)で可視化 (CTGAN関数から流用) ---
+    for label in labels:
+        aa_path = os.path.join(result_dir, f'{label}_after_augument.png')
+        
+        plt.figure(figsize=(10, 6))
+        # 拡張後データで再度ユニーク値とカラーマップを定義
+        unique_values = sorted(synthetic_targets_df[label].dropna().unique())
+        colors = plt.cm.get_cmap('tab10', max(10, len(unique_values)))
+        color_map = {val: colors(i % 10) for i, val in enumerate(unique_values)}
+        
+        # 色情報を列として追加
+        df_augmented_embedded['color'] = synthetic_targets_df[label].map(color_map).values
+        
+        # 元のデータ (マーカー: 〇)
+        plt.scatter(
+            df_augmented_embedded.iloc[:n_original]['tsne1'], df_augmented_embedded.iloc[:n_original]['tsne2'],
+            c=df_augmented_embedded.iloc[:n_original]['color'], marker='o', alpha=0.8
+        )
+        # 生成データ (マーカー: △)
+        if len(df_augmented_embedded) > n_original:
+            plt.scatter(
+                df_augmented_embedded.iloc[n_original:]['tsne1'], df_augmented_embedded.iloc[n_original:]['tsne2'],
+                c=df_augmented_embedded.iloc[n_original:]['color'], marker='^', alpha=0.8
+            )
+            
+        plt.xlabel("t-SNE 1")
+        plt.ylabel("t-SNE 2")
+        plt.title(f"t-SNE after Augmentation (colored by {label})")
+        
+        # 凡例を2種類作成 (マーカーの種類と色の意味)
+        legend_marker = [Line2D([0], [0], marker='o', color='w', label='Original', markerfacecolor='k', markersize=10),
+                         Line2D([0], [0], marker='^', color='w', label='Generated', markerfacecolor='k', markersize=10)]
+        legend1 = plt.legend(handles=legend_marker, loc='upper right')
+        plt.gca().add_artist(legend1)
+
+        legend_color = [Patch(facecolor=color_map[val], label=val) for val in unique_values if val in color_map]
+        plt.legend(handles=legend_color, title=label, bbox_to_anchor=(1.05, 1), loc='upper left')
+        
+        plt.tight_layout()
+        plt.savefig(aa_path, bbox_inches='tight')
+        plt.close()
+
+    print("--- SMOTER Augmentation Finished ---")
+    
+    # 拡張後の特徴量とターゲット/ラベルを返す
+    return synthetic_features, synthetic_targets_df

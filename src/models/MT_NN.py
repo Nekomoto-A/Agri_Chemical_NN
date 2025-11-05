@@ -5,7 +5,7 @@ class MTNNModel(nn.Module):
     """
     共有層とタスク特化層の数を任意に設定できるマルチタスクニューラルネットワークモデル。
     """
-    def __init__(self, input_dim, output_dims, reg_list, shared_layers=[512, 256, 128], task_specific_layers=[64]):
+    def __init__(self, input_dim, output_dims, reg_list, shared_layers=[512, 256], task_specific_layers=[64]):
         """
         Args:
             input_dim (int): 入力データの特徴量の数。
@@ -29,8 +29,9 @@ class MTNNModel(nn.Module):
         for i, out_features in enumerate(shared_layers):
             self.shared_block.add_module(f"shared_fc_{i+1}", nn.Linear(in_features, out_features))
             self.shared_block.add_module(f"shared_batchnorm_{i+1}", nn.BatchNorm1d(out_features))
-            self.shared_block.add_module(f"dropout{i+1}", nn.Dropout(0.2))
-            self.shared_block.add_module(f"shared_relu_{i+1}", nn.ReLU())
+            self.shared_block.add_module(f"dropout{i+1}", nn.Dropout(0.5))
+            #self.shared_block.add_module(f"shared_relu_{i+1}", nn.ReLU())
+            self.shared_block.add_module(f"shared_relu_{i+1}", nn.LeakyReLU())
             in_features = out_features # 次の層の入力特徴量を更新します。
             
         # --- 2. 各タスク特化層（ヘッド）の構築 ---
@@ -46,7 +47,9 @@ class MTNNModel(nn.Module):
             # `task_specific_layers`に基づいてタスク特化の隠れ層を追加します。
             for i, hidden_units in enumerate(task_specific_layers):
                 task_head.add_module(f"task_fc_{i+1}", nn.Linear(in_features_task, hidden_units))
-                task_head.add_module(f"task_relu_{i+1}", nn.ReLU())
+                #task_head.add_module(f"task_relu_{i+1}", nn.ReLU())
+                task_head.add_module(f"task_relu_{i+1}", nn.LeakyReLU())
+                
                 in_features_task = hidden_units
             
             # 最終的な出力層を追加します。

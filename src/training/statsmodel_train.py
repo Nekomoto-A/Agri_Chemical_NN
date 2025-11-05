@@ -8,6 +8,8 @@ from sklearn.linear_model import LinearRegression
 import numpy as np
 import lightgbm as lgb
 
+from sklearn.linear_model import GammaRegressor
+
 def statsmodel_train(X,Y,scalers,reg):
     models = {}
     # モデルの定義
@@ -36,8 +38,11 @@ def statsmodel_train(X,Y,scalers,reg):
             "LGB": lgb.LGBMRegressor(
                 #n_job = -1
                 ),
+            
+            #"GL": GammaRegressor(),
+
             "SVR": SVR(),
-            #"LR": LinearRegression()
+            "LR": LinearRegression()
         }
     else:
         models = {
