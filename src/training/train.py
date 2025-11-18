@@ -128,7 +128,7 @@ class WeightedRootMSELoss(nn.Module):
     L = mean( (sqrt(y_true + epsilon)) * (y_true - y_pred)^2 )
     """
     
-    def __init__(self, epsilon=1e-6):
+    def __init__(self, y_train, epsilon=1e-6):
         """
         損失関数を初期化します。
 
@@ -145,6 +145,8 @@ class WeightedRootMSELoss(nn.Module):
             raise ValueError(f"epsilon は 0 以上の値である必要がありますが、{epsilon} が指定されました。")
             
         self.epsilon = epsilon
+        self.y_train = y_train
+
 
     def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
         """
@@ -166,13 +168,15 @@ class WeightedRootMSELoss(nn.Module):
         # 2. 重みを計算 (sqrt(y_true + epsilon))
         # y_true が万が一負の値だった場合に NaN になるのを防ぐため、
         # clamp(min=0.0) で 0 以上の値に丸めます。
-        weights = torch.sqrt(y_true.clamp(min=0.0) + self.epsilon)
+        weights = torch.sqrt(y_true.clamp(min=0.0)) + self.epsilon
+
+        r = torch.sum(torch.sqrt(self.y_train.clamp(min=0.0)) + self.epsilon)
         
         # 3. 重み付き二乗誤差を計算
-        weighted_squared_errors = weights * squared_errors
+        weighted_squared_errors = (weights * squared_errors)/r
         
         # 4. バッチ全体の平均を取り、最終的な損失とする
-        loss = torch.mean(weighted_squared_errors)
+        loss = torch.sum(weighted_squared_errors)
         
         return loss
 
@@ -503,90 +507,77 @@ class AutoWeightedLinearMSELoss(nn.Module):
 
 from sklearn.neighbors import KernelDensity
 
-class KDEWeightedMSELoss(nn.Module):
-    """
-    ターゲット変数yのカーネル密度推定（KDE）に基づいて重み付けを行う
-    損失関数（L1LossまたはMSELoss）。
-    重みは、バッチ内で平均が1になるように正規化されます。
-    """
-    def __init__(self, bandwidth=1.0, epsilon=1e-8, use_mse=False):
+class DensityWeightedMSELoss(nn.Module):
+    def __init__(self, bin_edges, weights):
         """
-        Args:
-            bandwidth (float): KDEのバンド幅。データのスケールに合わせて調整が必要。
-            epsilon (float): ゼロ除算を避けるための微小な値。
-            use_mse (bool): Trueの場合はMSELoss、Falseの場合はL1Loss（MAE）を使用。
-                           (元のコードではL1Lossが使用されていました)
-        """
-        super(KDEWeightedMSELoss, self).__init__()
-        
-        if use_mse:
-            self.loss_func = nn.MSELoss(reduction='none')
-            loss_name = "MSELoss"
-        else:
-            # 元のコードに合わせてデフォルトをL1Loss (MAE) にします
-            self.loss_func = nn.L1Loss(reduction='none') 
-            loss_name = "L1Loss"
-            
-        self.bandwidth = bandwidth
-        self.epsilon = epsilon
-        print(f"KDEWeightedLossクラスが初期化されました（{loss_name}使用）。バンド幅: {self.bandwidth}")
+        密度(頻度)に基づき重み付けされたMSE損失 (Density-Weighted MSE Loss)。
 
+        Args:
+            bin_edges (torch.Tensor): 1Dテンソル (N+1,)。ヒストグラムのビンの境界。
+            weights (torch.Tensor): 1Dテンソル (N,)。各ビンに対応する重み。
+        """
+        super(DensityWeightedMSELoss, self).__init__()
+        
+        # パラメータとしてではなく、バッファとして登録します。
+        # これにより、.to(device) で一緒に移動し、state_dict に保存されますが、
+        # optimizer の更新対象にはなりません。
+        
+        # ビンの境界は N+1 個
+        self.register_buffer('bin_edges', bin_edges)
+        # 重みは N 個
+        self.register_buffer('weights', weights)
+        
+        # ビンの数は重みの数と一致
+        self.num_bins = len(weights)
+        
+        # np.histogram と同じ挙動をさせるため、
+        # bucketize (検索) に使う境界は bin_edges[1:-1] とします。
+        # (N-1,) のテンソルになります。
+        self.register_buffer('boundaries', bin_edges[1:-1])
 
     def forward(self, y_pred, y_true):
         """
-        損失を計算するフォワードパス。
-
+        損失の計算
         Args:
-            y_pred (torch.Tensor): モデルの予測値。
-            y_true (torch.Tensor): 正解値。
-
-        Returns:
-            torch.Tensor: 計算されたスカラ値の損失。
+            y_pred (torch.Tensor): モデルの予測値 (B, ...)
+            y_true (torch.Tensor): 真の値 (B, ...)
         """
-        # --- ステップ1: サンプルごとの損失を計算 ---
-        # (use_mse=TrueならMSE、FalseならL1)
-        unweighted_loss = self.loss_func(y_pred, y_true)
-
-        # --- ステップ2: カーネル密度を推定 ---
-        # scikit-learnはNumPy配列を要求するため、テンソルを変換します。
-        # 勾配計算は不要なので、.detach()を使用します。
-        y_true_numpy = y_true.detach().cpu().numpy().reshape(-1, 1)
-
-        # KDEモデルを作成し、y_trueで学習
-        kde = KernelDensity(kernel='gaussian', bandwidth=self.bandwidth).fit(y_true_numpy)
         
-        # 各y_trueの値の対数密度を計算し、指数関数で密度に戻す
-        log_density = kde.score_samples(y_true_numpy)
-        density = np.exp(log_density)
+        # y_true と y_pred の形状をフラット (1D) にします
+        y_true_flat = y_true.view(-1)
+        y_pred_flat = y_pred.view(-1)
 
-        # --- ステップ3: 重みを計算し、正規化 ---
-        # 密度の逆数を重みとします。ゼロ除算を避けるためにepsilonを加算します。
-        weights = 1.0 / (density + self.epsilon)
+        # 1. y_true の各値がどのビンに属するかを特定します
+        # torch.bucketize は、y_true_flat の各要素が boundaries のどこに入るかを
+        # 0 から len(boundaries) のインデックスで返します。
+        #
+        # 例: boundaries = [1.0, 2.0] (bin_edges = [0.0, 1.0, 2.0, 3.0])
+        # y < 1.0       -> index 0 (ビン0: [0.0, 1.0))
+        # 1.0 <= y < 2.0 -> index 1 (ビン1: [1.0, 2.0))
+        # y >= 2.0       -> index 2 (ビン2: [2.0, 3.0])
+        #
+        # これにより、インデックス [0, 1, 2] が得られ、weights[0], weights[1], weights[2] 
+        # に正しくマッピングされます。
+        bin_indices = torch.bucketize(y_true_flat, self.boundaries)
         
-        # ★★★ ここからが追加した正規化処理です ★★★
-        # weightsの平均値を計算します。
-        mean_weight = np.mean(weights)
+        # 2. 対応する重みを取得
+        # (B,) のテンソル
+        sample_weights = self.weights[bin_indices]
         
-        # 平均値で重みを割ることで正規化します（ゼロ除算防止のためepsilonを加算）。
-        # これにより、このバッチ内の重みの平均がほぼ1になります。
-        weights = weights / (mean_weight + self.epsilon)
-        # ★★★ 正規化処理ここまで ★★★
-
-        # NumPy配列からPyTorchテンソルに変換し、元のテンソルと同じデバイスに配置します。
-        weights_tensor = torch.from_numpy(weights).to(y_true.device).float()
+        # 3. 二乗誤差を計算
+        # (B,) のテンソル
+        #squared_errors = (y_pred_flat - y_true_flat) ** 2
+        squared_errors = torch.abs(y_pred_flat - y_true_flat)
         
-        # 重みがy_predやy_trueと同じ形状になるように調整します。
-        # (y_trueが[N, 1]や[N]の形状の場合に対応するため)
-        if y_pred.dim() > 1 and weights_tensor.dim() == 1:
-            weights_tensor = weights_tensor.view_as(y_true)
-
-        # --- ステップ4: 損失に重みを適用 ---
-        weighted_loss = unweighted_loss * weights_tensor
-
-        # --- ステップ5: 最終的な損失を計算 ---
-        # 重み付けされた損失の平均を返します。
-        return torch.mean(weighted_loss)
-
+        # 4. 重み付き誤差を計算
+        # (B,) のテンソル
+        weighted_errors = sample_weights * squared_errors
+        
+        # 5. 損失（重み付き誤差のバッチ平均）
+        loss = weighted_errors.mean()
+        
+        return loss
+    
 import torch
 import torch.nn as nn
 
@@ -773,6 +764,9 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                 alpha = config['GradNorm_alpha'],
                 #batch_size = config['batch_size'],
                 tr_loss = config['tr_loss'],
+
+                lasso = config['lasso'],
+                lasso_alpha = config['lasso_alpha']
                 ):
     
     # TensorBoardのライターを初期化
@@ -801,7 +795,7 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
             elif fn == 'hloss':
                 personal_losses[reg] = nn.SmoothL1Loss()
             elif fn == 'wmse':
-                personal_losses[reg] = WeightedRootMSELoss()
+                personal_losses[reg] = WeightedRootMSELoss(y_train = y_tr[reg])
             elif fn == 'pinball':
                 personal_losses[reg] = PinballLoss(quantiles = [0.1, 0.5, 0.9])
             elif fn == 'rwmse':
@@ -829,8 +823,31 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                 print(f'最dai値：{y_tr_max}')
             elif fn == 'msle':
                 personal_losses[reg] = MSLELoss()
-            elif fn == 'kdewmse':
-                personal_losses[reg] = KDEWeightedMSELoss()
+            elif fn == 'dwmse':
+                num_bins = 5
+                counts, bin_edges = torch.histogram(
+                                        y_tr[reg].cpu(), 
+                                        bins=num_bins
+                                    )
+                epsilon = 1e-6 
+                # counts もCPUテンソルなので、そのまま計算できます
+                counts_smooth = counts.float() + epsilon 
+
+                # 重み = 1 / 度数 (サンプルが少ないほど重みが大きくなる)
+                weights = 1.0 / counts_smooth
+
+                # (オプション) 重みの平均が 1 になるように正規化
+                weights = weights / weights.mean()
+
+                print(f"計算された重み (最初の5つ): {weights[:5]}")
+
+                # --- 4. 損失関数クラスのためにGPUに戻す ---
+                # 計算が完了した bin_edges と weights を
+                # 損失関数クラスが使用するデバイス (GPU) に送ります
+                bin_edges_torch = bin_edges.to(device, dtype=torch.float32)
+                weights_torch = weights.to(device, dtype=torch.float32)
+
+                personal_losses[reg] = DensityWeightedMSELoss(bin_edges_torch, weights_torch)
             elif fn == 'Uncertainly':
                 personal_losses[reg] = CustomUncertaintyLoss()
             elif fn == 'Gnll':
@@ -956,6 +973,15 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                     #weight_list = weights
                     for k,l in enumerate(train_losses.values()):
                         learning_loss += weights[k] * l
+
+            l1_norm = 0.0
+            # model.parameters() には重みとバイアスの両方が含まれます
+            for param in model.parameters():
+                # param.abs().sum() で L1 ノルムを計算
+                l1_norm += param.abs().sum()
+
+            if lasso:
+                learning_loss += lasso_alpha * l1_norm
 
             learning_loss.backward()
             optimizer.step()
@@ -1084,10 +1110,6 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
         plt.legend()
         plt.grid()
         plt.tight_layout()
-        if reg == 'SUM':
-            plt.ylim(0,SUM_train_lim)
-        else:
-            plt.ylim(0,personal_train_lim)
         #plt.show()
         plt.savefig(train_loss_history_dir)
         plt.close()

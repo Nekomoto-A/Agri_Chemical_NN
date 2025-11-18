@@ -352,6 +352,8 @@ def analyze_and_plot(df: pd.DataFrame, variable_columns: list, label_column: str
     
     print("\nすべての処理が完了しました！ 🎉")
 
+
+
 def classify_crop(crop_name):
   """
   作物の名前を受け取り、カテゴリを返す関数

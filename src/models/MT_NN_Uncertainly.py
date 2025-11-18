@@ -6,7 +6,7 @@ class MTNNModelWithUncertainty(nn.Module):
     共有層とタスク特化層の数を任意に設定でき、
     各タスクで予測値(mu)と不確実性(log_sigma_sq)を出力するマルチタスクニューラルネットワークモデル。
     """
-    def __init__(self, input_dim, output_dims, reg_list, shared_layers=[256, 128], task_specific_layers=[64]):
+    def __init__(self, input_dim, output_dims, reg_list, shared_layers=[512, 256, 128], task_specific_layers=[64]):
         """
         Args:
             input_dim (int): 入力データの特徴量の数。

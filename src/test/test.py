@@ -1099,6 +1099,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                   labels_train = None,
                   labels_val = None,
                   labels_test = None,
+                  label_encoders = None,
                   loss_sum = config['loss_sum'], shap_eval = config['shap_eval'], save_feature = config['save_feature'],
                   batch_size = config['batch_size']
                   ):
@@ -1146,8 +1147,18 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         from src.models.AE import Autoencoder, FineTuningModel, FineTuningModel_PEFT
         ae_model = Autoencoder(input_dim=input_dim)
         ae_model = ae_model.to(device)
-        from src.training.train_FT import train_pretraining
-        ae_model = train_pretraining(model = ae_model, x_tr = X_train, x_val = X_val, device = device, output_dir = vis_dir)
+        if model_name == 'DAE':
+            from src.training.train_FT_DAE import train_pretraining_DAE
+
+            ae_model = train_pretraining_DAE(model = ae_model, x_tr = X_train, x_val = X_val, device = device, output_dir = vis_dir,
+                                        y_tr = labels_train, y_val = labels_val, label_encoders = label_encoders
+                                        )
+        else:
+            from src.training.train_FT import train_pretraining
+
+            ae_model = train_pretraining(model = ae_model, x_tr = X_train, x_val = X_val, device = device, output_dir = vis_dir,
+                                        y_tr = labels_train, y_val = labels_val, label_encoders = label_encoders
+                                        )
         import copy
         pretrained_encoder = copy.deepcopy(ae_model.get_encoder())
         if 'PEFT' in model_name:

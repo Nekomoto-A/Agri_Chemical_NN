@@ -926,6 +926,7 @@ def augment_with_smoter(X, y, reg_list, output_dir, data_vis, labels=None):
     # smognはXとyが結合されたDataFrameを入力として要求します
     # y[labels] も含めて、後で分離・可視化するために全情報を結合します
     df_for_training = pd.concat([X, y], axis=1)
+    df_for_training = df_for_training.reset_index(drop=True)
     
     # 元のデータ数を記録
     n_original = len(df_for_training)
@@ -940,7 +941,10 @@ def augment_with_smoter(X, y, reg_list, output_dir, data_vis, labels=None):
         # 'data'に全DataFrameを、'y'に拡張の基準となるターゲット列名を指定
         augmented_df_full = smogn.smoter(
             data=df_for_training,
-            y=reg_target
+            y=reg_target,
+            #k = 2,
+            samp_method = 'extreme',
+            #rel_thres=0.8,  # この値を調整 (例: 0.7 〜 0.95)
             # 必要に応じて smogn の他のパラメータ (k, pert など) を追加
         )
         print(f"Generated {len(augmented_df_full) - n_original} synthetic samples.")

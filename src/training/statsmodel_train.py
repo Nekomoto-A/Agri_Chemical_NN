@@ -53,8 +53,15 @@ def statsmodel_train(X,Y,scalers,reg):
 
     # モデルの学習
     for name, model in models.items():
+
+        weights_large_y = Y - Y.min() + 0.1
+        weights_large_y = (weights_large_y / weights_large_y.mean())
+        weights_large_y = weights_large_y.ravel()
+
         #print(Y)
-        model.fit(X, Y)
+        model.fit(X, Y, 
+                  sample_weight=weights_large_y
+                  )
         print(f'{name}の学習が完了しました')
     #print(models)
     return models

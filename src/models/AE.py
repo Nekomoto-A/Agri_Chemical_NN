@@ -9,7 +9,7 @@ class Autoencoder(nn.Module):
     1. デコーダーにもBatchNorm1dを追加し、学習を安定化。
     2. デコーダー最終層の活性化関数についてコメントを追記。
     """
-    def __init__(self, input_dim, shared_layers=[256, 128]):
+    def __init__(self, input_dim, shared_layers=[512, 256, 128]):
         """
         Args:
             input_dim (int): 入力データの特徴量の数。
@@ -72,8 +72,8 @@ class FineTuningModel(nn.Module):
         self.reg_list = reg_list
         self.shared_block = pretrained_encoder
 
-        #for param in self.shared_block.parameters():
-        #    param.requires_grad = shared_learn
+        for param in self.shared_block.parameters():
+            param.requires_grad = shared_learn
         
         self.task_specific_heads = nn.ModuleList()
         for out_dim in output_dims:

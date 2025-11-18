@@ -13,7 +13,6 @@ from skbio.stats.composition import clr, multiplicative_replacement
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from sklearn.decomposition import PCA
 
 import yaml
 import os
@@ -154,6 +153,7 @@ class data_create:
 
                 # デフォルト値は 'field'
                 chem_data[r] = np.select(conditions, choices, default='field')
+
             elif r == 'crop_ph':
                 chem_data[r] = np.where((chem_data['crop'] == 'jpea') | (chem_data['crop'] == 'Spin'), 'alkali', 'neutral')
             elif '_rank' in r:
@@ -234,21 +234,22 @@ class data_create:
             #asv_array = multiplicative_replacement(asv_data.values)
             asv_array = asv_data.where(asv_data != 0, asv_data + 1e-100).values
             asv_feature = pd.DataFrame(asv_array, columns=asv_data.columns, index=asv_data.index)
-
-        '''
-        if self.label_data is not None:
-            for l in self.label_data:
-                if l == 'prefandcrop':
-                    chem_data[l] = chem_data['pref'].astype(str) + '_' + chem_data['crop'].astype(str)    
-                le = LabelEncoder()
-                chem_data[l] = le.fit_transform(chem_data[l])
-                label_encoders[l] = le  # 後でデコードするために保存
-                label_map = dict(zip(le.classes_, le.transform(le.classes_)))
-                print(f"{l} → 数値 のマッピング:", label_map)
-            yield label_encoders
-        '''
+        
+        # if self.label_data is not None:
+        #     for l in self.label_data:
+        #         if ('riken' in self.path_asv) and (l == 'experimental_purpose'):
+        #             chem_data[l] = chem_data['pref'].astype(str) + '_' + chem_data['crop'].astype(str)    
+        #         le = LabelEncoder()
+        #         chem_data[l] = le.fit_transform(chem_data[l])
+        #         label_encoders[l] = le  # 後でデコードするために保存
+        #         label_map = dict(zip(le.classes_, le.transform(le.classes_)))
+        #         print(f"{l} → 数値 のマッピング:", label_map)
+        #     #yield label_encoders        
+        
         yield asv_feature
         yield chem_data
+
+
         
         #if self.label_list != None:
         #    label_data = chem_data[self.label_list]
@@ -334,6 +335,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
         if combat:
             from src.datasets.data_integration import apply_combat_and_visualize
             x_train_split, x_test, x_val, y_train_split = apply_combat_and_visualize(X_large_ilr, x_train_ilr, y_train_split, source_reg_list, y_large, fold, x_test, x_val)
+            y_labels = y_train_split.copy()
         else:
             y_large = y_large.rename(columns={'index': 'crop-id'})
             column_mapping = {
@@ -346,6 +348,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
             y_large = y_large.rename(columns=rename_dict)
             x_train_split = pd.concat([X_large_ilr, x_train_ilr], ignore_index=True)
             y_train_split = pd.concat([y_large, y_train_split], ignore_index=True)
+            y_labels = y_train_split.copy()
         #print(x_train_split.shape)
         #print(y_train_split.shape)
 
@@ -659,19 +662,18 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
             Y_test_tensor[reg] = torch.tensor(y_test_pp, dtype=torch.int64)
 
     
+    # if labels is not None:
+    #     for l in labels:
 
-    '''
-    if labels is not None:
-        for l in labels:
-            label_train_tensor[l] = torch.tensor(y_train_split[l].values.reshape(-1), dtype=torch.int64)
-            label_test_tensor[l] = torch.tensor(y_test[l].values.reshape(-1), dtype=torch.int64)
-            if isinstance(val_size, (int, float)):
-                label_val_tensor[l] = torch.tensor(y_val[l].values.reshape(-1), dtype=torch.int64)
+    #         label_train_tensor[l] = torch.tensor(y_train_split[l].values.reshape(-1), dtype=torch.int64)
+    #         label_test_tensor[l] = torch.tensor(y_test[l].values.reshape(-1), dtype=torch.int64)
+    #         if isinstance(val_size, (int, float)):
+    #             label_val_tensor[l] = torch.tensor(y_val[l].values.reshape(-1), dtype=torch.int64)
             #print(label_train_tensor)
 
     #print(Y_train_tensor)
     #print(Y_test_tensor)
-    '''
+    
     data = []
     data_cov = []
     #data = {}
@@ -717,6 +719,316 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
             plt.savefig(save_path)
             plt.close()
     
+    plot_tsne_by_targets(X_tensor = X_train_tensor, targets_dict = Y_train_tensor, save_dir = fold)
+
+    label_encoders = {}
+    label_train_tensor = {}
+    label_test_tensor = {}
+    label_val_tensor = {}
+    for label in labels:
+        if label not in y_train_split.columns:
+            #print(f"'{target_col_1}' が存在しないため、NaN列を追加します。")
+            y_train_split[label] = np.nan
+            
+        if label == 'experimental_purpose':
+            filler_series_train = y_train_split['pref'].astype(str) + '_' + y_train_split['crop'].astype(str)
+            y_val[label] = y_val['pref'].astype(str) + '_' + y_val['crop'].astype(str)
+            y_test[label] = y_test['pref'].astype(str) + '_' + y_test['crop'].astype(str)
+            y_train_split['experimental_purpose'].fillna(filler_series_train, inplace=True)
+
+        y_train_split['data_type'] = 'train'
+        y_test['data_type'] = 'test'
+        y_val['data_type'] = 'valid'
+
+        #visualize_tsne_with_missing_values(X = X_train_tensor, Y = y_train_split[label].values, save_dir = fold, filename = f"tsne_{label}.png")
+        visualize_tsne_with_categorical_labels(X = X_train_tensor, Y_series = y_train_split[label], save_dir = fold, filename = f"tsne_{label}.png")
+
+        all_df = pd.concat([y_train_split, y_test, y_val], ignore_index=True)
+        le = LabelEncoder()
+        
+        all_df[label] = le.fit_transform(all_df[label])
+        label_encoders[label] = le
+
+        y_train_split = all_df[all_df['data_type'] == 'train'].reset_index(drop=True)
+        y_test = all_df[all_df['data_type'] == 'test'].reset_index(drop=True)
+        y_val = all_df[all_df['data_type'] == 'valid'].reset_index(drop=True)
+
+        label_train_tensor[label] = torch.tensor(y_train_split[label].values.reshape(-1), dtype=torch.int64)
+        label_test_tensor[label] = torch.tensor(y_test[label].values.reshape(-1), dtype=torch.int64)
+        label_val_tensor[label] = torch.tensor(y_val[label].values.reshape(-1), dtype=torch.int64)
+
+    return X_train_tensor, X_val_tensor, X_test_tensor,selected_features, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids,label_train_tensor,label_test_tensor,label_val_tensor, label_encoders
 
 
-    return X_train_tensor, X_val_tensor, X_test_tensor,selected_features, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids,label_train_tensor,label_test_tensor,label_val_tensor
+from sklearn.manifold import TSNE
+def plot_tsne_by_targets(X_tensor, 
+                         targets_dict, 
+                         save_dir='tsne_plots', 
+                         perplexity=30, 
+                         random_state=42,
+                         discrete_threshold=20):
+    """
+    特徴量Xをt-SNEで2次元に削減し、複数のターゲットYで色付けしてプロットを保存する関数。
+
+    - 連続値: カラーバーで表示
+    - 離散値: 凡例で表示（ユニークな値が 'discrete_threshold' 未満の場合、離散値とみなす）
+    - 欠損値 (NaN): '×' (バツ印) でプロット
+
+    Args:
+        X_tensor (torch.Tensor): 特徴量テンソル (N, D)
+        targets_dict (dict): ターゲットの辞書 {'target_name': torch.Tensor(N,)}
+        save_dir (str): プロットの保存先ディレクトリ
+        perplexity (int): t-SNEのperplexityパラメータ
+        random_state (int): t-SNEの乱数シード
+        discrete_threshold (int): この値未満のユニークな値を持つターゲットを離散値として扱う
+    """
+    
+    print(f"t-SNEプロットの保存を開始します。保存先: {save_dir}")
+
+    # --- 1. 保存ディレクトリの作成 ---
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    # --- 2. t-SNEの実行 ---
+    # データをCPUに移動し、NumPy配列に変換
+    # .detach() は勾配計算グラフから切り離すために安全です
+    X_np = X_tensor.detach().cpu().numpy()
+
+    print("t-SNEによる次元削減を実行中... (データサイズによっては時間がかかります)")
+    tsne = TSNE(n_components=2, 
+                perplexity=perplexity, 
+                random_state=random_state,
+                init='pca',  # PCA初期化は高速化と安定化に寄与します
+                n_iter=1000)
+    
+    X_2d = tsne.fit_transform(X_np)
+    print("t-SNE完了。")
+
+    # --- 3. ターゲットごとにプロット ---
+    for target_name, Y_tensor in targets_dict.items():
+        
+        Y_np = Y_tensor.detach().cpu().numpy().squeeze()
+
+        # --- 3a. 欠損値と有効値の分離 ---
+        nan_mask = np.isnan(Y_np)
+        valid_mask = ~nan_mask.squeeze()
+        
+        X_valid = X_2d[valid_mask]
+        Y_valid = Y_np[valid_mask]
+        X_nan = X_2d[nan_mask]
+
+        # --- 3b. 離散/連続の判定 ---
+        is_discrete = False
+        if len(Y_valid) > 0:
+            unique_values = np.unique(Y_valid)
+            # 整数型、またはfloat型でもユニークな値が閾値以下なら離散とみなす
+            if np.issubdtype(Y_valid.dtype, np.integer) or len(unique_values) < discrete_threshold:
+                is_discrete = True
+        
+        # --- 3c. プロットの作成 ---
+        plt.figure(figsize=(10, 8))
+        ax = plt.gca() # 現在の軸を取得
+
+        # (A) 欠損値 (NaN) のプロット (×印)
+        if len(X_nan) > 0:
+            ax.scatter(X_nan[:, 0], X_nan[:, 1], 
+                       marker='x', 
+                       color='gray', 
+                       label='NaN (欠損)', 
+                       s=50, 
+                       alpha=0.7)
+
+        # (B) 有効値のプロット
+        if is_discrete:
+            # --- 離散値の場合 (凡例) ---
+            
+            # ユニークな値でループし、個別にプロットして凡例を作成する
+            # (cmapを使うと、値と色のマッピングが制御しにくいため)
+            unique_vals_sorted = np.sort(unique_values)
+            
+            # 使うカラーマップ（カテゴリ数に応じて 'tab10' や 'tab20' を選択）
+            cmap = plt.get_cmap('tab10', len(unique_vals_sorted))
+            
+            for i, val in enumerate(unique_vals_sorted):
+                mask = (Y_valid == val)
+                ax.scatter(X_valid[mask, 0], X_valid[mask, 1], 
+                           color=cmap(i), 
+                           label=str(val), 
+                           alpha=0.7)
+            
+            # 凡例を表示 (NaN も含める)
+            ax.legend(title=target_name)
+
+        else:
+            # --- 連続値の場合 (カラーバー) ---
+            scatter = ax.scatter(X_valid[:, 0], X_valid[:, 1], 
+                                 c=Y_valid, 
+                                 cmap='viridis', 
+                                 alpha=0.7)
+            
+            # カラーバーを追加
+            plt.colorbar(scatter, label=target_name)
+            
+            # NaN の凡例も表示 (もしあれば)
+            if len(X_nan) > 0:
+                ax.legend()
+
+        # --- 3d. 仕上げと保存 ---
+        plt.title(f't-SNE of X, colored by {target_name}')
+        plt.xlabel('t-SNE Dimension 1')
+        plt.ylabel('t-SNE Dimension 2')
+        plt.grid(True, linestyle='--', alpha=0.5)
+
+        save_path = os.path.join(save_dir, f'tsne_plot_{target_name}.png')
+        plt.savefig(save_path, dpi=150)
+        plt.close() # メモリ解放のために図を閉じます
+
+    print(f"すべてのプロットを {save_dir} に保存しました。")
+
+
+# 必要なライブラリのインポート
+import torch
+import numpy as np
+import pandas as pd # pandas をインポート
+from sklearn.manifold import TSNE
+import matplotlib.pyplot as plt
+import os
+
+def visualize_tsne_with_categorical_labels(X, Y_series, save_dir, filename="tsne_visualization.png"):
+    """
+    特徴量Xと、欠損値を含む文字列(カテゴリカル)ラベルY_seriesを受け取り、
+    欠損サンプルを削除した後、t-SNEで2次元に削減し、
+    ラベルで色付けした散布図を保存する関数。
+
+    引数:
+    X (torch.Tensor): 特徴量データ (N, D)。
+    Y_series (pd.Series): ラベルデータ (N,)。文字列を含み、欠損値(np.nanやNone)も含む。
+    save_dir (str): プロットを保存するディレクトリのパス。
+    filename (str, optional): 保存するファイル名。デフォルトは "tsne_visualization.png"。
+    """
+    
+    print("t-SNE可視化処理（カテゴリカルラベル版）を開始します...")
+    
+    if not isinstance(Y_series, pd.Series):
+        print(f"警告: Y が pandas.Series ではありません (型: {type(Y_series)})。Series に変換します。")
+        Y_series = pd.Series(Y_series)
+
+    ## 1. 欠損値を含むサンプルの削除
+    # ---------------------------------
+    # pandas の .isna() を使い、np.nan や None などの欠損値を検出
+    non_missing_mask = ~Y_series.isna()
+
+    # 欠損値が含まれていない Y を作成 (これは pandas.Series)
+    Y_cleaned_series = Y_series[non_missing_mask]
+    
+    # X (torch.Tensor) から Y と同じインデックスのサンプルを抽出
+    # マスク (pd.Series) の .values (numpy配列) を使ってTensorをスライス
+    X_cleaned = X[non_missing_mask.values]
+
+    print(f"元のサンプル数: {len(Y_series)}, 欠損値削除後のサンプル数: {len(Y_cleaned_series)}")
+
+    # サンプルが残っているか確認
+    n_samples = len(Y_cleaned_series)
+    if n_samples == 0:
+        print("有効なサンプルが残らなかったため、処理を中断します。")
+        return
+
+    ## 2. ラベルの数値エンコード
+    # ---------------------------------
+    # 文字列のラベル (例: "A", "B", "A", "C") を
+    # カテゴリカルな数値 (例: 0, 1, 0, 2) に変換します。
+    Y_encoded = Y_cleaned_series.astype('category').cat.codes
+    # Y_encoded は pandas.Series ですが、中身は数値 (0, 1, 2...) です。
+    
+    # 凡例作成のため、元の文字列とエンコード後の数値の対応を取得します。
+    # (例: {"A": 0, "B": 1, "C": 2})
+    label_map = dict(zip(Y_cleaned_series, Y_encoded))
+    # 数値コードでソートしたラベルリストを作成 (凡例の順序を固定するため)
+    sorted_labels = sorted(label_map.keys(), key=lambda k: label_map[k])
+    n_labels = len(sorted_labels)
+
+    print(f"検出されたユニークなカテゴリ数: {n_labels}")
+
+    ## 3. t-SNEによる次元削減
+    # ---------------------------------
+    X_cleaned_np = X_cleaned.cpu().numpy()
+
+    # サンプル数が 1 または 0 の場合、t-SNEは実行できない
+    if n_samples <= 1:
+        print(f"t-SNEの実行に必要なサンプル数（最低2）に満たないため、処理を中断します。 (サンプル数: {n_samples})")
+        return
+        
+    # perplexity の値をサンプル数に基づいて安全に設定
+    perplexity_value = min(30, max(1, n_samples - 1))
+    
+    print(f"t-SNEを実行します (n_components=2, perplexity={perplexity_value})...")
+
+    tsne = TSNE(
+        n_components=2,
+        perplexity=perplexity_value,
+        init='pca',
+        learning_rate='auto',
+        random_state=42
+    )
+    
+    X_embedded = tsne.fit_transform(X_cleaned_np)
+    print("t-SNEの実行が完了しました。")
+
+    ## 4. 可視化と保存 (カテゴリカルな凡例を使用)
+    # ---------------------------------
+    plt.figure(figsize=(14, 10)) # 凡例スペースを考慮し、横幅を少し広げます
+    
+    # カラーマップを取得 (カテゴリ数に合わせる)
+    cmap = plt.get_cmap('viridis', n_labels)
+
+    # ラベル（文字列）ごとにループし、異なる色でプロット
+    for i, label_str in enumerate(sorted_labels):
+        
+        # このラベルに対応する数値コード
+        code = label_map[label_str]
+        
+        # このカテゴリのデータのみを抽出するためのマスク (numpy bool 配列)
+        indices = (Y_encoded == code).values
+        
+        if np.sum(indices) == 0: # サンプルがない場合はスキップ
+            continue
+
+        # 正規化されたインデックス (0.0 〜 1.0) を cmap に渡す
+        color_index = i / (n_labels - 1) if n_labels > 1 else 0.5
+        
+        plt.scatter(
+            X_embedded[indices, 0],   # 1次元目の成分 (x軸)
+            X_embedded[indices, 1],   # 2次元目の成分 (y軸)
+            color=cmap(color_index),  # マップから色を取得
+            label=label_str,          # 凡例用のラベル (元の文字列)
+            alpha=0.7
+        )
+
+    # 凡例（Legend）を追加
+    # bbox_to_anchor=(1.05, 1) でグラフの右外側上部に配置
+    plt.legend(title='Label', bbox_to_anchor=(1.05, 1), loc='upper left')
+    
+    # グラフの装飾
+    plt.title('t-SNE visualization of features (colored by label)')
+    plt.xlabel('t-SNE Component 1')
+    plt.ylabel('t-SNE Component 2')
+    plt.grid(True)
+
+    # レイアウト調整 (凡例がはみ出ないように)
+    # rect=[left, bottom, right, top] でプロット領域を指定
+    plt.tight_layout(rect=[0, 0, 0.85, 1]) 
+
+    # ディレクトリの確認と作成
+    os.makedirs(save_dir, exist_ok=True)
+    
+    # 保存パスの結合
+    save_path = os.path.join(save_dir, filename)
+    
+    # ファイルに保存
+    plt.savefig(save_path)
+    
+    # メモリ解放のためにプロットを閉じる
+    plt.close()
+
+    print(f"プロットが正常に保存されました: {save_path}")
+

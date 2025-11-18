@@ -8,9 +8,9 @@ dataset.py:
   level: 7
   feature_transformer: 'ILR'
   softlabel: True
-  labels: ['crop']
+  labels: ['experimental_purpose', 'crop','pref', ]
   data_vis: 'visualize'
-  data_augumentation: None #'smoter' #'gaussian_copula'
+  data_augumentation: None #'smoter' #'smoter' #'smoter' #'gaussian_copula'
   num_augumentation: 200
   num_epochs: 30
   batch_size: 32
@@ -29,12 +29,12 @@ train.py:
   early_stopping: True
   patience: 10
   least_epoch: 0
-  visualize: False
+  visualize: True
   epochs: 200
   vis_step: 5
   validation: True
   lambda: 0.1
-  learning_rate: [0.0001]
+  learning_rate: [0.001]
   weights: [0.1, 0.9, 1.0, 1.0, 1.0, 1.0]
   SUM_train_lim: 10
   personal_train_lim: 1
@@ -45,6 +45,8 @@ train.py:
   tr_loss: False
   tracenorm_rho: 3.0
   tracenorm_lambda: 1.0
+  lasso: True
+  lasso_alpha: 0.001
 train_GP.py:
   learning_rate: 0.1
   epochs: 60
@@ -75,6 +77,20 @@ train_FT.py:
   early_stopping: True
   patience: 10
   l1_lambda: 0.01
+  tsne_plot_epoch_freq: 10
+  tsne_perplexity: 30
+  tsne_max_samples: 10000
+train_FT_DAE.py:
+  lr: 0.01
+  batch_size: 256
+  num_epochs: 2000
+  early_stopping: True
+  patience: 10
+  l1_lambda: 0.01
+  tsne_plot_epoch_freq: 10
+  tsne_perplexity: 30
+  tsne_max_samples: 10000
+  noise_std: 0.5
 train_MoE.py:
   lr: 0.01
   epochs: 2000
@@ -103,7 +119,7 @@ fold_eval.py:
   carr_calc: False
   marginal_hist: False
   k_fold: 10
-  model_name: 'NN'
+  model_name: 'DAE'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
@@ -132,15 +148,16 @@ fold_eval.py:
   ]
   feature_path: 'data/raw/riken/taxon_data/lv6.csv' #'/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/lv6.csv' # # #
   target_path:  'data/raw/riken/chem_data.xlsx' #'/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/chem_data.xlsx' # # #
-  data_inte: False
+  data_inte: True
   transformer: [None, 'QT'] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
-  reg_loss_fanction: ['kdewmse', 'mse'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
+  reg_loss_fanction: ['mae', 'mse'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
 main.py:
-  result_dir: 'result_1106'
+  result_dir: 'result_DAE'
   reg_list: [
             #'pH', 'Available.P'
+            #['pH'],
             ['Available.P'], #, 'pH'
-            ['NO3.N',], 
+            ['NO3.N',],
             #['pH', 'NO3.N',],
             #'pH'
             #['pH', 'Available.P',],
@@ -154,4 +171,5 @@ main.py:
             #['pH_dry_soil'], ['available_P'], ['EC_electric_conductivity'], ['Total_C'], ['Total_N'],
             #['pH_dry_soil', 'available_P', 'EC_electric_conductivity', 'Total_C', 'Total_N']
   ]
+
 

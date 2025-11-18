@@ -91,3 +91,4 @@ class MTNNQuantileModel(nn.Module):
             mc_outputs[reg] = {'mean': mean_preds, 'std': std_preds}
             
         return mc_outputs
+    
