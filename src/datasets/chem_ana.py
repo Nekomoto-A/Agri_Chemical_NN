@@ -297,3 +297,5 @@ if __name__ == '__main__':
     plot_kde_pairplot(df=df, columns=target_features)
     kde = calculate_and_save_density(df=df, columns=target_features, id_column='crop-id', output_filename='/home/nomura/Agri_Chemical_NN/datas/kde.csv')
     #kde.to_csv('/home/nomura/Agri_Chemical_NN/datas/kde.csv')
+
+    

@@ -18,8 +18,9 @@ from sklearn.decomposition import PCA
 import yaml
 import os
 yaml_path = 'config.yaml'
+#yaml_path = 'C:\\Users\\asahi\\Agri_Chemical_NN\\config.yaml'
 script_name = os.path.basename(__file__)
-with open(yaml_path, "r") as file:
+with open(yaml_path, "r", encoding='utf-8') as file:
     config = yaml.safe_load(file)[script_name]
 
 # ilr変換行列を作成する関数

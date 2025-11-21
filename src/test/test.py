@@ -13,7 +13,7 @@ import yaml
 import os
 yaml_path = 'config.yaml'
 script_name = os.path.basename(__file__)
-with open(yaml_path, "r") as file:
+with open(yaml_path, "r", encoding='utf-8') as file:
     config = yaml.safe_load(file)[script_name]
 
 class SpecificTaskModel(nn.Module):
@@ -80,6 +80,38 @@ def test_shap(x_tr, x_te,model,reg_list, features, output_dir):
             # index=Trueはデフォルトですが、特徴量名を行名として残すために明示しています
             sorted_df_for_task.to_excel(writer, sheet_name=task_name, index=True)
     return feature_importance_dict
+
+def normalized_mae_by_iqr(y_true, y_pred):
+    """
+    MAEを実測値の四分位範囲（IQR）で正規化します。
+    外れ値に強い正規化手法です。
+
+    Args:
+        y_true (np.array): 実測値の配列
+        y_pred (np.array): 予測値の配列
+
+    Returns:
+        float: 正規化されたMAEの値
+    """
+    # 1. scikit-learnを使ってMAEを計算
+    mae = mean_absolute_error(y_true, y_pred)
+    
+    # 2. 第3四分位数（75パーセンタイル）と第1四分位数（25パーセンタイル）を計算
+    q3 = np.percentile(y_true, 75)
+    q1 = np.percentile(y_true, 25)
+    
+    # 3. 四分位範囲（IQR）を計算
+    iqr = q3 - q1
+    
+    # 4. ゼロ除算を避けるためのチェック
+    if iqr == 0:
+        print("警告: 実測値の四分位範囲が0です。ゼロ除算を避けるため、Noneを返します。")
+        return None
+        
+    # 5. MAEをIQRで割って正規化
+    nmae = mae / iqr
+    
+    return nmae
 
 def test_MT(x_te,y_te,model,reg_list,scalers,output_dir,device, features, shap_eval = config['shap_eval']):
     model.eval()  # モデルを評価モードに
@@ -159,7 +191,8 @@ def test_MT(x_te,y_te,model,reg_list,scalers,output_dir,device, features, shap_e
                 #print(r2)
                 r2_scores.append(r2)
                 #mse = mean_squared_error(true,output)
-                mse = mean_absolute_error(true,output)
+                #mse = mean_absolute_error(true,output)
+                mse = normalized_mae_by_iqr(true,output)
                 #print(mse)
                 mse_scores.append(mse)
             else:
@@ -486,93 +519,12 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
 
     # figに全体のタイトルを追加
     #fig.suptitle('Comparison of Multiple Datasets', fontsize=16, y=0.95)
-    x_positions = np.arange(len(test_ids))
+    #x_positions = np.arange(len(test_ids))
 
     #test_df = pd.DataFrame(index=test_ids)
     for reg in reg_list:
         predictions.setdefault(method, {}).setdefault(reg, []).append(predicts[reg])
         trues.setdefault(method, {}).setdefault(reg, []).append(true[reg])
-    
-    if len(reg_list) > 1:
-        #out_csv = os.path.join(vis_dir, 'loss.csv')
-        for reg, ax in zip(reg_list, axes):
-            #predictions.setdefault(method, {}).setdefault(reg, []).append(predicts[reg])
-            #trues.setdefault(method, {}).setdefault(reg, []).append(true[reg])
-
-            #if 'CNN' in model_name:
-            #print(f'test_ids = {test_ids.to_numpy().ravel()}')
-            loss = np.abs(predicts[reg]-true[reg])
-            ax.bar(
-                x_positions, loss.ravel(), 
-                #color=colors[i], label=titles[i]
-                )
-            ax.set_ylabel(f'{reg}_MAE') # 各グラフのy軸ラベル
-            
-            #test_df[reg] = loss.ravel()
-
-        # axes[-1] が一番下のグラフのaxを指します
-        last_ax = axes[-1]
-        last_ax.set_xticks(x_positions) # 目盛りの位置を設定
-        # ラベルを設定し、回転させる
-        last_ax.set_xticklabels(test_ids, rotation=90, ha='right') 
-        # 4. レイアウトの自動調整
-        plt.tight_layout() # 全体タイトルと重ならないように調整
-
-        mpld3.save_html(fig, out)
-        # メモリを解放するためにプロットを閉じます（多くのグラフを作成する場合に有効です）
-        plt.close(fig)
-
-        #test_df.to_csv(out_csv)
-
-            #ax.legend() # 各グラフの凡例を表示
-            #ax.grid(axis='y', linestyle='--', alpha=0.7) # y軸のグリッド線
-            #print(loss)
-            #loss_dir = os.path.join(vis_dir, reg)
-            #os.makedirs(loss_dir,exist_ok=True)
-            #out = os.path.join(loss_dir, 'loss.png')
-            #out = os.path.join(loss_dir, 'loss.html')
-
-            # 1. グラフの準備 (figとaxを取得)
-            # figsizeでグラフ全体のサイズを指定します。幅を広く(30)、高さを標準(8)に設定してみましょう。
-            #fig, ax = plt.subplots(figsize=(90, 8))
-
-            #print(f'ids:{test_ids}')
-            # 2. グラフの描画
-            # 元のコードと同じように棒グラフを作成します。
-            #ax.bar(test_ids.to_numpy().ravel(), loss.ravel())
-            # 2. 【変更点】x軸の位置を数値で作成
-
-            #ax.bar(test_ids, loss.ravel())
-            # 3. 【変更点】数値の位置を使ってグラフを描画
-            #ax.bar(x_positions, loss.ravel())
-            #ax.bar(test_ids.values(), loss.ravel())
-            #ax.tick_params(axis='x', rotation=90) # x軸のラベルを90度回転
-    else:
-        #out_csv = os.path.join(vis_dir, f'loss_{reg_list[0]}.csv')        
-        loss = np.abs(predicts[reg_list[0]]-true[reg_list[0]])
-        axes.bar(
-            x_positions, loss.ravel(), 
-            #color=colors[i], label=titles[i]
-            )
-        axes.set_ylabel(f'{reg_list[0]}_MAE') # 各グラフのy軸ラベル
-        axes.legend() # 各グラフの凡例を表示
-        axes.grid(axis='y', linestyle='--', alpha=0.7) # y軸のグリッド線
-        # 4. 【変更点】ティックの位置とラベルを明示的に設定
-        # 3. 共通のx軸の設定（一番下のグラフに対してのみ行う）
-        plt.xticks(x_positions, test_ids, rotation=90)
-        plt.xlabel('Categories')
-
-        # 4. レイアウトの自動調整
-        plt.tight_layout() # 全体タイトルと重ならないように調整
-
-        mpld3.save_html(fig, out)
-        # メモリを解放するためにプロットを閉じます（多くのグラフを作成する場合に有効です）
-        plt.close(fig)
-
-        #test_df[reg] = loss.ravel()
-        #test_df.to_csv(out_csv)
-
-
     # plt.figure(figsize=(18, 14))
     # plt.bar(test_ids.to_numpy().ravel(),loss.ravel())
     # plt.xticks(rotation=90)
