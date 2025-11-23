@@ -1,4 +1,0 @@
-,,accuracy,accuracy,accuracy,accuracy,accuracy,Loss,Loss,Loss,Loss,Loss
-,,pH,Available.P,EC,Inorganic.N,Exchangeable.K,pH,Available.P,EC,Inorganic.N,Exchangeable.K
-method,fold,,,,,,,,,,
-M,fold1,0.5075153112411499,0.43080639839172363,-0.12290537357330322,-0.6682977676391602,0.32533735036849976,0.24327979981899261,35.970497131347656,0.031628891825675964,1.4686791896820068,14.382542610168457
