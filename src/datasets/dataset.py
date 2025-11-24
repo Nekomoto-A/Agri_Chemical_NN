@@ -290,6 +290,8 @@ def create_soft_labels_vectorized(values: torch.Tensor, thresholds: torch.Tensor
 from src.datasets.feature_selection import shap_feature_selection, mutual_info_feature_selection, rfe_shap_feature_selection
 from src.datasets.data_augumentation import augment_with_ctgan, augment_with_smoter, augment_with_gaussian_copula, augment_with_copulagan
 
+import platform
+
 def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer, 
                           feature_selection,num_selected_features, data_name, data_inte, 
                           val_size = config['val_size'],
@@ -325,6 +327,13 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
     #print(y_train_split)
     
     if data_inte:
+        os_name = platform.system()
+        if os_name == 'Linux':
+            source_asv_path = config['asv_path_linux']
+            source_chem_path = config['chem_path_linux']
+        elif os_name == 'Windows':
+            source_asv_path = config['asv_path_windows']
+            source_chem_path = config['chem_path_windows']
         from src.datasets.data_integration import prepare_and_ilr_transform
         X_large_ilr, x_train_ilr, x_test, x_val, y_large = prepare_and_ilr_transform(asv_path = source_asv_path, chem_path = source_chem_path, 
                                                                                      reg_list_big = source_reg_list, x_train =x_train_split,

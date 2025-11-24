@@ -53,11 +53,12 @@ def calculate_and_save_correlations(df, target_data, output_dir, reg_list):
         print(sorted_correlation_df.head())
         print("---------------------------------")
 
-
+import platform
 
 def fold_evaluate(reg_list, output_dir, device, 
                   transformer = config['transformer'],
-                  feature_path = config['feature_path'], target_path = config['target_path'], exclude_ids = config['exclude_ids'],
+                  #feature_path = config['feature_path'], target_path = config['target_path'], 
+                  exclude_ids = config['exclude_ids'],
                   k = config['k_fold'], 
                   #output_dir = config['result_dir'], 
                   csv_path = config['result_fold'], 
@@ -88,6 +89,15 @@ def fold_evaluate(reg_list, output_dir, device,
 
     if os.path.exists(csv_dir):
         os.remove(csv_dir)
+
+    # OS名を取得します
+    os_name = platform.system()
+    if os_name == 'Linux':
+        feature_path = config['feature_path_linux']
+        target_path = config['target_path_linux']
+    elif os_name == 'Windows':
+        feature_path = config['feature_path_windows']
+        target_path = config['target_path_windows']
 
     if data_inte:
         X,Y = data_create(feature_path, target_path, reg_list, exclude_ids, feature_transformer='NON_TR',)
