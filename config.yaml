@@ -20,8 +20,10 @@ dataset.py:
   num_clusters: 2
   marginal_hist_train: False
   unknown_drop: True
-  asv_path: '/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/lv6.csv' #'data/raw/riken/taxon_data/lv6.csv' # # #
-  chem_path:  '/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/chem_data.xlsx' #'data/raw/riken/chem_data.xlsx' # # #
+  asv_path_linux: '/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/lv6.csv' #'data/raw/riken/taxon_data/lv6.csv' # # #
+  chem_path_linux::  '/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/chem_data.xlsx' #'data/raw/riken/chem_data.xlsx' # # #
+  asv_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\lv6.csv'
+  chem_path_windoes: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\chem_data.xlsx'
   reg_list2: ['pH_dry_soil'] #['pH_dry_soil'] #[] #['pH_dry_soil'] #[] #
   exclude_ids2: []
   combat: True
@@ -146,8 +148,10 @@ fold_eval.py:
     #'259_21_Sait_Spin', '181_21_Miyz_Spin', '251_21_Aomo_Appl', '062_20_Naga_Barl', 
     #'247_21_Aomo_Appl', '298_22_Hokk_Whea', '325_22_Niig_Rice', '182_21_Miyz_Spin', '267_21_Naga_Appl', '269_21_Naga_Appl', '193_21_Miyz_Spin', '195_21_Miyz_Spin', '327_22_Niig_Pear'
   ]
-  feature_path: 'data/raw/riken/taxon_data/lv6.csv' #'/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/lv6.csv' # # #
-  target_path:  'data/raw/riken/chem_data.xlsx' #'/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/chem_data.xlsx' # # #
+  feature_path_linux: 'data/raw/riken/taxon_data/lv6.csv' #'/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/lv6.csv' # # #
+  target_path_linux:  'data/raw/riken/chem_data.xlsx' #'/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/chem_data.xlsx' # # #
+  feature_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\taxon_data\lv6.csv'
+  feature_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\chem_data.xlsx'
   data_inte: True
   transformer: [None, 'QT'] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
   reg_loss_fanction: ['mae', 'mse'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
