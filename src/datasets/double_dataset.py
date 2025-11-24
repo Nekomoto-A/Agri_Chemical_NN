@@ -361,7 +361,7 @@ def visualize_tsne_comparison(df1, df2, labels1, labels2, df1_name='DataFrame 1'
     #print(f"\nグラフを '{filename}' として保存しました。")
     plt.show()
 
-from combat.pycombat import pycombat
+#from combat.pycombat import pycombat
 
 def visualize_tsne_with_combat(df1, df2, labels1, labels2, df1_name='DataFrame 1', df2_name='DataFrame 2'):
     """
