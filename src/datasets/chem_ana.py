@@ -369,7 +369,7 @@ def classify_crop(crop_name):
     return 'Vegetable'
 
 if __name__ == '__main__':
-    df = pd.read_excel('/home/nomura/Agri_Chemical_NN/data/raw/riken/chem_data.xlsx')
+    df = pd.read_excel('C:\\Users\\asahi\\Agri_Chemical_NN\\data\\raw\\riken\\chem_data.xlsx')
     #df = pd.read_excel('/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/chem_data.xlsx')
 
     # 今回は4つの特徴量すべてを使います。

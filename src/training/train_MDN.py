@@ -15,7 +15,7 @@ import os
 import yaml
 yaml_path = 'config.yaml'
 script_name = os.path.basename(__file__)
-with open(yaml_path, "r") as file:
+with open(yaml_path, "r", encoding="utf-8") as file:
     config = yaml.safe_load(file)['train.py']
 
 def mdn_nll_loss_normal(pi_logits, mu, log_sigma, target_log):

@@ -9,7 +9,7 @@ from torch.utils.data import TensorDataset, dataloader
 from sklearn.neighbors import LocalOutlierFactor
 from sklearn.preprocessing import LabelEncoder
 from sklearn.cluster import DBSCAN
-from skbio.stats.composition import clr, multiplicative_replacement
+#from skbio.stats.composition import clr, multiplicative_replacement
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -18,7 +18,7 @@ import yaml
 import os
 yaml_path = 'config.yaml'
 script_name = os.path.basename(__file__)
-with open(yaml_path, "r") as file:
+with open(yaml_path, "r", encoding="utf-8") as file:
     config = yaml.safe_load(file)[script_name]
 
 # ilr変換行列を作成する関数

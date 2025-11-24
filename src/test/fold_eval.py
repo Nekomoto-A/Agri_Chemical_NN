@@ -16,7 +16,7 @@ from sklearn.manifold import TSNE
 import yaml
 yaml_path = 'config.yaml'
 script_name = os.path.basename(__file__)
-with open(yaml_path, "r") as file:
+with open(yaml_path, "r", encoding="utf-8") as file:
     config = yaml.safe_load(file)[script_name]
 
 import shutil
