@@ -665,6 +665,8 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
             #Y_val_tensor.append(torch.tensor(y_val[reg].values, dtype=torch.int64))
             #Y_test_tensor.append(torch.tensor(y_test[reg].values, dtype=torch.int64))
 
+            print(y_train_split_pp)
+
             Y_train_tensor[reg] = torch.tensor(y_train_split_pp, dtype=torch.int64)
             if isinstance(val_size, (int, float)):
                 Y_val_tensor[reg] = torch.tensor(y_val_pp, dtype=torch.int64)

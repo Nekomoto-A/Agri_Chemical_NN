@@ -448,7 +448,10 @@ def apply_combat_and_visualize(X_large_ilr, x_train_ilr, y_train, reg_list_big, 
     column_mapping = {
         'pH_dry_soil': 'pH',
         'EC_electric_conductivity': 'EC',
-        'available_P': 'Available.P'
+        'available_P': 'Available.P',
+
+        'crop' : 'crop_notask'
+
     }
     # reg_list_bigに含まれるカラムのみをリネーム
     rename_dict = {k: v for k, v in column_mapping.items() if k in reg_list_big and k in Y_large.columns}
