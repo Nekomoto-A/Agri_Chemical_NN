@@ -309,7 +309,9 @@ def visualize_tsne_comparison(df1, df2, labels1, labels2, df1_name='DataFrame 1'
 
     # --- 3. t-SNEによる次元削減 ---
     print("t-SNEによる次元削減を実行中...")
-    tsne = TSNE(n_components=2, random_state=42, perplexity=min(30, len(X_scaled)-1), n_iter=1000, init='pca')
+    tsne = TSNE(n_components=2, random_state=42, perplexity=min(30, len(X_scaled)-1), 
+                #n_iter=1000, 
+                init='pca')
     tsne_results = tsne.fit_transform(X_scaled)
     print("t-SNEの処理が完了しました。")
 
@@ -455,7 +457,9 @@ def visualize_tsne_with_combat(df1, df2, labels1, labels2, df1_name='DataFrame 1
 
     # --- 5. t-SNEによる次元削減 ---
     print("\nt-SNEによる次元削減を実行中...")
-    tsne = TSNE(n_components=2, random_state=42, perplexity=min(30, len(X_corrected)-1), n_iter=1000, init='pca')
+    tsne = TSNE(n_components=2, random_state=42, perplexity=min(30, len(X_corrected)-1),
+                 #n_iter=1000, 
+                 init='pca')
     tsne_results = tsne.fit_transform(X_corrected)
     print("t-SNEの処理が完了しました。")
 
@@ -795,7 +799,9 @@ def visualize_tsne_with_custom_combat_model(df1, df2, labels1, labels2, df1_name
 
     # --- 5. t-SNEによる次元削減 ---
     print("\nt-SNEによる次元削減を実行中...")
-    tsne = TSNE(n_components=2, random_state=42, perplexity=min(30, len(X_corrected)-1), n_iter=1000, init='pca')
+    tsne = TSNE(n_components=2, random_state=42, perplexity=min(30, len(X_corrected)-1), 
+                #n_iter=1000, 
+                init='pca')
     tsne_results = tsne.fit_transform(X_corrected)
     print("t-SNEの処理が完了しました。")
 

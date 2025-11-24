@@ -401,7 +401,9 @@ def apply_combat_and_visualize(X_large_ilr, x_train_ilr, y_train, reg_list_big, 
     ])
     
     # t-SNEモデルで2次元に削減
-    tsne = TSNE(n_components=2, random_state=42, perplexity=30, n_iter=1000)
+    tsne = TSNE(n_components=2, random_state=42, perplexity=30, 
+                #n_iter=1000
+                )
     tsne_results = tsne.fit_transform(all_data_combat_values)
 
     plt.figure(figsize=(12, 10))

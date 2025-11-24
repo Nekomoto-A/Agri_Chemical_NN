@@ -310,8 +310,8 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
                           marginal_hist_train = config['marginal_hist_train'],
 
                           #data_inte = config['data_inte'],
-                          source_asv_path = config['asv_path'],
-                          source_chem_path = config['chem_path'],
+                          #source_asv_path = config['asv_path'],
+                          #source_chem_path = config['chem_path'],
                           source_reg_list = config['reg_list2'],
                           source_exclude_ids = config['exclude_ids2'],
                           combat = config['combat'],
@@ -808,7 +808,8 @@ def plot_tsne_by_targets(X_tensor,
                 perplexity=perplexity, 
                 random_state=random_state,
                 init='pca',  # PCA初期化は高速化と安定化に寄与します
-                n_iter=1000)
+                #n_iter=1000
+                )
     
     X_2d = tsne.fit_transform(X_np)
     print("t-SNE完了。")

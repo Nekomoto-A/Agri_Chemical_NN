@@ -158,7 +158,7 @@ def fold_evaluate(reg_list, output_dir, device,
                                                                                                                                                                                                                               fold = fold_dir,
                                                                                                                                                                                                                               feature_selection = feature_selection,
                                                                                                                                                                                                                               num_selected_features = num_features_to_select,
-                                                                                                                                                                                                                              data_name = config['feature_path'],
+                                                                                                                                                                                                                              data_name = feature_path,
                                                                                                                                                                                                                               data_inte=data_inte)
         
         ids.append(test_ids)

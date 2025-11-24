@@ -304,7 +304,7 @@ def plot_tsne(
 
     tsne = TSNE(n_components=2, 
                 perplexity=current_perplexity, 
-                n_iter=n_iter, 
+                #n_iter=n_iter, 
                 random_state=random_state,
                 init='pca', 
                 learning_rate='auto')
