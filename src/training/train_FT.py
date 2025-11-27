@@ -472,3 +472,19 @@ def plot_tsne(
         plt.close()
         
         print(f"t-SNE可視化 (Train/Val) を {save_path} に保存しました。")
+
+
+# AdaBN関数
+def apply_adabn(model, target_dataloader, device):
+    print("--- AdaBN: ターゲットデータへの適応を開始 ---")
+    model.train() # BatchNorm更新のためTrainモード
+    # 重み固定
+    for param in model.parameters():
+        param.requires_grad = False
+        
+    with torch.no_grad():
+        for inputs, _, _, _ in target_dataloader: # ラベルは無視
+            inputs = inputs.to(device)
+            model(inputs) # Forwardのみ実行して統計量を更新
+            
+    print("--- AdaBN: 完了 ---")

@@ -9,7 +9,6 @@ from torch.utils.data import TensorDataset, dataloader
 from sklearn.neighbors import LocalOutlierFactor
 from sklearn.preprocessing import LabelEncoder
 from sklearn.cluster import DBSCAN
-#from skbio.stats.composition import clr, multiplicative_replacement
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -211,6 +210,8 @@ class data_create:
             #asv_array = multiplicative_replacement(asv_data.values)
             asv_array = asv_data.where(asv_data != 0, asv_data + 1e-100).values
             #print(asv_data)
+            
+            from skbio.stats.composition import clr, multiplicative_replacement
             clr_array = clr(asv_array)
             # 結果をDataFrameに戻す
             asv_feature = pd.DataFrame(clr_array, columns=asv_data.columns, index=asv_data.index)

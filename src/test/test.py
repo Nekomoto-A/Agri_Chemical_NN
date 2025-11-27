@@ -675,7 +675,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
             ae_model = train_pretraining_DAE(model = ae_model, x_tr = X_train, x_val = X_val, device = device, output_dir = vis_dir,
                                         y_tr = labels_train, y_val = labels_val, label_encoders = label_encoders
                                         )
-        elif model_name == 'FAE':
+        elif 'FAE' in model_name:
             # 「NaNがあるかどうか」を記録するマスクを作成（最初はすべて False）
             n_samples = X_train.shape[0]
             nan_mask = torch.zeros(n_samples, dtype=torch.bool)
@@ -707,10 +707,16 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
             labels_AE_train = {key: val[train_idx] for key, val in labels_nan_only.items()}
             labels_AE_val = {key: val[val_idx] for key, val in labels_nan_only.items()}
 
-            from src.training.train_FT import train_pretraining
-            ae_model = train_pretraining(model = ae_model, x_tr = X_AE_train, x_val = X_AE_val, device = device, output_dir = vis_dir,
-                                        y_tr = labels_AE_train, y_val = labels_AE_val, label_encoders = label_encoders
-                                        )
+            if model_name == 'FAE':
+                from src.training.train_FT import train_pretraining
+                ae_model = train_pretraining(model = ae_model, x_tr = X_AE_train, x_val = X_AE_val, device = device, output_dir = vis_dir,
+                                            y_tr = labels_AE_train, y_val = labels_AE_val, label_encoders = label_encoders
+                                            )
+            elif model_name == 'DFAE':
+                from src.training.train_FT_DAE import train_pretraining_DAE
+                ae_model = train_pretraining_DAE(model = ae_model, x_tr = X_AE_train, x_val = X_AE_val, device = device, output_dir = vis_dir,
+                                            y_tr = labels_AE_train, y_val = labels_AE_val, label_encoders = label_encoders
+                                            )
 
         else:
             from src.training.train_FT import train_pretraining

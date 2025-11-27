@@ -49,6 +49,7 @@ train.py:
   tracenorm_lambda: 1.0
   lasso: True
   lasso_alpha: 0.001
+  'AdaBN': True
 train_GP.py:
   learning_rate: 0.1
   epochs: 60
@@ -89,7 +90,7 @@ train_FT_DAE.py:
   early_stopping: True
   patience: 10
   l1_lambda: 0.01
-  tsne_plot_epoch_freq: 10
+  tsne_plot_epoch_freq: 0
   tsne_perplexity: 30
   tsne_max_samples: 10000
   noise_std: 0.5
@@ -121,7 +122,7 @@ fold_eval.py:
   carr_calc: False
   marginal_hist: False
   k_fold: 10
-  model_name: 'FAE'
+  model_name: 'DFAE'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
