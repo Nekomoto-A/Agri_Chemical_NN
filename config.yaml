@@ -8,7 +8,7 @@ dataset.py:
   level: 7
   feature_transformer: 'ILR'
   softlabel: True
-  labels: ['experimental_purpose', 'crop','pref', ]
+  labels: ['experimental_purpose']
   data_vis: 'visualize'
   data_augumentation: None #'smoter' #'smoter' #'smoter' #'gaussian_copula'
   num_augumentation: 200
@@ -21,12 +21,12 @@ dataset.py:
   marginal_hist_train: False
   unknown_drop: True
   asv_path_linux: '/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/lv6.csv' #'data/raw/riken/taxon_data/lv6.csv' # # #
-  chem_path_linux::  '/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/chem_data.xlsx' #'data/raw/riken/chem_data.xlsx' # # #
+  chem_path_linux:  '/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/chem_data.xlsx' #'data/raw/riken/chem_data.xlsx' # # #
   asv_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\lv6.csv'
   chem_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\chem_data.xlsx'
   reg_list2: ['pH_dry_soil', 'crop'] #['pH_dry_soil'] #[] #['pH_dry_soil'] #[] #
   exclude_ids2: []
-  combat: True
+  combat: False
 train.py:
   early_stopping: True
   patience: 10
@@ -121,7 +121,7 @@ fold_eval.py:
   carr_calc: False
   marginal_hist: False
   k_fold: 10
-  model_name: 'DAE'
+  model_name: 'FAE'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
@@ -156,11 +156,11 @@ fold_eval.py:
   transformer: [None, None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
   reg_loss_fanction: ['mae', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
 main.py:
-  result_dir: 'result_DAE'
+  result_dir: 'result_FAE'
   reg_list: [
-            #'pH', 'Available.P'
+            'Available.P',
             #['pH'],
-            ['Available.P', 'crop'], #, 'pH'
+            #['Available.P', 'crop'], #, 'pH'
             #['NO3.N',],
             #['pH', 'NO3.N',],
             #'pH'

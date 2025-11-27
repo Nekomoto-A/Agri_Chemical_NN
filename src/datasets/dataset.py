@@ -757,6 +757,8 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
         all_df = pd.concat([y_train_split, y_test, y_val], ignore_index=True)
         le = LabelEncoder()
         
+        print(all_df[label])
+
         all_df[label] = le.fit_transform(all_df[label])
         label_encoders[label] = le
 
