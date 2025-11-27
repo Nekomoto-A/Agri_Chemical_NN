@@ -15,105 +15,10 @@ import yaml
 yaml_path = 'config.yaml'
 script_name = os.path.basename(__file__)
 with open(yaml_path, "r", encoding="utf-8") as file:
-    config = yaml.safe_load(file)[script_name]
+    config = yaml.safe_load(file)['train.py']
 
 from src.training import optimizers
 
-def calculate_shared_l2_regularization(model, lambda_shared):
-    l2_reg = torch.tensor(0., device=model.parameters().__next__().device) # デバイスをモデルのパラメータに合わせる
-    
-    # sharedconvのパラメータに対するL2正則化
-    for name, param in model.sharedconv.named_parameters():
-        if 'weight' in name or 'bias' in name: # 重みとバイアス両方にかける場合
-            #l2_reg += torch.sum(param**2)
-            l2_reg += torch.sum(torch.abs(param))
-            
-    # shared_fcのパラメータに対するL2正則化
-    for name, param in model.shared_fc.named_parameters():
-        if 'weight' in name or 'bias' in name: # 重みとバイアス両方にかける場合
-            #l2_reg += torch.sum(param**2)
-            l2_reg += torch.sum(torch.abs(param))
-            
-    return lambda_shared * l2_reg
-
-def calculate_shared_elastic_net(model, lambda_l1, lambda_l2):
-    l_elastic_net = torch.tensor(0., device=model.parameters().__next__().device) # デバイスをモデルのパラメータに合わせる
-    
-    # sharedconvのパラメータに対するL2正則化
-    for name, param in model.sharedconv.named_parameters():
-        if 'weight' in name or 'bias' in name: # 重みとバイアス両方にかける場合
-            #l2_reg += torch.sum(param**2)
-            l_elastic_net += lambda_l1 * torch.sum(torch.abs(param)) + lambda_l2 * torch.sum((param)**2)
-            
-    # shared_fcのパラメータに対するL2正則化
-    for name, param in model.shared_fc.named_parameters():
-        if 'weight' in name or 'bias' in name: # 重みとバイアス両方にかける場合
-            #l2_reg += torch.sum(param**2)
-            l_elastic_net += lambda_l1 * torch.sum(torch.abs(param)) + lambda_l2 * torch.sum((param)**2)
-    return  l_elastic_net
-
-# ==============================================================================
-# 1. Fused Lassoペナルティを共有層に適用する関数
-# ==============================================================================
-def calculate_fused_lasso_for_shared_layers(model, lambda_1, lambda_2):
-    """
-    MTCNNModelの共有層(sharedconv, shared_fc)にFused Lassoペナルティを適用する。
-    """
-    l1_penalty = 0.0
-    fusion_penalty = 0.0
-
-    # 対象となる層をリストアップ
-    target_layers_containers = [model.sharedconv, model.shared_fc]
-
-    for container in target_layers_containers:
-        for layer in container:
-            # Conv1d層の場合
-            if isinstance(layer, nn.Conv1d):
-                weights = layer.weight
-                # L1ペナルティ
-                l1_penalty += lambda_1 * torch.sum(torch.abs(weights))
-                # Fusionペナルティ (カーネルの次元に沿って)
-                # shape: (out_channels, in_channels, kernel_size)
-                diff = weights[:, :, 1:] - weights[:, :, :-1]
-                fusion_penalty += lambda_2 * torch.sum(torch.abs(diff))
-            
-            # Linear層の場合
-            elif isinstance(layer, nn.Linear):
-                weights = layer.weight
-                # L1ペナルティ
-                l1_penalty += lambda_1 * torch.sum(torch.abs(weights))
-                # Fusionペナルティ (入力特徴量の次元に沿って)
-                # shape: (out_features, in_features)
-                diff = weights[:, 1:] - weights[:, :-1]
-                fusion_penalty += lambda_2 * torch.sum(torch.abs(diff))
-
-    return l1_penalty + fusion_penalty
-
-class CustomDataset(Dataset):
-    """
-    入力データ(X)と辞書型のターゲット(y)を扱うためのカスタムデータセット。
-    """
-    def __init__(self, X, y):
-        self.X = X
-        self.y = y
-        # y辞書のキー（タスク名）を取得
-        self.reg_list = list(y.keys())
-
-    def __len__(self):
-        # データセットの全長を返す
-        return len(self.X)
-
-    def __getitem__(self, idx):
-        # 指定されたインデックスのデータを取得
-        
-        # Xからデータを取得
-        x_data = self.X[idx]
-        
-        # yの各キーからデータを取得し、新しい辞書を作成
-        y_data = {key: self.y[key][idx] for key in self.reg_list}
-        
-        return x_data, y_data
-    
 import torch
 import torch.nn as nn
 
@@ -207,51 +112,60 @@ from src.training.adversarial import Discriminator
 from src.training.adversarial import GradientReversalLayer
 from src.training.adversarial import create_data_from_dict
 
+import torch
+from torch.utils.data import Dataset, DataLoader
 
-
-class CustomDatasetAdv(Dataset):
+class MultiTaskFilmDataset(Dataset):
     """
-    敵対的学習のために拡張されたカスタムデータセット。
-    データ(X, y)に加えて、マスクと欠損パターンラベルも返します。
+    X (入力), Y (複数のターゲット), Label (FiLM用の埋め込み情報) を扱うデータセット
     """
-    def __init__(self, X, y_dict):
+    def __init__(self, x_tensor, y_dict, label_dict):
         """
         Args:
-            X (torch.Tensor): 入力データ
-            y_dict (dict): 欠損値(NaN)を含む目的変数の辞書
+            x_tensor (torch.Tensor): 入力データ [N_samples, Input_Dim]
+            y_dict (dict): タスク名をキー、Tensorを値とする辞書 {'task1': Tensor, ...}
+            label_dict (dict): ラベル名をキー、Tensorを値とする辞書 {'label1': Tensor, ...}
         """
-        self.X = X
+        self.x = x_tensor
+        self.y_dict = y_dict
+        self.label_dict = label_dict
         
-        # __init__で一度だけ、y辞書から必要な情報をすべて前処理しておく
-        y_filled, masks, pattern_labels, pattern_map = create_data_from_dict(y_dict)
+        # データの長さがすべて一致しているか確認（簡易チェック）
+        self.n_samples = len(self.x)
+        # 辞書内の各Tensorの長さもチェックする場合はここに追加
         
-        self.y_filled = y_filled
-        self.masks = masks
-        self.pattern_labels = pattern_labels
-        self.pattern_map = pattern_map
-        
-        self.reg_list = list(y_dict.keys())
-        # ディスクリミネータの出力次元数として使えるように、パターンの総数を保存
-        self.num_patterns = len(pattern_map)
+        # 辞書のキーの順序を固定化（毎回同じ順序で結合するため）
+        self.label_keys = sorted(label_dict.keys())
 
     def __len__(self):
-        return len(self.X)
+        return self.n_samples
 
     def __getitem__(self, idx):
-        # 1. 入力データを取得
-        x_data = self.X[idx]
+        # 1. 入力データ X
+        x_out = self.x[idx]
         
-        # 2. 0埋めされた目的変数を取得
-        y_data = {key: self.y_filled[key][idx] for key in self.reg_list}
+        # 2. ターゲットデータ Y (辞書形式のまま返す)
+        # 出力例: {'task1': tensor([value]), 'task2': tensor([value])}
+        y_out = {key: self.y_dict[key][idx] for key in self.y_dict}
         
-        # 3. マスクを取得
-        mask_data = {key: self.masks[key][idx] for key in self.reg_list}
+        # 3. ラベルデータ (辞書の値を結合して1つのベクトルにする)
+        # 例: label1=[0.5], label2=[1.0] -> emb=[0.5, 1.0]
+        # FiLM層に入力するためには float型 である必要があります
+        label_tensors = [self.label_dict[key][idx] for key in self.label_keys]
         
-        # 4. 欠損パターンラベルを取得
-        pattern_label = self.pattern_labels[idx]
+        # もしデータがスカラー(次元なし)の場合、結合のために次元を増やします
+        # 既に [1] のような形状ならそのままでOKですが、念の為確認
+        processed_labels = []
+        for t in label_tensors:
+            if t.dim() == 0:
+                processed_labels.append(t.unsqueeze(0)) # scalar -> [1]
+            else:
+                processed_labels.append(t)
+                
+        # 結合して1つの embedding ベクトルを作成
+        emb_out = torch.cat(processed_labels, dim=0).float()
         
-        # これら4つの情報をタプルとして返す
-        return x_data, y_data, mask_data, pattern_label
+        return x_out, emb_out, y_out
 
 import torch
 import torch.nn as nn
@@ -752,7 +666,8 @@ class GaussianNLLLoss(nn.Module):
 
 
 
-def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, model_name,loss_sum, device, batch_size, #optimizer, 
+def training_FiLM(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, model_name,loss_sum, device, batch_size, #optimizer, 
+                label_tr, label_val,
                 scalers, 
                 train_ids, 
                 reg_loss_fanction,
@@ -879,7 +794,8 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
     # if loss_sum == 'Graph_weight':
     #     correlation_matrix_tensor = optimizers.create_correlation_matrix(y_tr)
 
-    train_dataset = CustomDatasetAdv(x_tr, y_tr)
+    #train_dataset = CustomDatasetAdv(x_tr, y_tr)
+    train_dataset = MultiTaskFilmDataset(x_tr, y_tr, label_tr)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, 
                             shuffle=True,
                             #sampler=sampler
@@ -888,7 +804,8 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
     # 検証用 (シャッフルは必須ではない)
     #val_dataset = TensorDataset(x_val, y_val_tensor)
     #val_dataset = CustomDataset(x_val, y_val)
-    val_dataset = CustomDatasetAdv(x_val, y_val)
+    #val_dataset = CustomDatasetAdv(x_val, y_val)
+    val_dataset = MultiTaskFilmDataset(x_val, y_val, label_val)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
     if 'AE' in model_name:
@@ -920,17 +837,17 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
 
         running_train_losses = {key: 0.0 for key in ['SUM'] + reg_list}
         #for x_batch, y_batch in train_loader:
-        for x_batch, y_batch, masks_batch, patterns_batch in train_loader:
+        for x_batch, label_batch, y_batch in train_loader:
             x_batch = x_batch.to(device)
             patterns_batch = patterns_batch.to(device)
             # 辞書型のデータは、各キーの値を転送する
             y_batch = {k: v.to(device) for k, v in y_batch.items()}
-            masks_batch = {k: v.to(device) for k, v in masks_batch.items()}
+            #masks_batch = {k: v.to(device) for k, v in masks_batch.items()}
             
             model.train()
             optimizer.zero_grad()
 
-            outputs, _ = model(x_batch)
+            outputs, _ = model(x_batch, label_batch)
             train_losses = {}
 
             for reg, lf in zip(reg_list, reg_loss_fanction):
@@ -1020,12 +937,12 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
             running_val_losses = {key: 0.0 for key in ['SUM'] + reg_list}
             #val_loss = 0
             with torch.no_grad():
-                for x_val_batch, y_val_batch, _, _ in val_loader:
+                for x_val_batch, label_val_batch, y_val_batch in val_loader:
 
                     x_val_batch = x_val_batch.to(device)
                     #y_val_batch = y_val_batch.to(device)
                     
-                    outputs,_ = model(x_val_batch)
+                    outputs,_ = model(x_val_batch, label_val_batch)
                     val_losses = []
                     #for j in range(len(output_dim)):
 

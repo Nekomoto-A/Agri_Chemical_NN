@@ -730,6 +730,9 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
 
         if 'PEFT' in model_name:
             model = FineTuningModel_PEFT(pretrained_encoder = pretrained_encoder,last_shared_layer_dim = 128, output_dims = output_dims,reg_list = reg_list)
+        # if 'FiLM' in model_name:
+        #     from src.models.AE import FineTuningModelWithFiLM
+        #     model = FineTuningModelWithFiLM(pretrained_encoder = pretrained_encoder,last_shared_layer_dim = 128, output_dims = output_dims,reg_list = reg_list, label_embedding_dim = )
         else:
             model = FineTuningModel(pretrained_encoder = pretrained_encoder,last_shared_layer_dim = 128, output_dims = output_dims,reg_list = reg_list)
         

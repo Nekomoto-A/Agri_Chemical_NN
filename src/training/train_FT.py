@@ -488,3 +488,4 @@ def apply_adabn(model, target_dataloader, device):
             model(inputs) # Forwardのみ実行して統計量を更新
             
     print("--- AdaBN: 完了 ---")
+    

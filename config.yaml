@@ -49,7 +49,7 @@ train.py:
   tracenorm_lambda: 1.0
   lasso: True
   lasso_alpha: 0.001
-  'AdaBN': True
+  AdaBN: False
 train_GP.py:
   learning_rate: 0.1
   epochs: 60
