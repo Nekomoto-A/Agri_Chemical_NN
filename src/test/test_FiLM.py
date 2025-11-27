@@ -83,7 +83,7 @@ def test_FiLM(x_te, y_te, x_val, y_val, label_te, label_val, model, reg_list, sc
                      median_index = quantiles_list.index(0.5)
                  except (ValueError, AttributeError):
                      median_index = 0 # フォールバック
-                 
+                
                  for reg in reg_list:
                      if reg in raw_val_outputs:
                          val_outputs_log[reg] = raw_val_outputs[reg][:, median_index:median_index+1]
@@ -146,6 +146,7 @@ def test_FiLM(x_te, y_te, x_val, y_val, label_te, label_val, model, reg_list, sc
         print("INFO: 検証データ (x_val, y_val) が提供されなかったため、バイアス補正はスキップされます。")
 
     x_te = x_te.to(device)
+    label_te = label_te.to(device)
     predicts, trues = {}, {}
     stds = None # 標準偏差 (MC or Aleatoric) 用
     
@@ -153,7 +154,7 @@ def test_FiLM(x_te, y_te, x_val, y_val, label_te, label_val, model, reg_list, sc
     # ( ... 元のコードと同じ ... )
     if has_mc_dropout:
         print("INFO: MC Dropoutを有効にして予測区間を計算します。")
-        mc_outputs = model.predict_with_mc_dropout(x_te, n_samples=n_samples_mc)
+        mc_outputs = model.predict_with_mc_dropout(x_te,label_te, n_samples=n_samples_mc)
         outputs = {reg: mc['mean'] for reg, mc in mc_outputs.items()}
         stds = {reg: mc['std'] for reg, mc in mc_outputs.items()}
         
@@ -164,7 +165,7 @@ def test_FiLM(x_te, y_te, x_val, y_val, label_te, label_val, model, reg_list, sc
         print("INFO: 通常の予測を実行します。")
         model.eval()
         with torch.no_grad():
-            raw_outputs, _ = model(x_te)
+            raw_outputs, _ = model(x_te, label_te)
         
         if has_quantile_regression:
             print("INFO: 分位点回帰モデルとして予測値を出力します。")

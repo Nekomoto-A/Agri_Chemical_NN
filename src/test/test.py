@@ -853,6 +853,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         model_trained = train_pls_sem(X_train,Y_train, reg_list, features)
         from src.test.test_SEM import test_pls_sem
         predicts, true, r2_results, mse_results = test_pls_sem(X_test,Y_test,model_trained,reg_list,features,scalers,output_dir=vis_dir)
+
     elif ('Stacking' in model_name) and (len(reg_list) >= 2):
         from src.training.train_lf import train_stacking
         meta_model, final_models = train_stacking(x_train = X_train, y_train = Y_train, x_val = X_val, y_val = Y_val, 
@@ -892,6 +893,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                                                 output_dir = vis_dir, device = device, 
                                                                 #features, n_samples_mc=100, shap_eval=False
                                                                 )
+        
     elif model_name == 'PNN_gamma':
         from src.training.train_PNN_gamma import training_MT_PNN_gamma
         model_trained = training_MT_PNN_gamma(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model, 
@@ -902,6 +904,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                                                 output_dir = vis_dir, device = device, 
                                                                 #features, n_samples_mc=100, shap_eval=False
                                                                 )
+        
     elif model_name == 'MDN':
         from src.training.train_MDN import training_MT_MDN
         model_trained = training_MT_MDN(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model, 
@@ -928,9 +931,34 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                     )
         from src.test.test_gate import test_MT_gate
         predicts, true, r2_results, mse_results = test_MT_gate(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir,device = device)
+
+    elif "FiLM" in model_name:
+        label_emmbed_tr, label_emmbed_val, label_emmbed_te, num_classes = preprocess_onehot_labels(labels_train['crop'], labels_val['crop'], labels_test['crop'])
+
+        from src.training.train_FiLM import training_FiLM
+        
+        model_trained = training_FiLM(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model,
+                                    #optimizer = optimizer, 
+                                    scalers = scalers,
+                                    train_ids = train_ids,
+                                    reg_loss_fanction = reg_loss_fanction,
+                                    output_dim=output_dims,
+                                    reg_list = reg_list, output_dir = vis_dir, 
+                                    model_name = model_name,
+                                    loss_sum = loss_sum,
+                                    device = device,
+                                    batch_size = batch_size,
+                                    label_tr = label_emmbed_tr, label_val = label_emmbed_val,
+                                    )
+        
+        from src.test.test_FiLM import test_FiLM
+        predicts, true, r2_results, mse_results = test_FiLM(X_test,Y_test, X_val, Y_val, label_emmbed_te, label_emmbed_val,
+                                                          model_trained,reg_list,scalers,output_dir=vis_dir,device = device, test_ids = test_ids)
+
     else:
         #optimizer = optim.Adam(model.parameters(), lr=0.001)
-        model_trained = training_MT(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model, 
+        model_trained = training_MT(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, 
+                                    model = model, 
                                     #optimizer = optimizer, 
                                     scalers = scalers,
                                     train_ids = train_ids,
@@ -941,6 +969,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                     loss_sum = loss_sum,
                                     device = device,
                                     batch_size = batch_size
+
                                     )
         
         predicts, true, r2_results, mse_results = test_MT(X_test,Y_test, X_val, Y_val, 
@@ -1042,3 +1071,51 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
     write_result(r2_results, mse_results, columns_list = reg_list, csv_dir = csv_dir, method = method, ind = index)
 
     return predictions, trues, r2_results, mse_results, model_trained
+
+import torch.nn.functional as F
+
+def preprocess_onehot_labels(train_labels, val_labels, test_labels, manual_num_classes=None):
+    """
+    学習・検証・テストデータのラベルを統一された次元のOne-Hotベクトルに変換します。
+    
+    Args:
+        train_labels: 学習データのラベル (List, Numpy array, or Tensor)
+        val_labels: 検証データのラベル
+        test_labels: テストデータのラベル
+        manual_num_classes (int, optional): クラス総数がわかっている場合は指定します。
+                                            指定しない場合、全データの最大値から自動計算します。
+    
+    Returns:
+        train_oh, val_oh, test_oh: float型のOne-Hot Tensor
+        num_classes: 使用されたクラス数
+    """
+    
+    # 1. まず、すべてのデータをLongTensor（整数）に変換します
+    # (リストやNumpy配列が入力されても大丈夫なようにします)
+    t_train = torch.as_tensor(train_labels, dtype=torch.long)
+    t_val = torch.as_tensor(val_labels, dtype=torch.long)
+    t_test = torch.as_tensor(test_labels, dtype=torch.long)
+    
+    # 2. クラス数 (num_classes) の決定
+    # すべてのデータセットの中での最大値を探します
+    if manual_num_classes is None:
+        max_label = max(t_train.max(), t_val.max(), t_test.max())
+        num_classes = int(max_label.item()) + 1
+    else:
+        num_classes = manual_num_classes
+        
+    print(f"クラス数を {num_classes} に設定しました。")
+
+    # 3. 変換を行う内部関数
+    def convert(tensor_data):
+        # one_hot変換
+        oh = F.one_hot(tensor_data, num_classes=num_classes)
+        # モデルに入力するために float型 に変換
+        return oh.float()
+
+    # 4. それぞれ変換
+    train_oh = convert(t_train)
+    val_oh = convert(t_val)
+    test_oh = convert(t_test)
+    
+    return train_oh, val_oh, test_oh, num_classes

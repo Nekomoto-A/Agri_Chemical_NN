@@ -112,60 +112,41 @@ from src.training.adversarial import Discriminator
 from src.training.adversarial import GradientReversalLayer
 from src.training.adversarial import create_data_from_dict
 
-import torch
-from torch.utils.data import Dataset, DataLoader
-
-class MultiTaskFilmDataset(Dataset):
+class MultiTaskDataset(Dataset):
     """
-    X (入力), Y (複数のターゲット), Label (FiLM用の埋め込み情報) を扱うデータセット
+    X, ラベル埋め込み, Y(辞書型) をまとめて扱うカスタムデータセット
     """
-    def __init__(self, x_tensor, y_dict, label_dict):
+    def __init__(self, x_tensor, label_emb_tensor, y_dict):
         """
         Args:
-            x_tensor (torch.Tensor): 入力データ [N_samples, Input_Dim]
-            y_dict (dict): タスク名をキー、Tensorを値とする辞書 {'task1': Tensor, ...}
-            label_dict (dict): ラベル名をキー、Tensorを値とする辞書 {'label1': Tensor, ...}
+            x_tensor (torch.Tensor): 入力特徴量データ
+            label_emb_tensor (torch.Tensor): FiLM用ラベル埋め込みデータ
+            y_dict (dict): タスク名をキー、正解ラベルTensorを値に持つ辞書
+                           例: {'task1': tensor(...), 'task2': tensor(...)}
         """
         self.x = x_tensor
+        self.emb = label_emb_tensor
         self.y_dict = y_dict
-        self.label_dict = label_dict
         
-        # データの長さがすべて一致しているか確認（簡易チェック）
+        # データの長さ（サンプル数）がすべて一致しているか確認する（安全のため）
         self.n_samples = len(self.x)
-        # 辞書内の各Tensorの長さもチェックする場合はここに追加
-        
-        # 辞書のキーの順序を固定化（毎回同じ順序で結合するため）
-        self.label_keys = sorted(label_dict.keys())
+        assert len(self.emb) == self.n_samples, "Xとラベル埋め込みのサンプル数が一致しません"
+        for key, val in self.y_dict.items():
+            assert len(val) == self.n_samples, f"タスク {key} のサンプル数がXと一致しません"
 
     def __len__(self):
+        # データセットの総サンプル数を返す
         return self.n_samples
 
     def __getitem__(self, idx):
-        # 1. 入力データ X
-        x_out = self.x[idx]
+        # 指定されたインデックス(idx)のデータを1つ取り出す
+        x_sample = self.x[idx]
+        emb_sample = self.emb[idx]
         
-        # 2. ターゲットデータ Y (辞書形式のまま返す)
-        # 出力例: {'task1': tensor([value]), 'task2': tensor([value])}
-        y_out = {key: self.y_dict[key][idx] for key in self.y_dict}
+        # Yは辞書なので、すべてのタスクについて idx 番目のデータを取り出して新しい辞書を作る
+        y_sample = {key: val[idx] for key, val in self.y_dict.items()}
         
-        # 3. ラベルデータ (辞書の値を結合して1つのベクトルにする)
-        # 例: label1=[0.5], label2=[1.0] -> emb=[0.5, 1.0]
-        # FiLM層に入力するためには float型 である必要があります
-        label_tensors = [self.label_dict[key][idx] for key in self.label_keys]
-        
-        # もしデータがスカラー(次元なし)の場合、結合のために次元を増やします
-        # 既に [1] のような形状ならそのままでOKですが、念の為確認
-        processed_labels = []
-        for t in label_tensors:
-            if t.dim() == 0:
-                processed_labels.append(t.unsqueeze(0)) # scalar -> [1]
-            else:
-                processed_labels.append(t)
-                
-        # 結合して1つの embedding ベクトルを作成
-        emb_out = torch.cat(processed_labels, dim=0).float()
-        
-        return x_out, emb_out, y_out
+        return x_sample, emb_sample, y_sample
 
 import torch
 import torch.nn as nn
@@ -748,7 +729,7 @@ def training_FiLM(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir,
                                         y_tr[reg].cpu(), 
                                         bins=num_bins
                                     )
-                epsilon = 1e-6 
+                epsilon = 1e-6
                 # counts もCPUテンソルなので、そのまま計算できます
                 counts_smooth = counts.float() + epsilon 
 
@@ -795,7 +776,7 @@ def training_FiLM(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir,
     #     correlation_matrix_tensor = optimizers.create_correlation_matrix(y_tr)
 
     #train_dataset = CustomDatasetAdv(x_tr, y_tr)
-    train_dataset = MultiTaskFilmDataset(x_tr, y_tr, label_tr)
+    train_dataset = MultiTaskDataset(x_tr, y_tr, label_tr)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, 
                             shuffle=True,
                             #sampler=sampler
@@ -805,7 +786,7 @@ def training_FiLM(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir,
     #val_dataset = TensorDataset(x_val, y_val_tensor)
     #val_dataset = CustomDataset(x_val, y_val)
     #val_dataset = CustomDatasetAdv(x_val, y_val)
-    val_dataset = MultiTaskFilmDataset(x_val, y_val, label_val)
+    val_dataset = MultiTaskDataset(x_val, y_val, label_val)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
     if 'AE' in model_name:
@@ -839,7 +820,8 @@ def training_FiLM(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir,
         #for x_batch, y_batch in train_loader:
         for x_batch, label_batch, y_batch in train_loader:
             x_batch = x_batch.to(device)
-            patterns_batch = patterns_batch.to(device)
+            label_batch = label_batch.to(device)
+            
             # 辞書型のデータは、各キーの値を転送する
             y_batch = {k: v.to(device) for k, v in y_batch.items()}
             #masks_batch = {k: v.to(device) for k, v in masks_batch.items()}
@@ -870,7 +852,7 @@ def training_FiLM(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir,
                         predictions_list = {reg: []}
                         for _ in range(n_samples_train):
                             # model.train() モードなので、Dropoutが毎回異なるマスクで適用されます
-                            outputs, _ = model(x_batch)
+                            outputs, _ = model(x_batch, label_batch)
                             for reg in reg_list:
                                 predictions_list[reg].append(outputs[reg][mask])
 
@@ -941,6 +923,8 @@ def training_FiLM(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir,
 
                     x_val_batch = x_val_batch.to(device)
                     #y_val_batch = y_val_batch.to(device)
+
+                    label_val_batch = label_val_batch.to(device)
                     
                     outputs,_ = model(x_val_batch, label_val_batch)
                     val_losses = []
@@ -1054,7 +1038,8 @@ def training_FiLM(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir,
         pred = {}
         for x_tr_batch, y_tr_batch, _, _ in train_loader:
             x_tr_batch = x_tr_batch.to(device)
-            outputs,_ = model(x_tr_batch)
+            label_batch = label_batch.to(device)
+            outputs,_ = model(x_tr_batch,label_batch)
 
             first_output_value = next(iter(outputs.values()))
             if isinstance(first_output_value, tuple):
