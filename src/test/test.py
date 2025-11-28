@@ -669,6 +669,11 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         from src.models.AE import Autoencoder, FineTuningModel, FineTuningModel_PEFT
         ae_model = Autoencoder(input_dim=input_dim)
         ae_model = ae_model.to(device)
+
+        stacked_Y = torch.stack(list(Y_train.values()), dim=1)
+        has_nan_mask = torch.isnan(stacked_Y).any(dim=1)
+        keep_mask = ~has_nan_mask
+
         if model_name == 'DAE':
             from src.training.train_FT_DAE import train_pretraining_DAE
 
@@ -707,20 +712,25 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
             labels_AE_train = {key: val[train_idx] for key, val in labels_nan_only.items()}
             labels_AE_val = {key: val[val_idx] for key, val in labels_nan_only.items()}
 
-            if model_name == 'FAE':
-                from src.training.train_FT import train_pretraining
-                ae_model = train_pretraining(model = ae_model, x_tr = X_AE_train, x_val = X_AE_val, device = device, output_dir = vis_dir,
-                                            y_tr = labels_AE_train, y_val = labels_AE_val, label_encoders = label_encoders
-                                            )
-            elif model_name == 'DFAE':
+            if model_name == 'DFAE':
                 from src.training.train_FT_DAE import train_pretraining_DAE
                 ae_model = train_pretraining_DAE(model = ae_model, x_tr = X_AE_train, x_val = X_AE_val, device = device, output_dir = vis_dir,
                                             y_tr = labels_AE_train, y_val = labels_AE_val, label_encoders = label_encoders
                                             )
+            
+            else:
+                from src.training.train_FT import train_pretraining
+                ae_model = train_pretraining(model = ae_model, x_tr = X_AE_train, x_val = X_AE_val, device = device, output_dir = vis_dir,
+                                            y_tr = labels_AE_train, y_val = labels_AE_val, label_encoders = label_encoders
+                                            )
+
+            # if 'FiLM' in model_name:         
+            #     print(labels_train)
+            #     label_emmbed_tr, label_emmbed_val, label_emmbed_te, num_classes = preprocess_onehot_labels(labels_train['crop'], labels_val['crop'], labels_test['crop'])
+            #     print(label_emmbed_tr)
 
         else:
             from src.training.train_FT import train_pretraining
-
             ae_model = train_pretraining(model = ae_model, x_tr = X_train, x_val = X_val, device = device, output_dir = vis_dir,
                                         y_tr = labels_train, y_val = labels_val, label_encoders = label_encoders
                                         )
@@ -730,19 +740,24 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
 
         if 'PEFT' in model_name:
             model = FineTuningModel_PEFT(pretrained_encoder = pretrained_encoder,last_shared_layer_dim = 128, output_dims = output_dims,reg_list = reg_list)
-        # if 'FiLM' in model_name:
-        #     from src.models.AE import FineTuningModelWithFiLM
-        #     model = FineTuningModelWithFiLM(pretrained_encoder = pretrained_encoder,last_shared_layer_dim = 128, output_dims = output_dims,reg_list = reg_list, label_embedding_dim = )
+        
+        elif 'FiLM' in model_name:
+            la = labels_train['crop'][keep_mask.squeeze()]
+            #print('label_data')
+            #print(labels_train)
+            label_emmbed_tr, label_emmbed_val, label_emmbed_te, num_classes = preprocess_onehot_labels(la, labels_val['crop'], labels_test['crop'])
+            #print(label_emmbed_tr)
+
+            from src.models.AE import FineTuningModelWithFiLM
+            model = FineTuningModelWithFiLM(pretrained_encoder = pretrained_encoder,last_shared_layer_dim = 128, 
+                                            output_dims = output_dims,reg_list = reg_list, label_embedding_dim = num_classes)
         else:
             model = FineTuningModel(pretrained_encoder = pretrained_encoder,last_shared_layer_dim = 128, output_dims = output_dims,reg_list = reg_list)
         
-        stacked_Y = torch.stack(list(Y_train.values()), dim=1)
-        has_nan_mask = torch.isnan(stacked_Y).any(dim=1)
-        keep_mask = ~has_nan_mask
         X_train = X_train[keep_mask.squeeze()]
         Y_train = {reg: Y_train[reg][keep_mask.squeeze()] for reg in reg_list}
 
-
+        
 
     elif model_name == 'MoE':
         from src.models.MoE import MoEModel
@@ -933,8 +948,6 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         predicts, true, r2_results, mse_results = test_MT_gate(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir,device = device)
 
     elif "FiLM" in model_name:
-        label_emmbed_tr, label_emmbed_val, label_emmbed_te, num_classes = preprocess_onehot_labels(labels_train['crop'], labels_val['crop'], labels_test['crop'])
-
         from src.training.train_FiLM import training_FiLM
         
         model_trained = training_FiLM(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model,
@@ -951,9 +964,13 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                     label_tr = label_emmbed_tr, label_val = label_emmbed_val,
                                     )
         
+        
+        
         from src.test.test_FiLM import test_FiLM
         predicts, true, r2_results, mse_results = test_FiLM(X_test,Y_test, X_val, Y_val, label_emmbed_te, label_emmbed_val,
                                                           model_trained,reg_list,scalers,output_dir=vis_dir,device = device, test_ids = test_ids)
+
+        
 
     else:
         #optimizer = optim.Adam(model.parameters(), lr=0.001)

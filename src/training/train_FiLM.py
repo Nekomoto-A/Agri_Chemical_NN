@@ -776,7 +776,11 @@ def training_FiLM(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir,
     #     correlation_matrix_tensor = optimizers.create_correlation_matrix(y_tr)
 
     #train_dataset = CustomDatasetAdv(x_tr, y_tr)
-    train_dataset = MultiTaskDataset(x_tr, y_tr, label_tr)
+
+    print(f'labels:{label_tr.shape}')
+    print(f'x:{x_tr.shape}')
+
+    train_dataset = MultiTaskDataset(x_tr, label_tr, y_tr)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, 
                             shuffle=True,
                             #sampler=sampler
@@ -786,7 +790,7 @@ def training_FiLM(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir,
     #val_dataset = TensorDataset(x_val, y_val_tensor)
     #val_dataset = CustomDataset(x_val, y_val)
     #val_dataset = CustomDatasetAdv(x_val, y_val)
-    val_dataset = MultiTaskDataset(x_val, y_val, label_val)
+    val_dataset = MultiTaskDataset(x_val, label_val, y_val)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
     if 'AE' in model_name:
@@ -1036,7 +1040,7 @@ def training_FiLM(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir,
     with torch.no_grad():
         true = {}
         pred = {}
-        for x_tr_batch, y_tr_batch, _, _ in train_loader:
+        for x_tr_batch, label_batch, y_tr_batch in train_loader:
             x_tr_batch = x_tr_batch.to(device)
             label_batch = label_batch.to(device)
             outputs,_ = model(x_tr_batch,label_batch)

@@ -771,6 +771,8 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
         label_test_tensor[label] = torch.tensor(y_test[label].values.reshape(-1), dtype=torch.int64)
         label_val_tensor[label] = torch.tensor(y_val[label].values.reshape(-1), dtype=torch.int64)
 
+        #print(f'{label}:{label_train_tensor}')
+
     return X_train_tensor, X_val_tensor, X_test_tensor,selected_features, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids,label_train_tensor,label_test_tensor,label_val_tensor, label_encoders
 
 

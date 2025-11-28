@@ -61,6 +61,7 @@ def test_FiLM(x_te, y_te, x_val, y_val, label_te, label_val, model, reg_list, sc
     if x_val is not None and y_val is not None:
         try:
             x_val_tensor = x_val.to(device)
+            label_val = label_val.to(device)
             
             # 検証データの予測値を計算 (対数空間)
             val_outputs_log = {}
@@ -75,7 +76,7 @@ def test_FiLM(x_te, y_te, x_val, y_val, label_te, label_val, model, reg_list, sc
             elif has_quantile_regression:
                  print("INFO: (Bias Correction) 検証データ予測に分位点回帰（中央値）を使用します。")
                  with torch.no_grad():
-                     raw_val_outputs, _ = model(x_val_tensor)
+                     raw_val_outputs, _ = model(x_val_tensor, label_val)
                  
                  # 分位点回帰の場合、補正係数計算のために中央値(0.5)を使用する
                  try:
@@ -92,7 +93,7 @@ def test_FiLM(x_te, y_te, x_val, y_val, label_te, label_val, model, reg_list, sc
                 # 通常予測またはAleatoric予測 (平均値 mu を使用)
                 print("INFO: (Bias Correction) 検証データ予測に通常の予測値 (mean) を使用します。")
                 with torch.no_grad():
-                    raw_val_outputs, _ = model(x_val_tensor)
+                    raw_val_outputs, _ = model(x_val_tensor, label_val)
                 
                 for reg in reg_list:
                     if reg in raw_val_outputs:

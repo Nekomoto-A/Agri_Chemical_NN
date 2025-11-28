@@ -167,6 +167,8 @@ def fold_evaluate(reg_list, output_dir, device,
 
         #test_df = pd.DataFrame(index=test_ids)
 
+
+
         if len(reg_list) > 1:
             vis_dir_main = os.path.join(fold_dir, method)
             os.makedirs(vis_dir_main,exist_ok=True)
@@ -225,6 +227,8 @@ def fold_evaluate(reg_list, output_dir, device,
 
         vis_dir_st = os.path.join(fold_dir, method_st)
         os.makedirs(vis_dir_st,exist_ok=True)
+
+        #print(f'label_data:{label_train_tensor}')
 
         for i,r in enumerate(reg_list):
             Y_train_single, Y_test_single ={r:Y_train_tensor[r]}, {r:Y_test_tensor[r]}
