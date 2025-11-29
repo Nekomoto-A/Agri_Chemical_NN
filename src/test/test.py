@@ -746,6 +746,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
             #print('label_data')
             #print(labels_train)
             label_emmbed_tr, label_emmbed_val, label_emmbed_te, num_classes = preprocess_onehot_labels(la, labels_val['crop'], labels_test['crop'])
+            print(f'クラス数：{num_classes}')
             #print(label_emmbed_tr)
 
             from src.models.AE import FineTuningModelWithFiLM

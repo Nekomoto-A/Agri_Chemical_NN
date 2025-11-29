@@ -132,8 +132,8 @@ def fold_evaluate(reg_list, output_dir, device,
     if k == 'LOOCV':
         kf = LeaveOneOut()
     else:
-        kf = KFold(n_splits=k, shuffle=True, random_state=42)
-        #kf = StratifiedKFold(n_splits=k, shuffle=True, random_state=42)
+        #kf = KFold(n_splits=k, shuffle=True, random_state=42)
+        kf = StratifiedKFold(n_splits=k, shuffle=True, random_state=42)
     predictions = {}
     trues = {}
 
@@ -141,8 +141,8 @@ def fold_evaluate(reg_list, output_dir, device,
 
     scores = {}
 
-    #for fold, (train_index, test_index) in enumerate(kf.split(X, Y['prefandcrop'])):
-    for fold, (train_index, test_index) in enumerate(kf.split(X)):
+    for fold, (train_index, test_index) in enumerate(kf.split(X, Y['crop'])):
+    #for fold, (train_index, test_index) in enumerate(kf.split(X)):
         index = [f'fold{fold+1}']
         X_train, X_test = X.iloc[train_index], X.iloc[test_index]
         Y_train, Y_test = Y.iloc[train_index], Y.iloc[test_index]

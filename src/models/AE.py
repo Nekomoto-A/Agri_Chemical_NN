@@ -112,79 +112,125 @@ class FineTuningModel(nn.Module):
             mc_outputs[reg] = {'mean': mean_preds, 'std': std_preds}
         return mc_outputs
     
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class FiLMGenerator(nn.Module):
+    """
+    ラベル埋め込みから Gamma と Beta を生成するネットワーク。
+    単なるLinearではなく、MLPにすることで表現力を高めます。
+    """
+    def __init__(self, input_dim, output_dim):
+        super(FiLMGenerator, self).__init__()
+        self.mlp = nn.Sequential(
+            nn.Linear(input_dim, input_dim * 2),
+            nn.ReLU(),
+            nn.Linear(input_dim * 2, output_dim * 2) # gammaとbetaの両方を出力するため2倍
+        )
+        self.output_dim = output_dim
+
+    def forward(self, label_emb):
+        # [batch, output_dim * 2] -> [batch, output_dim], [batch, output_dim]
+        out = self.mlp(label_emb)
+        gamma, beta = torch.split(out, self.output_dim, dim=1)
+        return gamma, beta
+
+class FiLMLayer(nn.Module):
+    """
+    特徴量を受け取り、FiLM変調を適用する層。
+    """
+    def __init__(self, label_emb_dim, feature_dim):
+        super(FiLMLayer, self).__init__()
+        # 専用のジェネレーターを持つことで、層ごとに異なる変調が可能になります
+        self.generator = FiLMGenerator(label_emb_dim, feature_dim)
+
+    def forward(self, x, label_emb):
+        # 1. パラメータ生成
+        gamma, beta = self.generator(label_emb)
+        
+        # 2. 変調 (Modulation)
+        # x: [batch, features], gamma/beta: [batch, features]
+        # ブロードキャストで計算されます
+        return x * (1 + gamma) + beta
+
 class FineTuningModelWithFiLM(nn.Module):
     """
-    FiLM層を追加したファインチューニングモデル。
-    ラベル埋め込み情報に基づいて、エンコーダーの特徴量を変調します。
+    タスクヘッドの各層でFiLMを適用する「深い」FiLMモデル。
     """
     def __init__(self, pretrained_encoder, last_shared_layer_dim, output_dims, reg_list, 
-                 label_embedding_dim,  # 追加: ラベル埋め込みの次元数
+                 label_embedding_dim,
                  task_specific_layers=[64], shared_learn=True):
         
         super(FineTuningModelWithFiLM, self).__init__()
         self.reg_list = reg_list
         self.shared_block = pretrained_encoder
 
-        # エンコーダーの重みを固定するかどうか
+        # エンコーダーの重み設定
         for param in self.shared_block.parameters():
             param.requires_grad = shared_learn
         
-        # --- FiLM層の定義 ---
-        # label_embedding_dim から 特徴量次元(last_shared_layer_dim) へ変換します
-        self.film_gamma = nn.Linear(label_embedding_dim, last_shared_layer_dim) # スケール用 (Gamma)
-        self.film_beta = nn.Linear(label_embedding_dim, last_shared_layer_dim)  # シフト用 (Beta)
+        # --- 改善点1: エンコーダー直後のFiLM ---
+        self.encoder_film = FiLMLayer(label_embedding_dim, last_shared_layer_dim)
         
-        # タスク固有のヘッド (変更なし)
+        # --- 改善点2: タスクヘッドの構築 (各層にFiLMを挿入) ---
+        # 従来の nn.Sequential では引数(label_emb)を渡せないので、ModuleListで管理します
         self.task_specific_heads = nn.ModuleList()
+
         for out_dim in output_dims:
-            task_head = nn.Sequential()
-            in_features_task = last_shared_layer_dim
-            for i, hidden_units in enumerate(task_specific_layers):
-                task_head.add_module(f"task_fc_{i+1}", nn.Linear(in_features_task, hidden_units))
-                task_head.add_module(f"task_relu_{i+1}", nn.ReLU())
-                in_features_task = hidden_units
-            task_head.add_module("task_output_layer", nn.Linear(in_features_task, out_dim))
-            self.task_specific_heads.append(task_head)
+            layers = nn.ModuleList()
+            input_dim = last_shared_layer_dim
+            
+            for hidden_dim in task_specific_layers:
+                # 全結合層
+                layers.append(nn.Linear(input_dim, hidden_dim))
+                # 活性化関数
+                layers.append(nn.ReLU())
+                # ★ここでFiLM適用 (層ごとの変調)
+                layers.append(FiLMLayer(label_embedding_dim, hidden_dim))
+                
+                input_dim = hidden_dim
+            
+            # 出力層
+            layers.append(nn.Linear(input_dim, out_dim))
+            self.task_specific_heads.append(layers)
 
     def forward(self, x, label_emb):
-        """
-        Args:
-            x: 入力データ
-            label_emb: ラベル情報の埋め込みベクトル
-        """
-        # 1. エンコーダーで特徴抽出
+        # 1. エンコーダー
         shared_features = self.shared_block(x)
         
-        # 2. FiLMによる変調 (Modulation)
-        gamma = self.film_gamma(label_emb)
-        beta = self.film_beta(label_emb)
+        # 2. エンコーダー直後のFiLM変調
+        modulated_features = self.encoder_film(shared_features, label_emb)
         
-        # 特徴量に変調を適用: (特徴量 * gamma) + beta
-        # gammaは掛け算、betaは足し算で作用します
-        modulated_features = shared_features * gamma + beta
-        
-        # 3. 各タスクヘッドへ入力
+        # 3. 各タスクヘッドへ入力 (Deep FiLM適用)
         outputs = {}
-        for reg, head in zip(self.reg_list, self.task_specific_heads):
-            # 変調された特徴量を使用します
-            outputs[reg] = head(modulated_features)
+        for reg, head_layers in zip(self.reg_list, self.task_specific_heads):
+            
+            current_features = modulated_features
+            
+            # 層ごとに処理を進める
+            for layer in head_layers:
+                if isinstance(layer, FiLMLayer):
+                    # FiLMLayerの場合は label_emb も渡す
+                    current_features = layer(current_features, label_emb)
+                else:
+                    # Linear や ReLU
+                    current_features = layer(current_features)
+            
+            outputs[reg] = current_features
             
         return outputs, modulated_features
-    
+
     def predict_with_mc_dropout(self, x, label_emb, n_samples=100):
-        """
-        MC Dropout推論にも label_emb を渡す必要があります。
-        """
+        # (変更なし: forwardの呼び出し方は同じなのでそのまま利用可能)
         self.eval() 
         for m in self.modules():
             if m.__class__.__name__.startswith('Dropout'):
                 m.train() 
         
         predictions = {reg: [] for reg in self.reg_list}
-        
         with torch.no_grad():
             for _ in range(n_samples):
-                # forwardにlabel_embも渡します
                 outputs, _ = self.forward(x, label_emb)
                 for reg in self.reg_list:
                     predictions[reg].append(outputs[reg])
@@ -192,9 +238,7 @@ class FineTuningModelWithFiLM(nn.Module):
         mc_outputs = {}
         for reg in self.reg_list:
             preds_tensor = torch.stack(predictions[reg])
-            mean_preds = torch.mean(preds_tensor, dim=0)
-            std_preds = torch.std(preds_tensor, dim=0)
-            mc_outputs[reg] = {'mean': mean_preds, 'std': std_preds}
+            mc_outputs[reg] = {'mean': torch.mean(preds_tensor, dim=0), 'std': torch.std(preds_tensor, dim=0)}
         return mc_outputs
     
 class Adapter(nn.Module):

@@ -70,7 +70,7 @@ def test_FiLM(x_te, y_te, x_val, y_val, label_te, label_val, model, reg_list, sc
             if has_mc_dropout:
                 # MC Dropoutの場合、平均値を予測値として使用
                 print("INFO: (Bias Correction) 検証データ予測に MC Dropout (mean) を使用します。")
-                mc_val_outputs = model.predict_with_mc_dropout(x_val_tensor, n_samples=n_samples_mc)
+                mc_val_outputs = model.predict_with_mc_dropout(x_val_tensor,label_val, n_samples=n_samples_mc)
                 val_outputs_log = {reg: mc['mean'] for reg, mc in mc_val_outputs.items()}
             
             elif has_quantile_regression:
