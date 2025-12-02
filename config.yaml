@@ -36,7 +36,7 @@ train.py:
   vis_step: 5
   validation: True
   lambda: 0.1
-  learning_rate: [0.01]
+  learning_rate: [0.001]
   weights: [0.1, 0.9, 1.0, 1.0, 1.0, 1.0]
   SUM_train_lim: 10
   personal_train_lim: 1
@@ -139,7 +139,7 @@ fold_eval.py:
   target_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\chem_data.xlsx'
   data_inte: True
   transformer: [None, None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
-  reg_loss_fanction: ['mse', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
+  reg_loss_fanction: ['lds', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
 main.py:
   result_dir: 'result_FiLM_scale'
   reg_list: [

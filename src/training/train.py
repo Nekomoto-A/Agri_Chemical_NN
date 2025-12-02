@@ -750,6 +750,74 @@ class GaussianNLLLoss(nn.Module):
         
         return loss
 
+import torch
+import torch.nn as nn
+import numpy as np
+from scipy.stats import gaussian_kde
+
+# ==========================================
+# 1. LDSのための重み計算関数
+# ==========================================
+def get_lds_weights(targets):
+    """
+    ターゲット（正解ラベル）の配列を受け取り、
+    KDEを用いて分布を推定し、その逆数（重み）を返します。
+    
+    Args:
+        targets (numpy.array or list): 学習データの全ターゲット値
+        
+    Returns:
+        torch.Tensor: 各ターゲットに対応する重み
+    """
+    # データを1次元のnumpy配列に変換
+    targets_np = np.array(targets).flatten()
+    
+    # カーネル密度推定 (KDE) の計算
+    # これにより、データの分布（確率密度）が得られます
+    kde = gaussian_kde(targets_np)
+    
+    # 各データ点における密度を計算
+    densities = kde(targets_np)
+    
+    # 重みの計算: 密度の逆数 (密度が低いほど重みが大きくなる)
+    weights = 1.0 / densities
+    
+    # 重みの正規化 (平均が1になるように調整することで、学習率への影響を抑える)
+    weights = weights / np.mean(weights)
+    
+    # PyTorchのTensorに変換して返す（勾配計算は不要なのでdetachなどを想定）
+    return torch.tensor(weights, dtype=torch.float32)
+
+# ==========================================
+# 2. 重み付き損失関数の定義
+# ==========================================
+class LDSMSELoss(nn.Module):
+    """
+    サンプルごとの重みを受け取ることができるMSE損失関数
+    """
+    def __init__(self):
+        super(LDSMSELoss, self).__init__()
+        
+    def forward(self, prediction, target, weights):
+        """
+        Args:
+            prediction (Tensor): モデルの予測値
+            target (Tensor): 正解ラベル
+            weights (Tensor): 事前に計算したLDS重み
+            
+        Returns:
+            Tensor: 重み付けされた損失の平均
+        """
+        # 通常の二乗誤差: (y_pred - y_true)^2
+        loss = (prediction - target) ** 2
+        
+        # 重みを適用: weight * (y_pred - y_true)^2
+        # 注意: weightsはバッチサイズと同じ形状である必要があります
+        weighted_loss = loss * weights.view_as(loss)
+        
+        # 平均を返してスカラーにする
+        return weighted_loss.mean()
+
 
 
 def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, model_name,loss_sum, device, batch_size, #optimizer, 
@@ -806,6 +874,8 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                 personal_losses[reg] = RankWeightedMSELoss()
             elif fn == 'uwmse':
                 personal_losses[reg] = UncertaintyWeightedMSELoss(reduction='mean')
+            elif fn == 'lds':
+                personal_losses[reg] = LDSMSELoss()
             elif fn == 'nwmse':
                 #print(f'mokutekihennsuu{y_tr[reg]}')
                 #y_tr_min = torch.nanmin(y_tr[reg])
