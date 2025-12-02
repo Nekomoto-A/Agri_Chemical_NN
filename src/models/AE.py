@@ -154,10 +154,37 @@ class FiLMLayer(nn.Module):
         # ブロードキャストで計算されます
         return x * (1 + gamma) + beta
 
+class LabelAwareOutputScaler(nn.Module):
+    """
+    ラベル埋め込みを受け取り、最終出力に対する Scale (掛け算) と Shift (足し算) を予測します。
+    これにより、ラベルごとに異なる目的変数のレンジに対応します。
+    """
+    def __init__(self, label_emb_dim, target_output_dim=1):
+        super(LabelAwareOutputScaler, self).__init__()
+        # シンプルなMLPで、そのラベルにおける「平均的な値(shift)」と「ばらつき(scale)」を予測
+        self.meta_net = nn.Sequential(
+            nn.Linear(label_emb_dim, label_emb_dim),
+            nn.ReLU(),
+            nn.Linear(label_emb_dim, target_output_dim * 2) # scaleとshift
+        )
+        self.target_output_dim = target_output_dim
+
+    def forward(self, raw_output, label_emb):
+        # raw_output: [batch, target_output_dim] (タスクヘッドからの生の出力)
+        # label_emb: [batch, label_emb_dim]
+        
+        stats = self.meta_net(label_emb)
+        scale_pred, shift_pred = torch.split(stats, self.target_output_dim, dim=1)
+        
+        # Scaleは正の値である必要があるため、SoftplusやExpを通すのが一般的です
+        # ここでは学習初期の安定性のため 1 + ... の形にし、負にならないよう処理します
+        scale = F.softplus(scale_pred) + 1.0  # 初期値は1.0付近、かつ常に正
+        shift = shift_pred                    # 初期値は0付近
+
+        # 最終的な補正: y = y_raw * scale + shift
+        return raw_output * scale + shift
+
 class FineTuningModelWithFiLM(nn.Module):
-    """
-    タスクヘッドの各層でFiLMを適用する「深い」FiLMモデル。
-    """
     def __init__(self, pretrained_encoder, last_shared_layer_dim, output_dims, reg_list, 
                  label_embedding_dim,
                  task_specific_layers=[64], shared_learn=True):
@@ -166,58 +193,59 @@ class FineTuningModelWithFiLM(nn.Module):
         self.reg_list = reg_list
         self.shared_block = pretrained_encoder
 
-        # エンコーダーの重み設定
         for param in self.shared_block.parameters():
             param.requires_grad = shared_learn
         
-        # --- 改善点1: エンコーダー直後のFiLM ---
         self.encoder_film = FiLMLayer(label_embedding_dim, last_shared_layer_dim)
         
-        # --- 改善点2: タスクヘッドの構築 (各層にFiLMを挿入) ---
-        # 従来の nn.Sequential では引数(label_emb)を渡せないので、ModuleListで管理します
         self.task_specific_heads = nn.ModuleList()
+        # ★追加: タスクごとの出力スケーラーを保持するリスト
+        self.output_scalers = nn.ModuleList()
 
         for out_dim in output_dims:
+            # 1. ヘッドの構築 (既存と同じ)
             layers = nn.ModuleList()
             input_dim = last_shared_layer_dim
-            
             for hidden_dim in task_specific_layers:
-                # 全結合層
                 layers.append(nn.Linear(input_dim, hidden_dim))
-                # 活性化関数
                 layers.append(nn.ReLU())
-                # ★ここでFiLM適用 (層ごとの変調)
                 layers.append(FiLMLayer(label_embedding_dim, hidden_dim))
-                
                 input_dim = hidden_dim
             
-            # 出力層
+            # 最終層 (活性化関数なし)
             layers.append(nn.Linear(input_dim, out_dim))
             self.task_specific_heads.append(layers)
 
+            # ★2. 出力スケーラーの追加
+            # 各タスクの出力次元(out_dim)に合わせて作成
+            self.output_scalers.append(LabelAwareOutputScaler(label_embedding_dim, out_dim))
+
     def forward(self, x, label_emb):
-        # 1. エンコーダー
         shared_features = self.shared_block(x)
-        
-        # 2. エンコーダー直後のFiLM変調
         modulated_features = self.encoder_film(shared_features, label_emb)
         
-        # 3. 各タスクヘッドへ入力 (Deep FiLM適用)
         outputs = {}
-        for reg, head_layers in zip(self.reg_list, self.task_specific_heads):
-            
+        # reg_list, head, scaler をまとめてループ
+        iterator = zip(self.reg_list, self.task_specific_heads, self.output_scalers)
+        
+        for reg, head_layers, scaler in iterator:
             current_features = modulated_features
             
-            # 層ごとに処理を進める
+            # --- ヘッド内の処理 ---
             for layer in head_layers:
                 if isinstance(layer, FiLMLayer):
-                    # FiLMLayerの場合は label_emb も渡す
                     current_features = layer(current_features, label_emb)
                 else:
-                    # Linear や ReLU
                     current_features = layer(current_features)
             
-            outputs[reg] = current_features
+            # ここでの current_features は、最後の Linear を通った直後の "生の予測値"
+            raw_output = current_features
+            
+            # --- ★改良点: 出力分布の補正 ---
+            # ラベル情報に基づいて、最終的な値のレンジを調整する
+            final_output = scaler(raw_output, label_emb)
+            
+            outputs[reg] = final_output
             
         return outputs, modulated_features
 

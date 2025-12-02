@@ -312,7 +312,7 @@ def plot_boxplot_by_category(df, category_column, value_column, output_dir):
         safe_cat_col = re.sub(r'[\\/*?:"<>|]', '_', category_column)
         safe_val_col = re.sub(r'[\\/*?:"<>|]', '_', value_column)
         
-        filename = f'boxplot_{safe_val_col}_by_{safe_cat_col}.png'
+        filename = f'boxplot_{safe_val_col}_by_{safe_cat_col}_noFiLM.png'
         save_path = os.path.join(output_dir, filename)
 
         plt.savefig(save_path)
@@ -443,7 +443,7 @@ def plot_grouped_boxplot(df, category_column, output_dir, t):
         # --- ステップ7: 保存 ---
         safe_cat_col = re.sub(r'[\\/*?:"<>|]', '_', category_column)
         
-        filename = f'grouped_boxplot_TruePred_by_{safe_cat_col}_{t}.png'
+        filename = f'grouped_boxplot_TruePred_by_{safe_cat_col}_{t}_noFiLM.png'
         save_path = os.path.join(output_dir, filename)
 
         plt.savefig(save_path)
@@ -459,22 +459,24 @@ def plot_grouped_boxplot(df, category_column, output_dir, t):
         print(f"エラー: 処理中に予期せぬ問題が発生しました: {e}")
 
 if __name__ == '__main__':
-    target = 'NH4_N'
+    target = 'Available_P'
     
-    path = f"/home/nomura/Agri_Chemical_NN/result_AE_nocombat/['{target}']/loss.csv"
+    #path = f"/home/nomura/Agri_Chemical_NN/result_AE_nocombat/['{target}']/loss.csv"
+    path = f"C:\\Users\\asahi\\Agri_Chemical_NN\\result_noFiLM\\['{target}']\\loss.csv"
 
     df = pd.read_csv(path, index_col=0)
 
     print(df)
 
-    output_dir = '/home/nomura/Agri_Chemical_NN/datas/losses'
+    #output_dir = '/home/nomura/Agri_Chemical_NN/datas/losses'
+    output_dir = 'C:\\Users\\asahi\\Agri_Chemical_NN\\datas\\losses'
 
     loss_data = create_features_and_save_csv(df, None, output_dir, output_filename = f'{target}_loss.csv')
 
     #plot_scatter_by_category(df, '作物', output_dir)
 
     v = f"{target}_ST"
-    plot_boxplot_by_category(df, '土地', v, output_dir)
+    plot_boxplot_by_category(df, '作物', v, output_dir)
 
-    plot_grouped_boxplot(df, '土地', output_dir, target)
+    plot_grouped_boxplot(df, '作物', output_dir, target)
 

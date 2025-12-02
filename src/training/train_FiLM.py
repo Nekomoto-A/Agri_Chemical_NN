@@ -645,8 +645,6 @@ class GaussianNLLLoss(nn.Module):
         
         return loss
 
-
-
 def training_FiLM(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, model_name,loss_sum, device, batch_size, #optimizer, 
                 label_tr, label_val,
                 scalers, 
@@ -839,7 +837,7 @@ def training_FiLM(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir,
             for reg, lf in zip(reg_list, reg_loss_fanction):
                 # ❶ 正解ラベルとモデルの出力を取得
                 true_tr = y_batch[reg].to(device)
-                output = outputs[reg] 
+                output = outputs[reg]
 
                 # ❷ 欠損値マスクを作成 (NaNでない要素がTrueになる)
                 # true_trが[batch, 1]のような形状でも、[batch]のような形状でも機能します。

@@ -614,6 +614,61 @@ def write_result(r2_results, mse_results, columns_list, csv_dir, method, ind):
     #result_data.to_csv(csv_dir, mode="a", header=not file_exists, index=True, encoding="utf-8")
     aligned_data.to_csv(csv_dir, mode="a", header=not os.path.exists(csv_dir), index=True, encoding="utf-8")
 
+def calculate_initial_scales(targets, labels_onehot, method='max', fallback_value=1.0):
+    """
+    targets: (N, 1) or (N,) の目的変数テンソル
+    labels_onehot: (N, num_labels) のOne-hotエンコードされたラベルテンソル
+    method: 'max' (最大値), 'mean' (平均値), 'quantile' (99%点)
+    fallback_value: そのラベルのデータが存在しない場合のデフォルト値
+    
+    return: (num_labels,) のテンソル
+    """
+    
+    # 入力形状の確認と整形
+    if targets.dim() == 2:
+        targets = targets.squeeze(1) # (N, 1) -> (N,)
+    
+    num_labels = labels_onehot.shape[1]
+    initial_scales = torch.zeros(num_labels)
+    
+    # One-hotをインデックスに変換 (計算効率のため)
+    # どの行がどのラベルかを取得: (N,)
+    label_indices = torch.argmax(labels_onehot, dim=1)
+    
+    for i in range(num_labels):
+        # ラベル i に該当するデータのマスクを作成
+        # One-hotが厳密な0/1でない場合(Soft label等)を考慮し、argmaxの結果と照合するか、
+        # あるいは単純に labels_onehot[:, i] == 1 を使う
+        mask = (label_indices == i)
+        
+        # 該当するラベルのtargetデータを抽出
+        subset_targets = targets[mask]
+        
+        if len(subset_targets) > 0:
+            if method == 'max':
+                # 最大値 (外れ値に弱いが、0~1正規化には適している)
+                val = subset_targets.max()
+                
+            elif method == 'mean':
+                # 平均値 (スケーラーが平均合わせの場合)
+                val = subset_targets.mean()
+                
+            elif method == 'quantile':
+                # 99%点 (最大値を使いたいが外れ値を無視したい場合)
+                val = torch.quantile(subset_targets, 0.99)
+            
+            else:
+                raise ValueError(f"Unknown method: {method}")
+        else:
+            # データセット内にそのラベルのサンプルが1つもない場合
+            val = fallback_value
+            print(f"Warning: Label {i} has no samples. Using fallback value: {val}")
+            
+        initial_scales[i] = val
+
+    return initial_scales
+
+
 def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predictions, trues, 
                   input_dim, method, index, reg_list, csv_dir, vis_dir, model_name, train_ids, test_ids, features,
                   device,  
@@ -748,6 +803,8 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
             label_emmbed_tr, label_emmbed_val, label_emmbed_te, num_classes = preprocess_onehot_labels(la, labels_val['crop'], labels_test['crop'])
             print(f'クラス数：{num_classes}')
             #print(label_emmbed_tr)
+
+            
 
             from src.models.AE import FineTuningModelWithFiLM
             model = FineTuningModelWithFiLM(pretrained_encoder = pretrained_encoder,last_shared_layer_dim = 128, 

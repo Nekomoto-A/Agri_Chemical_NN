@@ -483,9 +483,10 @@ def apply_adabn(model, target_dataloader, device):
         param.requires_grad = False
         
     with torch.no_grad():
-        for inputs, _, _, _ in target_dataloader: # ラベルは無視
+        for inputs, labels, _, in target_dataloader: # ラベルは無視
             inputs = inputs.to(device)
-            model(inputs) # Forwardのみ実行して統計量を更新
+            labels = labels.to(device)
+            model(inputs, labels) # Forwardのみ実行して統計量を更新
             
     print("--- AdaBN: 完了 ---")
     
