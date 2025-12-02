@@ -72,7 +72,7 @@ def train_pretraining(model, x_tr, x_val,  device, output_dir,
                       
                       tsne_plot_epoch_freq=config['tsne_plot_epoch_freq'], # デフォルト0 (実行しない)
                       tsne_perplexity=config['tsne_perplexity'],
-                      tsne_max_samples=config['tsne_max_samples'] # [追加]
+                      tsne_max_samples=config['tsne_max_samples']
                       ):
     """
     オートエンコーダーの事前学習を実行します（EarlyStopping、グラフ保存対応）。
@@ -187,21 +187,326 @@ def train_pretraining(model, x_tr, x_val,  device, output_dir,
     loss_path = os.path.join(pre_dir, 'AE_loss.png')
     save_loss_plot(train_loss_history, val_loss_history, loss_path)
 
-    if tsne_plot_epoch_freq > 0:
-        # モデルは .load_state_dict() の直後なので eval() モードにしておく
-        model.eval() 
-        plot_tsne(model=model, 
-                  x_train=x_tr, # 学習データ全体
-                  x_val=x_val,   # 検証データ全体
-                  device=device, 
-                  y_train = y_tr,
-                  y_val = y_val,
-                  label_encoders = label_encoders,
-                  epoch_str="final", # 学習後のため "final" とする
-                  output_dir=pre_dir,
-                  perplexity=tsne_perplexity)
+    #if tsne_plot_epoch_freq > 0:
+    # モデルは .load_state_dict() の直後なので eval() モードにしておく
+    model.eval() 
+    plot_tsne(model=model, 
+                x_train=x_tr, # 学習データ全体
+                x_val=x_val,   # 検証データ全体
+                device=device, 
+                y_train = y_tr,
+                y_val = y_val,
+                label_encoders = label_encoders,
+                epoch_str="final", # 学習後のため "final" とする
+                output_dir=pre_dir,
+                perplexity=tsne_perplexity)
 
     return model
+
+def train_pretraining_vae(model, x_tr, x_val, device, output_dir, 
+                      y_tr = None, y_val = None, label_encoders = None,
+                      early_stopping_config=config['early_stopping'], batch_size=config['batch_size'], num_epochs = config['num_epochs'], lr=config['lr'], 
+                      patience=config['patience'], l1_lambda = config['l1_lambda'],
+                      
+                      tsne_plot_epoch_freq=config['tsne_plot_epoch_freq'], # デフォルト0 (実行しない)
+                      tsne_perplexity=config['tsne_perplexity'],
+                      tsne_max_samples=config['tsne_max_samples']
+                      ):
+                      
+    """
+    VAEの事前学習を実行します。
+    """
+
+    pre_dir = os.path.join(output_dir, 'VAE_pretrain') # ディレクトリ名を変更
+    os.makedirs(pre_dir, exist_ok=True)
+
+    print("--- VAE 事前学習フェーズ開始 ---")
+    model.to(device)
+    
+    train_loss_history = []
+    val_loss_history = []
+    
+    # Dataset & DataLoader
+    pretrain_dataset_train = TensorDataset(x_tr, x_tr)
+    train_loader = DataLoader(pretrain_dataset_train, batch_size=batch_size, shuffle=True)
+    
+    pretrain_dataset_val = TensorDataset(x_val, x_val) 
+    validation_loader = DataLoader(pretrain_dataset_val, batch_size=batch_size, shuffle=False)
+
+    optimizer = optim.Adam(model.parameters(), lr=lr)
+
+    pre_path = os.path.join(pre_dir, 'VAE_early_stopping.pt')
+    early_stopping = EarlyStopping(patience=patience, verbose=False, path=pre_path)
+
+    for epoch in range(num_epochs):
+        # --- 訓練フェーズ ---
+        model.train()
+        train_loss = 0.0
+        for data, _ in train_loader: # targetは使わない（オートエンコーダーなので入力と同じ）
+            data = data.to(device)
+            optimizer.zero_grad()
+            
+            # [修正] VAEは3つの値を返す
+            recon_batch, mu, logvar = model(data)
+            
+            # [修正] VAE用の損失関数を使用
+            loss = vae_loss_function(recon_batch, data, mu, logvar)
+
+            # L1正則化 (オプション)
+            if l1_lambda > 0:
+                l1_norm = sum(p.abs().sum() for p in model.parameters() if p.dim() > 1)
+                loss += l1_lambda * l1_norm
+
+            loss.backward()
+            optimizer.step()
+            
+            train_loss += loss.item() # lossはreduction='sum'なのでバッチ合計
+            
+        avg_train_loss = train_loss / len(train_loader.dataset)
+        train_loss_history.append(avg_train_loss)
+
+        # --- 検証フェーズ ---
+        model.eval()
+        val_loss = 0.0
+        with torch.no_grad():
+            for data, _ in validation_loader:
+                data = data.to(device)
+                
+                recon_batch, mu, logvar = model(data)
+                loss = vae_loss_function(recon_batch, data, mu, logvar)
+                
+                val_loss += loss.item()
+        
+        avg_val_loss = val_loss / len(validation_loader.dataset)
+        val_loss_history.append(avg_val_loss)
+        
+        print(f"Epoch [VAE] {epoch+1}/{num_epochs}, Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}")
+
+        # --- t-SNE 可視化 ---
+        if tsne_plot_epoch_freq > 0 and (epoch + 1) % tsne_plot_epoch_freq == 0:
+            # model.get_encoder() は mu を出力するように修正されているのでそのまま使用可能
+            plot_tsne(model=model, 
+                      x_train=x_tr, x_val=x_val, device=device, 
+                      epoch_str=f"{epoch+1}", output_dir=pre_dir,
+                      perplexity=tsne_perplexity, max_samples=tsne_max_samples,
+                      y_train=y_tr, y_val=y_val, label_encoders=label_encoders)
+
+        # --- Early Stopping ---
+        if early_stopping_config:
+            early_stopping(avg_val_loss, model)
+            if early_stopping.early_stop:
+                print("Early stopping triggered")
+                break
+                
+    if early_stopping_config:
+        model.load_state_dict(torch.load(early_stopping.path))
+    
+    # グラフの保存
+    loss_path = os.path.join(pre_dir, 'VAE_loss.png')
+    save_loss_plot(train_loss_history, val_loss_history, loss_path)
+
+    # 最終的なt-SNE
+    #if tsne_plot_epoch_freq > 0:
+    model.eval()
+    plot_tsne(model=model, 
+                x_train=x_tr, x_val=x_val, device=device, 
+                y_train=y_tr, y_val=y_val, label_encoders=label_encoders,
+                epoch_str="final", output_dir=pre_dir,
+                perplexity=tsne_perplexity)
+
+    return model
+
+def vae_loss_function(recon_x, x, mu, logvar, beta = 0.1):
+    """
+    VAEの損失関数
+    Loss = Reconstruction Loss (MSE) + KL Divergence
+    """
+    # 1. 再構成誤差 (MSE) - reduction='sum' でバッチ全体の合計をとるのが一般的
+    MSE = F.mse_loss(recon_x, x, reduction='sum')
+
+    # 2. KLダイバージェンス
+    # 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
+    KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+
+    return MSE + beta * KLD
+
+
+
+def train_pretraining_gmvae(model, x_tr, x_val, device, output_dir, 
+                      y_tr = None, y_val = None, label_encoders = None,
+                      early_stopping_config=config['early_stopping'], batch_size=config['batch_size'], num_epochs = config['num_epochs'], lr=config['lr'], 
+                      patience=config['patience'], l1_lambda = config['l1_lambda'],
+                      
+                      tsne_plot_epoch_freq=config['tsne_plot_epoch_freq'], # デフォルト0 (実行しない)
+                      tsne_perplexity=config['tsne_perplexity'],
+                      tsne_max_samples=config['tsne_max_samples']
+                      ):
+    """
+    GMVAE (Gaussian Mixture VAE) の事前学習を実行します。
+    """
+
+    # ディレクトリ名を GMVAE 用に変更
+    pre_dir = os.path.join(output_dir, 'GMVAE_pretrain') 
+    os.makedirs(pre_dir, exist_ok=True)
+
+    print("--- GMVAE 事前学習フェーズ開始 ---")
+    model.to(device)
+    
+    train_loss_history = []
+    val_loss_history = []
+    
+    # Dataset & DataLoader
+    pretrain_dataset_train = TensorDataset(x_tr, x_tr)
+    train_loader = DataLoader(pretrain_dataset_train, batch_size=batch_size, shuffle=True)
+    
+    pretrain_dataset_val = TensorDataset(x_val, x_val) 
+    validation_loader = DataLoader(pretrain_dataset_val, batch_size=batch_size, shuffle=False)
+
+    optimizer = optim.Adam(model.parameters(), lr=lr)
+
+    pre_path = os.path.join(pre_dir, 'GMVAE_early_stopping.pt')
+    early_stopping = EarlyStopping(patience=patience, verbose=False, path=pre_path)
+
+    for epoch in range(num_epochs):
+        # --- 訓練フェーズ ---
+        model.train()
+        train_loss = 0.0
+        for data, _ in train_loader:
+            data = data.to(device)
+            optimizer.zero_grad()
+            
+            # [修正] GMVAEは4つの値を返す (zが追加)
+            recon_batch, mu, logvar, z = model(data)
+            
+            # [修正] GMVAE用の損失関数を使用 (z と model を渡す)
+            loss = gmvae_loss_function(recon_batch, data, mu, logvar, z, model)
+
+            # L1正則化
+            if l1_lambda > 0:
+                l1_norm = sum(p.abs().sum() for p in model.parameters() if p.dim() > 1)
+                loss += l1_lambda * l1_norm
+
+            loss.backward()
+            optimizer.step()
+            
+            train_loss += loss.item()
+            
+        avg_train_loss = train_loss / len(train_loader.dataset)
+        train_loss_history.append(avg_train_loss)
+
+        # --- 検証フェーズ ---
+        model.eval()
+        val_loss = 0.0
+        with torch.no_grad():
+            for data, _ in validation_loader:
+                data = data.to(device)
+                
+                # [修正] 検証時もGMVAEの形式に合わせる必要があります
+                recon_batch, mu, logvar, z = model(data)
+                
+                # [修正] 検証時もGMVAE用の損失関数で評価
+                loss = gmvae_loss_function(recon_batch, data, mu, logvar, z, model)
+                
+                val_loss += loss.item()
+        
+        avg_val_loss = val_loss / len(validation_loader.dataset)
+        val_loss_history.append(avg_val_loss)
+        
+        print(f"Epoch [GMVAE] {epoch+1}/{num_epochs}, Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}")
+
+        # --- t-SNE 可視化 ---
+        # GMVAEの get_encoder() も mu を返すため、既存の plot_tsne がそのまま使えます
+        if tsne_plot_epoch_freq > 0 and (epoch + 1) % tsne_plot_epoch_freq == 0:
+            plot_tsne(model=model, 
+                      x_train=x_tr, x_val=x_val, device=device, 
+                      epoch_str=f"{epoch+1}", output_dir=pre_dir,
+                      perplexity=tsne_perplexity, max_samples=tsne_max_samples,
+                      y_train=y_tr, y_val=y_val, label_encoders=label_encoders)
+
+        # --- Early Stopping ---
+        if early_stopping_config:
+            early_stopping(avg_val_loss, model)
+            if early_stopping.early_stop:
+                print("Early stopping triggered")
+                break
+                
+    if early_stopping_config:
+        model.load_state_dict(torch.load(early_stopping.path))
+    
+    # グラフの保存
+    loss_path = os.path.join(pre_dir, 'GMVAE_loss.png')
+    save_loss_plot(train_loss_history, val_loss_history, loss_path)
+
+    # 最終的なt-SNE
+    #if tsne_plot_epoch_freq > 0:
+    model.eval()
+    plot_tsne(model=model, 
+                x_train=x_tr, x_val=x_val, device=device, 
+                y_train=y_tr, y_val=y_val, label_encoders=label_encoders,
+                epoch_str="final", output_dir=pre_dir,
+                perplexity=tsne_perplexity)
+
+    return model
+
+
+def gmvae_loss_function(recon_x, x, mu, logvar, z, model):
+    """
+    GMVAEの損失関数
+    Loss = Reconstruction + (log q(z|x) - log p(z))
+    """
+    # 1. 再構成誤差
+    MSE = F.mse_loss(recon_x, x, reduction='sum')
+
+    # ---------------------------------------------------------
+    # 2. KLダイバージェンス項の計算 (Monte Carlo Approximation)
+    # ---------------------------------------------------------
+    
+    # --- A. log q(z|x) の計算 ---
+    # エンコーダーが出力したガウス分布における z の対数確率密度
+    # log N(z | mu, sigma^2)
+    var = logvar.exp()
+    log_q_zx = -0.5 * torch.sum(logvar + np.log(2 * np.pi) + (z - mu).pow(2) / var, dim=1)
+
+    # --- B. log p(z) の計算 (GMM Prior) ---
+    # 事前分布 p(z) = Σ π_k * N(z | μ_k, σ_k^2) における z の対数確率密度
+    
+    # 必要なパラメータを取得・拡張
+    prior_means = model.prior_means       # (K, D)
+    prior_logvars = model.prior_logvars   # (K, D)
+    prior_weights = model.prior_weights.to(x.device) # (K,)
+    
+    # z: (Batch, D) -> (Batch, 1, D)
+    # means: (K, D) -> (1, K, D)
+    # これにより (Batch, K, D) の計算を行う
+    z_expanded = z.unsqueeze(1)
+    means_expanded = prior_means.unsqueeze(0)
+    logvars_expanded = prior_logvars.unsqueeze(0)
+    
+    # 各コンポーネント k における log N(z | μ_k, σ_k^2) を計算
+    # (Batch, K, D) -> sum -> (Batch, K)
+    log_p_z_given_k = -0.5 * torch.sum(
+        logvars_expanded + np.log(2 * np.pi) + (z_expanded - means_expanded).pow(2) / logvars_expanded.exp(),
+        dim=2
+    )
+    
+    # log Σ exp(x) の形にする (Log-Sum-Exp trick)
+    # log p(z) = log Σ (π_k * p(z|k))
+    #          = log Σ exp(log π_k + log p(z|k))
+    log_prior_weights = torch.log(prior_weights + 1e-8).unsqueeze(0) # (1, K)
+    
+    # (Batch, K) -> (Batch,)
+    log_p_z = torch.logsumexp(log_prior_weights + log_p_z_given_k, dim=1)
+
+    # --- C. KL Divergence ---
+    # KL = E[log q(z|x) - log p(z)]
+    # Sum over batch
+    #KLD = torch.sum(log_q_zx - log_p_z)
+    KLD = torch.mean(log_q_zx - log_p_z)
+
+    return MSE + KLD
+
+
+
 
 import torch
 import numpy as np
