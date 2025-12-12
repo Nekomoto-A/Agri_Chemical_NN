@@ -77,7 +77,7 @@ def pretrain_foundation(model_name, device, out_dir, reg_list = config['reg_list
 
     
     elif model_name == 'DAE':
-        from src.models.AE import Autoencoder, FineTuningModel
+        from src.models.AE import Autoencoder
         ae_model = Autoencoder(input_dim=input_dim).to(device)
         from src.training.train_FT_DAE import train_pretraining_DAE
         ae_model = train_pretraining_DAE(model = ae_model, x_tr = x_train_tensor, x_val = x_val_tensor, device = device, output_dir = out_dir,
@@ -85,8 +85,8 @@ def pretrain_foundation(model_name, device, out_dir, reg_list = config['reg_list
                                     )
         
     elif model_name == 'VAE':
-        from src.models.VAE import VariationalAutoencode
-        ae_model = VariationalAutoencode(input_dim=input_dim).to(device)
+        from src.models.VAE import VariationalAutoencoder
+        ae_model = VariationalAutoencoder(input_dim=input_dim).to(device)
         from src.training.train_FT import train_pretraining_vae
         ae_model = train_pretraining_vae(model = ae_model, x_tr = x_train_tensor, x_val = x_val_tensor, device = device, output_dir = out_dir,
                                     y_tr = y_train_tensor, y_val = y_val_tensor, label_encoders = label_encoders
