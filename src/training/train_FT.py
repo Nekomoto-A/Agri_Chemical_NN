@@ -200,6 +200,8 @@ def train_pretraining(model, x_tr, x_val,  device, output_dir,
                 epoch_str="final", # 学習後のため "final" とする
                 output_dir=pre_dir,
                 perplexity=tsne_perplexity)
+    
+    
 
     return model
 

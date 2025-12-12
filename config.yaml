@@ -139,9 +139,9 @@ fold_eval.py:
   target_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\chem_data.xlsx'
   data_inte: True
   transformer: [None, None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
-  reg_loss_fanction: ['lds', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
+  reg_loss_fanction: ['mae', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
 main.py:
-  result_dir: 'result_FiLM_scale'
+  result_dir: 'result_FAE'
   reg_list: [
             ['Available.P'],
             #['pH'],
@@ -151,9 +151,9 @@ main.py:
             #'pH'
             #['pH', 'Available.P',],
             #['pH','EC',],
-            #['NH4.N',],
+            ['NH4.N',],
             #['pH',CEC',],
-            #['Exchangeable.K'],
+            ['Exchangeable.K'],
             #]
             #['pH', 'Available.P'],
             #['pH', 'Available.P', 'EC', 'NH4.N', 'NO3.N', 'Exchangeable.K'],
