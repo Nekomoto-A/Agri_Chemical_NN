@@ -6,7 +6,7 @@ dataset.py:
   non_outlier: None
   val_size: 0.1
   level: 7
-  feature_transformer: 'ILR'
+  feature_transformer: 'CLR'
   softlabel: True
   labels: ['crop']
   data_vis: 'visualize'
@@ -24,7 +24,7 @@ dataset.py:
   chem_path_linux:  '/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/chem_data.xlsx' #'data/raw/riken/chem_data.xlsx' # # #
   asv_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\lv6.csv'
   chem_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\chem_data.xlsx'
-  reg_list2: ['pH_dry_soil'] #['pH_dry_soil'] #[] #['pH_dry_soil'] #[] #
+  reg_list2: ['experimental_purpose'] #['pH_dry_soil'] #[] #['pH_dry_soil'] #[] #
   exclude_ids2: []
   combat: False
 train.py:
@@ -36,7 +36,7 @@ train.py:
   vis_step: 5
   validation: True
   lambda: 0.1
-  learning_rate: [0.001]
+  learning_rate: [0.01]
   weights: [0.1, 0.9, 1.0, 1.0, 1.0, 1.0]
   SUM_train_lim: 10
   personal_train_lim: 1
@@ -116,7 +116,7 @@ fold_eval.py:
   carr_calc: False
   marginal_hist: False
   k_fold: 10
-  model_name: 'FAE_FiLM'
+  model_name: 'AE'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
@@ -137,7 +137,7 @@ fold_eval.py:
   target_path_linux:  'data/raw/riken/chem_data.xlsx' #'/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/chem_data.xlsx' # # #
   feature_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\taxon_data\lv6.csv'
   target_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\chem_data.xlsx'
-  data_inte: True
+  data_inte: False
   transformer: [None, None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
   reg_loss_fanction: ['mae', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
 main.py:

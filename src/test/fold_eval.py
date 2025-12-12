@@ -99,12 +99,21 @@ def fold_evaluate(reg_list, output_dir, device,
         feature_path = config['feature_path_windows']
         target_path = config['target_path_windows']
 
+    if 'AE' in model_name:
+        from src.training.training_foundation import pretrain_foundation
+        features_list, ae_dir = pretrain_foundation(model_name = model_name, device = device, out_dir = sub_dir)
 
-
-    if data_inte:
-        X,Y = data_create(feature_path, target_path, reg_list, exclude_ids, feature_transformer='NON_TR',)
+        if data_inte:
+            X,Y = data_create(feature_path, target_path, reg_list, exclude_ids, feature_transformer='NON_TR',features_list=features_list)
+        else:
+            X,Y = data_create(feature_path, target_path, reg_list, exclude_ids,features_list=features_list)
     else:
-        X,Y = data_create(feature_path, target_path, reg_list, exclude_ids)
+        if data_inte:
+            X,Y = data_create(feature_path, target_path, reg_list, exclude_ids, feature_transformer='NON_TR',)
+        else:
+            X,Y = data_create(feature_path, target_path, reg_list, exclude_ids)
+        
+        ae_dir = None
     
     #print(X)
     if corr_calc:
@@ -185,7 +194,8 @@ def fold_evaluate(reg_list, output_dir, device,
                 labels_train=label_train_tensor,
                 labels_val=label_val_tensor,
                 labels_test=label_test_tensor,
-                label_encoders = label_encoders
+                label_encoders = label_encoders,
+                ae_dir = ae_dir
                 )
             
             for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
@@ -212,7 +222,8 @@ def fold_evaluate(reg_list, output_dir, device,
                     labels_train=label_train_tensor,
                     labels_val=label_val_tensor,
                     labels_test=label_test_tensor,
-                    label_encoders = label_encoders
+                    label_encoders = label_encoders,
+                    ae_dir = ae_dir,
                     )
                 
                 #print(r2_results)
@@ -253,6 +264,7 @@ def fold_evaluate(reg_list, output_dir, device,
             labels_val=label_val_tensor,
             labels_test=label_test_tensor,
             label_encoders = label_encoders,
+            ae_dir = ae_dir
             )
             
             #pprint.pprint(predictions)

@@ -678,7 +678,8 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                   labels_test = None,
                   label_encoders = None,
                   loss_sum = config['loss_sum'], shap_eval = config['shap_eval'], save_feature = config['save_feature'],
-                  batch_size = config['batch_size']
+                  batch_size = config['batch_size'],
+                  ae_dir = None
                   ):
 
     output_dims = []
@@ -721,135 +722,28 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
     elif model_name == 'BNN_MG':
         model = MTBNNModel_MG(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
     elif 'AE' in model_name:
-        
-        # if 'GMVAE' in model_name:
-        #     from src.models.GMVAE import GMVAE
-        #     ae_model = GMVAE(input_dim=input_dim)
-
-        # elif 'VAE' in model_name:
-        #     from src.models.VAE import VariationalAutoencoder, FineTuningModel_vae
-        #     ae_model = VariationalAutoencoder(input_dim=input_dim)
-        #     #ae_model = ae_model.to(device)
-
-        # else:
-        #     from src.models.AE import Autoencoder, FineTuningModel, FineTuningModel_PEFT
-        #     ae_model = Autoencoder(input_dim=input_dim)
-        #     #ae_model = ae_model.to(device)
-
-        # ae_model = ae_model.to(device)
-
-        # stacked_Y = torch.stack(list(Y_train.values()), dim=1)
-        # has_nan_mask = torch.isnan(stacked_Y).any(dim=1)
-        # keep_mask = ~has_nan_mask
-
-        # if model_name == 'DAE':
-        #     from src.training.train_FT_DAE import train_pretraining_DAE
-
-        #     ae_model = train_pretraining_DAE(model = ae_model, x_tr = X_train, x_val = X_val, device = device, output_dir = vis_dir,
-        #                                 y_tr = labels_train, y_val = labels_val, label_encoders = label_encoders
-        #                                 )
-        # elif model_name == 'VAE':
-        #     from src.training.train_FT import train_pretraining_vae
-        #     ae_model = train_pretraining_vae(model = ae_model, x_tr = X_train, x_val = X_val, device = device, output_dir = vis_dir,
-        #                                 y_tr = labels_train, y_val = labels_val, label_encoders = label_encoders
-        #                                 )
-
-        # elif 'FAE' in model_name or model_name == 'FVAE' or model_name == 'FGMVAE':
-        #     # 「NaNがあるかどうか」を記録するマスクを作成（最初はすべて False）
-        #     n_samples = X_train.shape[0]
-        #     nan_mask = torch.zeros(n_samples, dtype=torch.bool)
-
-        #     # Yの各タスクをループしてチェック
-        #     for key, tensor in Y_train.items():
-        #         # torch.isnan() は NaN の場所を True にします
-        #         # .view(n_samples, -1) は、データが1次元でも2次元でも扱えるように形を整えています
-        #         # .any(dim=1) は、その行の中に1つでもNaNがあれば True にします
-        #         is_nan = torch.isnan(tensor).view(n_samples, -1).any(dim=1)
-                
-        #         # 既存のマスクと「OR演算 (|)」をして、どれかのタスクでNaNなら True に更新
-        #         nan_mask = nan_mask | is_nan
+        if model_name == 'AE':
+            from src.models.AE import Autoencoder
+            ae_model = Autoencoder(input_dim=input_dim).to(device)
+    
+        elif model_name == 'DAE':
+            from src.models.AE import Autoencoder
+            ae_model = Autoencoder(input_dim=input_dim).to(device)
             
-        #     # マスクが True の行だけを X から取り出す
-        #     X_nan_only = X_train[nan_mask]
-
-        #     # マスクが True の行だけを Y の各タスクから取り出し、新しい辞書を作る
-        #     Y_nan_only = {key: val[nan_mask] for key, val in Y_train.items()}
-
-        #     labels_nan_only = {key: val[nan_mask] for key, val in labels_train.items()}
-
-        #     indices = list(range(X_nan_only.shape[1]))
-        #     from sklearn.model_selection import train_test_split
-        #     train_idx, val_idx = train_test_split(indices, test_size=0.2, random_state=42, shuffle=True)
-        #     X_AE_train = X_nan_only[train_idx]
-        #     X_AE_val = X_nan_only[val_idx]
-
-        #     labels_AE_train = {key: val[train_idx] for key, val in labels_nan_only.items()}
-        #     labels_AE_val = {key: val[val_idx] for key, val in labels_nan_only.items()}
-
-        #     if model_name == 'DFAE':
-        #         from src.training.train_FT_DAE import train_pretraining_DAE
-        #         ae_model = train_pretraining_DAE(model = ae_model, x_tr = X_AE_train, x_val = X_AE_val, device = device, output_dir = vis_dir,
-        #                                     y_tr = labels_AE_train, y_val = labels_AE_val, label_encoders = label_encoders
-        #                                     )
-        #     elif model_name == 'FVAE':
-        #         from src.training.train_FT import train_pretraining_vae
-        #         ae_model = train_pretraining_vae(model = ae_model, x_tr = X_AE_train, x_val = X_AE_val, device = device, output_dir = vis_dir,
-        #                                     y_tr = labels_AE_train, y_val = labels_AE_val, label_encoders = label_encoders
-        #                                     )
-        #     elif model_name == 'FGMVAE':
-        #         from src.training.train_FT import train_pretraining_gmvae
-        #         ae_model = train_pretraining_gmvae(model = ae_model, x_tr = X_AE_train, x_val = X_AE_val, device = device, output_dir = vis_dir,
-        #                                     y_tr = labels_AE_train, y_val = labels_AE_val, label_encoders = label_encoders
-        #                                     )
-        #     else:
-        #         from src.training.train_FT import train_pretraining
-        #         ae_model = train_pretraining(model = ae_model, x_tr = X_AE_train, x_val = X_AE_val, device = device, output_dir = vis_dir,
-        #                                     y_tr = labels_AE_train, y_val = labels_AE_val, label_encoders = label_encoders
-        #                                     )
-
-        # else:
-        #     from src.training.train_FT import train_pretraining
-        #     ae_model = train_pretraining(model = ae_model, x_tr = X_train, x_val = X_val, device = device, output_dir = vis_dir,
-        #                                 y_tr = labels_train, y_val = labels_val, label_encoders = label_encoders
-        #                                 )
-
-        # import copy
-        # pretrained_encoder = copy.deepcopy(ae_model.get_encoder())
-
-        if 'PEFT' in model_name:
-            import copy
-            pretrained_encoder = copy.deepcopy(ae_model.get_encoder())
-            model = FineTuningModel_PEFT(pretrained_encoder = pretrained_encoder, last_shared_layer_dim = 128, output_dims = output_dims,reg_list = reg_list)
-            #(self, pretrained_encoder, latent_dim, output_dims, reg_list, task_specific_layers=[64], shared_learn=True, dropout_rate=0.0)
-        elif 'VAE' in model_name:
-            from src.models.VAE import FineTuningModel_vae
-            pretrained_encoder = ae_model.get_encoder()
-            model = FineTuningModel_vae(pretrained_encoder = pretrained_encoder, latent_dim = 128, output_dims = output_dims,reg_list = reg_list)
-
-        elif 'FiLM' in model_name:
-            import copy
-            pretrained_encoder = copy.deepcopy(ae_model.get_encoder())
-            la = labels_train['crop'][keep_mask.squeeze()]
-            #print('label_data')
-            #print(labels_train)
-            label_emmbed_tr, label_emmbed_val, label_emmbed_te, num_classes = preprocess_onehot_labels(la, labels_val['crop'], labels_test['crop'])
-            print(f'クラス数：{num_classes}')
-            #print(label_emmbed_tr)
-
-
-            from src.models.AE import FineTuningModelWithFiLM
-            model = FineTuningModelWithFiLM(pretrained_encoder = pretrained_encoder,last_shared_layer_dim = 128, 
-                                            output_dims = output_dims,reg_list = reg_list, label_embedding_dim = num_classes)
+        elif model_name == 'VAE':
+            from src.models.VAE import VariationalAutoencode
+            ae_model = VariationalAutoencode(input_dim=input_dim).to(device)
         
-        else:
-            import copy
-            pretrained_encoder = copy.deepcopy(ae_model.get_encoder())
-            model = FineTuningModel(pretrained_encoder = pretrained_encoder,last_shared_layer_dim = 128, output_dims = output_dims,reg_list = reg_list)
+        ae_model.load_state_dict(torch.load(ae_dir))
+        pretrained_encoder = ae_model.get_encoder()
         
-        X_train = X_train[keep_mask.squeeze()]
-        Y_train = {reg: Y_train[reg][keep_mask.squeeze()] for reg in reg_list}
-
-
+        from src.models.AE import FineTuningModel
+        model = FineTuningModel(pretrained_encoder=pretrained_encoder,
+                                last_shared_layer_dim = 128,
+                                output_dims = output_dims,
+                                reg_list = reg_list,
+                                shared_learn = False,
+                                )
 
     elif model_name == 'MoE':
         from src.models.MoE import MoEModel

@@ -55,7 +55,8 @@ def ilr_transform(data_array):
 
 class data_create:
     def __init__(self,path_asv,path_chem,reg_list,exclude_ids, label_list = None, feature_transformer = config['feature_transformer'], 
-                 label_data = config['labels'], unknown_drop  = config['unknown_drop'], non_outlier = config['non_outlier']
+                 label_data = config['labels'], unknown_drop  = config['unknown_drop'], non_outlier = config['non_outlier'],
+                 features_list = None
                  ):
         self.path_asv = path_asv
         self.asv_data = pd.read_csv(path_asv)#.drop('index',axis = 1)
@@ -69,61 +70,70 @@ class data_create:
         self.label_data = label_data
         self.unknown_drop = unknown_drop
         self.non_outlier = non_outlier
+        self.features_list = features_list
 
     def __iter__(self):
-        #self.chem_data.columns = [col.replace('.', '_') for col in self.chem_data.columns]
-        if config['level'] != 'asv':
-            asv_data = self.asv_data.loc[:, self.asv_data.columns.str.contains('d_')]
+        if self.features_list is not None:
+            print(self.asv_data.shape)
+            asv_data = self.asv_data.reindex(columns=self.features_list, fill_value=0)
+            print(f'ファインチューニングデータ：{asv_data.shape}')
+            print(asv_data.shape)
 
-            taxa = asv_data.columns.to_list()
-            
-            if 'lv6' in self.path_asv:
-                #tax_levels = ["domain", "phylum", "class", "order", "family", "genus", "species"]
-                tax_levels = ["domain", "phylum", "class", "order", "family", "genus"]
-                ends_with_patterns = (';__',';g__')
-            elif 'lv7' in self.path_asv:
-                tax_levels = ["domain", "phylum", "class", "order", "family", "genus", "species"]
-                ends_with_patterns = (';__',';s__')
-            elif 'lv5' in self.path_asv:
-                #tax_levels = ["domain", "phylum", "class", "order", "family", "genus", "species"]
-                tax_levels = ["domain", "phylum", "class", "order", "family"]
-                ends_with_patterns = (';__',';f__')
-            elif 'lv4' in self.path_asv:
-                tax_levels = ["domain", "phylum", "class", "order"]
-                ends_with_patterns = (';__',';o__')
-            elif 'lv3' in self.path_asv:
-                tax_levels = ["domain", "phylum", "class"]
-                ends_with_patterns = (';__',';c__')
-            elif 'lv2' in self.path_asv:
-                tax_levels = ["domain", "phylum"]
-                ends_with_patterns = (';__',';p__')
-            elif 'lv1' in self.path_asv:
-                tax_levels = ["domain"]
-                ends_with_patterns = (';__')
-            
-            if self.unknown_drop:
-                #columns_to_drop1 = [col for col in taxa if col.endswith(';s__')]
-                #ends_with_patterns = (';__', ';s__')
-                #    endswith()メソッドはタプルを渡すことで、いずれかのパターンに一致するかを判定できます。]
-                
-                columns_to_drop = [col for col in taxa if col.endswith(ends_with_patterns)]
-
-                asv_data = asv_data.drop(columns_to_drop, axis=1)
-                taxa = asv_data.columns.to_list()
-            
-            # 分類階層の分割情報をDataFrame化
-            tax_split = pd.DataFrame(
-                [taxon.split(";") for taxon in taxa],
-                columns=tax_levels,
-                index=taxa
-            )
-
-            # 階層順にソート
-            tax_sorted = tax_split.sort_values(by=tax_levels)
-            # 並び替えた分類名で元のデータフレームの列順を並び替え
-            asv_data = asv_data[tax_sorted.index]
         else:
-            asv_data = self.asv_data.drop('index',axis = 1)
+            #self.chem_data.columns = [col.replace('.', '_') for col in self.chem_data.columns]
+            if config['level'] != 'asv':
+                asv_data = self.asv_data.loc[:, self.asv_data.columns.str.contains('d_')]
+
+                taxa = asv_data.columns.to_list()
+                
+                if 'lv6' in self.path_asv:
+                    #tax_levels = ["domain", "phylum", "class", "order", "family", "genus", "species"]
+                    tax_levels = ["domain", "phylum", "class", "order", "family", "genus"]
+                    ends_with_patterns = (';__',';g__')
+                elif 'lv7' in self.path_asv:
+                    tax_levels = ["domain", "phylum", "class", "order", "family", "genus", "species"]
+                    ends_with_patterns = (';__',';s__')
+                elif 'lv5' in self.path_asv:
+                    #tax_levels = ["domain", "phylum", "class", "order", "family", "genus", "species"]
+                    tax_levels = ["domain", "phylum", "class", "order", "family"]
+                    ends_with_patterns = (';__',';f__')
+                elif 'lv4' in self.path_asv:
+                    tax_levels = ["domain", "phylum", "class", "order"]
+                    ends_with_patterns = (';__',';o__')
+                elif 'lv3' in self.path_asv:
+                    tax_levels = ["domain", "phylum", "class"]
+                    ends_with_patterns = (';__',';c__')
+                elif 'lv2' in self.path_asv:
+                    tax_levels = ["domain", "phylum"]
+                    ends_with_patterns = (';__',';p__')
+                elif 'lv1' in self.path_asv:
+                    tax_levels = ["domain"]
+                    ends_with_patterns = (';__')
+                
+                if self.unknown_drop:
+                    #columns_to_drop1 = [col for col in taxa if col.endswith(';s__')]
+                    #ends_with_patterns = (';__', ';s__')
+                    #    endswith()メソッドはタプルを渡すことで、いずれかのパターンに一致するかを判定できます。]
+                    
+                    columns_to_drop = [col for col in taxa if col.endswith(ends_with_patterns)]
+
+                    asv_data = asv_data.drop(columns_to_drop, axis=1)
+                    taxa = asv_data.columns.to_list()
+                
+                # 分類階層の分割情報をDataFrame化
+                tax_split = pd.DataFrame(
+                    [taxon.split(";") for taxon in taxa],
+                    columns=tax_levels,
+                    index=taxa
+                )
+
+                # 階層順にソート
+                tax_sorted = tax_split.sort_values(by=tax_levels)
+                # 並び替えた分類名で元のデータフレームの列順を並び替え
+                asv_data = asv_data[tax_sorted.index]
+            else:
+                asv_data = self.asv_data.drop('index',axis = 1)
+
 
         chem_data = self.chem_data
         #print(asv_data)
