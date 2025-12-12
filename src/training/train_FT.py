@@ -207,22 +207,30 @@ def train_pretraining(model, x_tr, x_val,  device, output_dir,
 
 def train_pretraining_vae(model, x_tr, x_val, device, output_dir, 
                       y_tr = None, y_val = None, label_encoders = None,
-                      early_stopping_config=config['early_stopping'], batch_size=config['batch_size'], num_epochs = config['num_epochs'], lr=config['lr'], 
-                      patience=config['patience'], l1_lambda = config['l1_lambda'],
+                      early_stopping_config=config['early_stopping'], 
+                      batch_size=config['batch_size'], 
+                      num_epochs = config['num_epochs'], 
+                      lr=config['lr'], 
+                      patience=config['patience'], 
+                      l1_lambda = config['l1_lambda'],
                       
-                      tsne_plot_epoch_freq=config['tsne_plot_epoch_freq'], # デフォルト0 (実行しない)
+                      # --- KL Annealing 用の設定を追加 ---
+                      kl_anneal_epochs=config.get('kl_anneal_epochs', 20), # 何エポックかけてbetaを上げるか
+                      kl_max_beta=config.get('kl_max_beta', 1.0),          # 最終的なbetaの値
+                      
+                      tsne_plot_epoch_freq=config['tsne_plot_epoch_freq'],
                       tsne_perplexity=config['tsne_perplexity'],
                       tsne_max_samples=config['tsne_max_samples']
                       ):
                       
     """
-    VAEの事前学習を実行します。
+    VAEの事前学習を実行します（KLアニーリング実装済み）。
     """
 
-    pre_dir = os.path.join(output_dir, 'VAE_pretrain') # ディレクトリ名を変更
+    pre_dir = os.path.join(output_dir, 'VAE_pretrain')
     os.makedirs(pre_dir, exist_ok=True)
 
-    print("--- VAE 事前学習フェーズ開始 ---")
+    print("--- VAE 事前学習フェーズ開始 (KL Annealing) ---")
     model.to(device)
     
     train_loss_history = []
@@ -238,23 +246,34 @@ def train_pretraining_vae(model, x_tr, x_val, device, output_dir,
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
     pre_path = os.path.join(pre_dir, 'VAE_early_stopping.pt')
-    early_stopping = EarlyStopping(patience=patience, verbose=False, path=pre_path)
+    # EarlyStoppingクラスの定義によりますが、パス等を渡します
+    if early_stopping_config:
+        early_stopping = EarlyStopping(patience=patience, verbose=False, path=pre_path)
 
     for epoch in range(num_epochs):
+        # --- KL Annealing: Betaの計算 ---
+        # 線形に 0 から kl_max_beta まで増加させる
+        if kl_anneal_epochs > 0:
+            beta = kl_max_beta * min(1.0, epoch / kl_anneal_epochs)
+        else:
+            beta = kl_max_beta
+        
         # --- 訓練フェーズ ---
         model.train()
         train_loss = 0.0
-        for data, _ in train_loader: # targetは使わない（オートエンコーダーなので入力と同じ）
+        train_mse = 0.0
+        train_kld = 0.0
+        
+        for data, _ in train_loader: 
             data = data.to(device)
             optimizer.zero_grad()
             
-            # [修正] VAEは3つの値を返す
             recon_batch, mu, logvar = model(data)
             
-            # [修正] VAE用の損失関数を使用
-            loss = vae_loss_function(recon_batch, data, mu, logvar)
+            # [修正] betaを渡す。lossの内訳も受け取る
+            loss, mse, kld = vae_loss_function(recon_batch, data, mu, logvar, beta=beta)
 
-            # L1正則化 (オプション)
+            # L1正則化 (Weightsに対して)
             if l1_lambda > 0:
                 l1_norm = sum(p.abs().sum() for p in model.parameters() if p.dim() > 1)
                 loss += l1_lambda * l1_norm
@@ -262,9 +281,15 @@ def train_pretraining_vae(model, x_tr, x_val, device, output_dir,
             loss.backward()
             optimizer.step()
             
-            train_loss += loss.item() # lossはreduction='sum'なのでバッチ合計
+            train_loss += loss.item()
+            train_mse += mse.item()
+            train_kld += kld.item()
             
+        # 平均Loss計算
         avg_train_loss = train_loss / len(train_loader.dataset)
+        avg_train_mse = train_mse / len(train_loader.dataset)
+        avg_train_kld = train_kld / len(train_loader.dataset)
+        
         train_loss_history.append(avg_train_loss)
 
         # --- 検証フェーズ ---
@@ -275,18 +300,21 @@ def train_pretraining_vae(model, x_tr, x_val, device, output_dir,
                 data = data.to(device)
                 
                 recon_batch, mu, logvar = model(data)
-                loss = vae_loss_function(recon_batch, data, mu, logvar)
+                # Validationでも同じbetaを使うのが一般的（Lossの尺度を合わせるため）
+                loss, _, _ = vae_loss_function(recon_batch, data, mu, logvar, beta=beta)
                 
                 val_loss += loss.item()
         
         avg_val_loss = val_loss / len(validation_loader.dataset)
         val_loss_history.append(avg_val_loss)
         
-        print(f"Epoch [VAE] {epoch+1}/{num_epochs}, Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}")
+        # ログ出力に beta の値と MSE/KLD の内訳を追加
+        print(f"Epoch {epoch+1}/{num_epochs} [beta={beta:.4f}] "
+              f"Tr Loss: {avg_train_loss:.4f} (MSE:{avg_train_mse:.1f}, KLD:{avg_train_kld:.1f}) "
+              f"Val Loss: {avg_val_loss:.4f}")
 
         # --- t-SNE 可視化 ---
         if tsne_plot_epoch_freq > 0 and (epoch + 1) % tsne_plot_epoch_freq == 0:
-            # model.get_encoder() は mu を出力するように修正されているのでそのまま使用可能
             plot_tsne(model=model, 
                       x_train=x_tr, x_val=x_val, device=device, 
                       epoch_str=f"{epoch+1}", output_dir=pre_dir,
@@ -294,44 +322,58 @@ def train_pretraining_vae(model, x_tr, x_val, device, output_dir,
                       y_train=y_tr, y_val=y_val, label_encoders=label_encoders)
 
         # --- Early Stopping ---
+        # 注意: アニーリング中はLossが上昇する可能性があるため、
+        # アニーリング期間が終わってからEarly Stoppingを開始する工夫も有効です。
         if early_stopping_config:
+            # 例: betaが最大になってからEarlyStoppingを判定する場合
+            # if epoch >= kl_anneal_epochs: 
             early_stopping(avg_val_loss, model)
+            
             if early_stopping.early_stop:
                 print("Early stopping triggered")
                 break
                 
     if early_stopping_config:
-        model.load_state_dict(torch.load(early_stopping.path))
+        # ロード前にファイルが存在するか確認（patience以内に保存されなかった場合の対策）
+        if os.path.exists(early_stopping.path):
+            model.load_state_dict(torch.load(early_stopping.path))
+        else:
+            print("Warning: No early stopping checkpoint found. Using final model.")
     
-    # グラフの保存
+    # グラフの保存 (関数がある前提)
     loss_path = os.path.join(pre_dir, 'VAE_loss.png')
-    save_loss_plot(train_loss_history, val_loss_history, loss_path)
+    # save_loss_plot(train_loss_history, val_loss_history, loss_path)
 
     # 最終的なt-SNE
-    #if tsne_plot_epoch_freq > 0:
     model.eval()
-    plot_tsne(model=model, 
-                x_train=x_tr, x_val=x_val, device=device, 
-                y_train=y_tr, y_val=y_val, label_encoders=label_encoders,
-                epoch_str="final", output_dir=pre_dir,
-                perplexity=tsne_perplexity)
+    if tsne_plot_epoch_freq > 0: # 設定によって実行有無を制御
+        plot_tsne(model=model, 
+                    x_train=x_tr, x_val=x_val, device=device, 
+                    y_train=y_tr, y_val=y_val, label_encoders=label_encoders,
+                    epoch_str="final", output_dir=pre_dir,
+                    perplexity=tsne_perplexity)
 
     return model
 
-def vae_loss_function(recon_x, x, mu, logvar, beta = 0.1):
+def vae_loss_function(recon_x, x, mu, logvar, beta=1.0):
     """
     VAEの損失関数
-    Loss = Reconstruction Loss (MSE) + KL Divergence
+    Loss = Reconstruction Loss (MSE) + beta * KL Divergence
     """
-    # 1. 再構成誤差 (MSE) - reduction='sum' でバッチ全体の合計をとるのが一般的
-    MSE = F.mse_loss(recon_x, x, reduction='sum')
+    # 1. 再構成誤差 (MSE)
+    # reduction='sum' なのでバッチサイズ分だけ値が大きくなる点に注意
+    #MSE = F.mse_loss(recon_x, x, reduction='sum')
+    MSE = F.mse_loss(recon_x, x, reduction='mean')
 
     # 2. KLダイバージェンス
     # 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
     KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+    #KLD = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
 
-    return MSE + beta * KLD
-
+    # 合計損失
+    total_loss = MSE + beta * KLD
+    
+    return total_loss, MSE, KLD
 
 
 def train_pretraining_gmvae(model, x_tr, x_val, device, output_dir, 

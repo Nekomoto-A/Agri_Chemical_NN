@@ -221,7 +221,7 @@ class data_create:
             asv_array = asv_data.where(asv_data != 0, asv_data + 1e-100).values
             #print(asv_data)
             
-            from skbio.stats.composition import clr, multiplicative_replacement
+            from skbio.stats.composition import clr#, multiplicative_replacement
             clr_array = clr(asv_array)
             # 結果をDataFrameに戻す
             asv_feature = pd.DataFrame(clr_array, columns=asv_data.columns, index=asv_data.index)

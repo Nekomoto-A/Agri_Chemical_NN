@@ -77,6 +77,8 @@ train_FT.py:
   tsne_plot_epoch_freq: 0
   tsne_perplexity: 30
   tsne_max_samples: 10000
+  kl_anneal_epochs: 20
+  kl_max_beta: 1.0
 train_FT_DAE.py:
   lr: 0.01
   batch_size: 256
@@ -116,7 +118,7 @@ fold_eval.py:
   carr_calc: False
   marginal_hist: False
   k_fold: 10
-  model_name: 'AE'
+  model_name: 'VAE'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'

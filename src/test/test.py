@@ -725,26 +725,46 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         if model_name == 'AE':
             from src.models.AE import Autoencoder
             ae_model = Autoencoder(input_dim=input_dim).to(device)
+
+            ae_model.load_state_dict(torch.load(ae_dir))
+            pretrained_encoder = ae_model.get_encoder()
+            
+            from src.models.AE import FineTuningModel
+            model = FineTuningModel(pretrained_encoder=pretrained_encoder,
+                                    last_shared_layer_dim = 128,
+                                    output_dims = output_dims,
+                                    reg_list = reg_list,
+                                    shared_learn = False,
+                                    )
     
         elif model_name == 'DAE':
             from src.models.AE import Autoencoder
             ae_model = Autoencoder(input_dim=input_dim).to(device)
+            ae_model.load_state_dict(torch.load(ae_dir))
+            pretrained_encoder = ae_model.get_encoder()
+            
+            from src.models.AE import FineTuningModel
+            model = FineTuningModel(pretrained_encoder=pretrained_encoder,
+                                    last_shared_layer_dim = 128,
+                                    output_dims = output_dims,
+                                    reg_list = reg_list,
+                                    shared_learn = False,
+                                    )
             
         elif model_name == 'VAE':
-            from src.models.VAE import VariationalAutoencode
-            ae_model = VariationalAutoencode(input_dim=input_dim).to(device)
-        
-        ae_model.load_state_dict(torch.load(ae_dir))
-        pretrained_encoder = ae_model.get_encoder()
-        
-        from src.models.AE import FineTuningModel
-        model = FineTuningModel(pretrained_encoder=pretrained_encoder,
-                                last_shared_layer_dim = 128,
-                                output_dims = output_dims,
-                                reg_list = reg_list,
-                                shared_learn = False,
-                                )
-
+            from src.models.VAE import VariationalAutoencoder
+            ae_model = VariationalAutoencoder(input_dim=input_dim).to(device)
+            ae_model.load_state_dict(torch.load(ae_dir))
+            pretrained_encoder = ae_model.get_encoder()
+            
+            from src.models.VAE import FineTuningModel_vae
+            model = FineTuningModel_vae(pretrained_encoder=pretrained_encoder,
+                                    latent_dim = 128,
+                                    output_dims = output_dims,
+                                    reg_list = reg_list,
+                                    shared_learn = False,
+                                    )
+    
     elif model_name == 'MoE':
         from src.models.MoE import MoEModel
         model = MoEModel(input_dim=input_dim, output_dims = output_dims, reg_list=reg_list, num_experts = 8, top_k = 4, )
