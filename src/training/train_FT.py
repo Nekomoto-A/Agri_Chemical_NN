@@ -499,7 +499,8 @@ def gmvae_loss_function(recon_x, x, mu, logvar, z, model):
     Loss = Reconstruction + (log q(z|x) - log p(z))
     """
     # 1. 再構成誤差
-    MSE = F.mse_loss(recon_x, x, reduction='sum')
+    #MSE = F.mse_loss(recon_x, x, reduction='sum')
+    MSE = F.mse_loss(recon_x, x, reduction='mean')
 
     # ---------------------------------------------------------
     # 2. KLダイバージェンス項の計算 (Monte Carlo Approximation)
@@ -509,7 +510,8 @@ def gmvae_loss_function(recon_x, x, mu, logvar, z, model):
     # エンコーダーが出力したガウス分布における z の対数確率密度
     # log N(z | mu, sigma^2)
     var = logvar.exp()
-    log_q_zx = -0.5 * torch.sum(logvar + np.log(2 * np.pi) + (z - mu).pow(2) / var, dim=1)
+    #log_q_zx = -0.5 * torch.sum(logvar + np.log(2 * np.pi) + (z - mu).pow(2) / var, dim=1)
+    log_q_zx = -0.5 * torch.mean(logvar + np.log(2 * np.pi) + (z - mu).pow(2) / var, dim=1)
 
     # --- B. log p(z) の計算 (GMM Prior) ---
     # 事前分布 p(z) = Σ π_k * N(z | μ_k, σ_k^2) における z の対数確率密度

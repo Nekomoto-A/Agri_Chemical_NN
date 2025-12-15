@@ -66,17 +66,15 @@ def pretrain_foundation(model_name, device, out_dir, reg_list = config['reg_list
 
     print(f'事前学習データ:{x_train_tensor.shape}')
 
-    if model_name == 'AE':
-        from src.models.AE import Autoencoder, FineTuningModel
-        ae_model = Autoencoder(input_dim=input_dim).to(device)
-
-        from src.training.train_FT import train_pretraining
-        ae_model = train_pretraining(model = ae_model, x_tr = x_train_tensor, x_val = x_val_tensor, device = device, output_dir = out_dir,
+    if 'GMVAE' in model_name:
+        from src.models.GMVAE import GMVAE
+        ae_model = GMVAE(input_dim=input_dim).to(device)
+        
+        from src.training.train_FT import train_pretraining_gmvae
+        ae_model = train_pretraining_gmvae(model = ae_model, x_tr = x_train_tensor, x_val = x_val_tensor, device = device, output_dir = out_dir,
                                     y_tr = y_train_tensor, y_val = y_val_tensor, label_encoders = label_encoders
                                     )
-
-    
-    elif model_name == 'DAE':
+    elif 'DAE' in model_name:
         from src.models.AE import Autoencoder
         ae_model = Autoencoder(input_dim=input_dim).to(device)
 
@@ -85,7 +83,7 @@ def pretrain_foundation(model_name, device, out_dir, reg_list = config['reg_list
                                     y_tr = y_train_tensor, y_val = y_val_tensor, label_encoders = label_encoders
                                     )
         
-    elif model_name == 'VAE':
+    elif 'VAE' in model_name:
         from src.models.VAE import VariationalAutoencoder
         ae_model = VariationalAutoencoder(input_dim=input_dim).to(device)
         
@@ -93,7 +91,14 @@ def pretrain_foundation(model_name, device, out_dir, reg_list = config['reg_list
         ae_model = train_pretraining_vae(model = ae_model, x_tr = x_train_tensor, x_val = x_val_tensor, device = device, output_dir = out_dir,
                                     y_tr = y_train_tensor, y_val = y_val_tensor, label_encoders = label_encoders
                                     )
-    
+    else:
+        from src.models.AE import Autoencoder
+        ae_model = Autoencoder(input_dim=input_dim).to(device)
+
+        from src.training.train_FT import train_pretraining
+        ae_model = train_pretraining(model = ae_model, x_tr = x_train_tensor, x_val = x_val_tensor, device = device, output_dir = out_dir,
+                                    y_tr = y_train_tensor, y_val = y_val_tensor, label_encoders = label_encoders
+                                    )
 
     ae_dir = os.path.join(out_dir, "autoencoder_weights.pth")
 

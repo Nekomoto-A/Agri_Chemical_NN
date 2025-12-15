@@ -722,26 +722,25 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
     elif model_name == 'BNN_MG':
         model = MTBNNModel_MG(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
     elif 'AE' in model_name:
-        if model_name == 'AE':
+        if 'GMVAE' in model_name:
+            from src.models.GMVAE import GMVAE
+            ae_model = GMVAE(input_dim=input_dim).to(device)
+            ae_model.load_state_dict(torch.load(ae_dir))
+            pretrained_encoder = ae_model.get_encoder()
+            
+            from src.models.VAE import FineTuningModel_vae
+            model = FineTuningModel_vae(pretrained_encoder=pretrained_encoder,
+                                    latent_dim = 128,
+                                    output_dims = output_dims,
+                                    reg_list = reg_list,
+                                    shared_learn = False,
+                                    )
+        elif 'DAE' in model_name:
             from src.models.AE import Autoencoder
             ae_model = Autoencoder(input_dim=input_dim).to(device)
+            ae_model.load_state_dict(torch.load(ae_dir))
+            pretrained_encoder = ae_model.get_encoder()
 
-            ae_model.load_state_dict(torch.load(ae_dir))
-            pretrained_encoder = ae_model.get_encoder()
-            
-            from src.models.AE import FineTuningModel
-            model = FineTuningModel(pretrained_encoder=pretrained_encoder,
-                                    last_shared_layer_dim = 128,
-                                    output_dims = output_dims,
-                                    reg_list = reg_list,
-                                    shared_learn = False,
-                                    )
-    
-        elif model_name == 'DAE':
-            from src.models.AE import Autoencoder
-            ae_model = Autoencoder(input_dim=input_dim).to(device)
-            ae_model.load_state_dict(torch.load(ae_dir))
-            pretrained_encoder = ae_model.get_encoder()
             
             from src.models.AE import FineTuningModel
             model = FineTuningModel(pretrained_encoder=pretrained_encoder,
@@ -751,7 +750,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                     shared_learn = False,
                                     )
             
-        elif model_name == 'VAE':
+        elif 'VAE' in model_name:
             from src.models.VAE import VariationalAutoencoder
             ae_model = VariationalAutoencoder(input_dim=input_dim).to(device)
             ae_model.load_state_dict(torch.load(ae_dir))
@@ -764,7 +763,31 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                     reg_list = reg_list,
                                     shared_learn = False,
                                     )
-    
+
+        else:
+            from src.models.AE import Autoencoder
+            ae_model = Autoencoder(input_dim=input_dim).to(device)
+
+            ae_model.load_state_dict(torch.load(ae_dir))
+            pretrained_encoder = ae_model.get_encoder()
+
+            if 'FiLM' in model_name:
+                from src.models.AE import FineTuningModelWithFiLM
+                model = FineTuningModelWithFiLM(pretrained_encoder=pretrained_encoder,
+                                            last_shared_layer_dim = 128,
+                                            output_dims = output_dims,
+                                            reg_list = reg_list,
+                                            label_embedding_dim = labels_train.shape[1],
+                                            shared_learn = False,
+                                            )
+            else:
+                from src.models.AE import FineTuningModel
+                model = FineTuningModel(pretrained_encoder=pretrained_encoder,
+                                        last_shared_layer_dim = 128,
+                                        output_dims = output_dims,
+                                        reg_list = reg_list,
+                                        shared_learn = False,
+                                        )
     elif model_name == 'MoE':
         from src.models.MoE import MoEModel
         model = MoEModel(input_dim=input_dim, output_dims = output_dims, reg_list=reg_list, num_experts = 8, top_k = 4, )

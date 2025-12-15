@@ -118,7 +118,7 @@ fold_eval.py:
   carr_calc: False
   marginal_hist: False
   k_fold: 10
-  model_name: 'VAE'
+  model_name: 'AE_FiLM'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
@@ -143,7 +143,7 @@ fold_eval.py:
   transformer: [None, None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
   reg_loss_fanction: ['mae', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
 main.py:
-  result_dir: 'result_FAE'
+  result_dir: 'result_AE'
   reg_list: [
             ['Available.P'],
             #['pH'],

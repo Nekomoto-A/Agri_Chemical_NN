@@ -21,7 +21,8 @@ class GMVAE(nn.Module):
         for i, out_features in enumerate(shared_layers[:-1]):
             self.encoder_body.add_module(f"enc_fc_{i}", nn.Linear(in_features, out_features))
             self.encoder_body.add_module(f"enc_bn_{i}", nn.BatchNorm1d(out_features))
-            self.encoder_body.add_module(f"enc_relu_{i}", nn.ReLU())
+            #self.encoder_body.add_module(f"enc_relu_{i}", nn.ReLU())
+            self.encoder_body.add_module(f"enc_relu_{i}", nn.LeakyReLU())
             in_features = out_features
             
         self.fc_mu = nn.Linear(in_features, self.latent_dim)
@@ -33,7 +34,7 @@ class GMVAE(nn.Module):
         for i, out_features in enumerate(decoder_layers[1:]):
             self.decoder.add_module(f"dec_fc_{i}", nn.Linear(in_features, out_features))
             self.decoder.add_module(f"dec_bn_{i}", nn.BatchNorm1d(out_features))
-            self.decoder.add_module(f"dec_relu_{i}", nn.ReLU())
+            #self.decoder.add_module(f"dec_relu_{i}", nn.ReLU())
             in_features = out_features
         self.decoder.add_module("dec_out", nn.Linear(in_features, input_dim))
 

@@ -54,7 +54,8 @@ class VariationalAutoencoder(nn.Module):
         for i, out_features in enumerate(decoder_layers_config[1:]): 
             self.decoder.add_module(f"decoder_fc_{i+1}", nn.Linear(in_features, out_features))
             self.decoder.add_module(f"decoder_batchnorm_{i+1}", nn.BatchNorm1d(out_features))
-            self.decoder.add_module(f"decoder_relu_{i+1}", nn.ReLU())
+            #self.decoder.add_module(f"decoder_relu_{i+1}", nn.ReLU())
+            self.decoder.add_module(f"decoder_relu_{i+1}", nn.LeakyReLU())
             in_features = out_features
             
         # 最後の層: 元の入力次元に戻す
@@ -142,7 +143,8 @@ class FineTuningModel_vae(nn.Module):
             for i, hidden_units in enumerate(task_specific_layers):
                 task_head.add_module(f"task_fc_{i+1}", nn.Linear(in_features_task, hidden_units))
                 task_head.add_module(f"task_batchnorm_{i+1}", nn.BatchNorm1d(hidden_units)) # 学習安定化のため追加推奨
-                task_head.add_module(f"task_relu_{i+1}", nn.ReLU())
+                #task_head.add_module(f"task_relu_{i+1}", nn.ReLU())
+                task_head.add_module(f"task_relu_{i+1}", nn.LeakyReLU())
                 if dropout_rate > 0:
                     task_head.add_module(f"task_dropout_{i+1}", nn.Dropout(p=dropout_rate)) # MC Dropoutのために重要
                 in_features_task = hidden_units
