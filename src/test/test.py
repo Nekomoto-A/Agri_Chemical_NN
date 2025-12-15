@@ -990,13 +990,11 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                     loss_sum = loss_sum,
                                     device = device,
                                     batch_size = batch_size,
-                                    label_tr = label_emmbed_tr, label_val = label_emmbed_val,
+                                    label_tr = labels_train, label_val = labels_val,
                                     )
         
-        
-        
         from src.test.test_FiLM import test_FiLM
-        predicts, true, r2_results, mse_results = test_FiLM(X_test,Y_test, X_val, Y_val, label_emmbed_te, label_emmbed_val,
+        predicts, true, r2_results, mse_results = test_FiLM(X_test,Y_test, X_val, Y_val, labels_test, labels_val,
                                                           model_trained,reg_list,scalers,output_dir=vis_dir,device = device, test_ids = test_ids)
 
         

@@ -70,7 +70,9 @@ def fold_evaluate(reg_list, output_dir, device,
                   num_features_to_select = config['num_selected_features'],
                   marginal_hist = config['marginal_hist'],
                   data_inte = config['data_inte'],
-                  loss_fanctions = config['reg_loss_fanction']
+                  loss_fanctions = config['reg_loss_fanction'],
+                  labels = config['labels'],
+                  embedding = config['embedding'],
                   ):
     #if feature_selection_all:
     #   output_dir = os.path.join(fsdir, output_dir)
@@ -170,7 +172,9 @@ def fold_evaluate(reg_list, output_dir, device,
                                                                                                                                                                                                                               feature_selection = feature_selection,
                                                                                                                                                                                                                               num_selected_features = num_features_to_select,
                                                                                                                                                                                                                               data_name = feature_path,
-                                                                                                                                                                                                                              data_inte=data_inte)
+                                                                                                                                                                                                                              data_inte=data_inte,
+                                                                                                                                                                                                                              labels = labels
+                                                                                                                                                                                                                              )
         
         ids.append(test_ids)
         
@@ -178,7 +182,9 @@ def fold_evaluate(reg_list, output_dir, device,
 
         #test_df = pd.DataFrame(index=test_ids)
 
-
+        if embedding == 'Onehot':
+            from src.datasets.Embedding import onehot_encode_and_split
+            label_train_embedded, label_val_embedded, label_test_embedded = onehot_encode_and_split(label_train_tensor, label_val_tensor, label_test_tensor,)
 
         if len(reg_list) > 1:
             vis_dir_main = os.path.join(fold_dir, method)
@@ -191,9 +197,9 @@ def fold_evaluate(reg_list, output_dir, device,
                 vis_dir = vis_dir_main, model_name = model_name, train_ids = train_ids, test_ids = test_ids, features= features,
                 device = device,
                 reg_loss_fanction = loss_fanctions,
-                labels_train=label_train_tensor,
-                labels_val=label_val_tensor,
-                labels_test=label_test_tensor,
+                labels_train=label_train_embedded,
+                labels_val=label_val_embedded,
+                labels_test=label_test_embedded,
                 label_encoders = label_encoders,
                 ae_dir = ae_dir
                 )
@@ -219,9 +225,9 @@ def fold_evaluate(reg_list, output_dir, device,
                     device = device,
                     reg_loss_fanction = loss_fanctions,
                     loss_sum = comp_method,
-                    labels_train=label_train_tensor,
-                    labels_val=label_val_tensor,
-                    labels_test=label_test_tensor,
+                    labels_train=label_train_embedded,
+                    labels_val=label_val_embedded,
+                    labels_test=label_test_embedded,
                     label_encoders = label_encoders,
                     ae_dir = ae_dir,
                     )
@@ -260,9 +266,9 @@ def fold_evaluate(reg_list, output_dir, device,
             vis_dir = vis_dir_st, model_name = model_name, train_ids = train_ids, test_ids = test_ids, features = features,
             device = device,
             reg_loss_fanction = loss_fanction,
-            labels_train=label_train_tensor,
-            labels_val=label_val_tensor,
-            labels_test=label_test_tensor,
+            labels_train=label_train_embedded,
+            labels_val=label_val_embedded,
+            labels_test=label_test_embedded,
             label_encoders = label_encoders,
             ae_dir = ae_dir
             )

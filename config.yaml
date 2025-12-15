@@ -8,7 +8,6 @@ dataset.py:
   level: 7
   feature_transformer: 'CLR'
   softlabel: True
-  labels: ['crop']
   data_vis: 'visualize'
   data_augumentation: None #'smoter' #'smoter' #'smoter' #'gaussian_copula'
   num_augumentation: 200
@@ -142,6 +141,8 @@ fold_eval.py:
   data_inte: False
   transformer: [None, None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
   reg_loss_fanction: ['mae', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
+  labels: ['crop']
+  embedding: 'Onehot'
 main.py:
   result_dir: 'result_AE'
   reg_list: [

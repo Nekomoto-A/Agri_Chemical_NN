@@ -55,7 +55,8 @@ def ilr_transform(data_array):
 
 class data_create:
     def __init__(self,path_asv,path_chem,reg_list,exclude_ids, label_list = None, feature_transformer = config['feature_transformer'], 
-                 label_data = config['labels'], unknown_drop  = config['unknown_drop'], non_outlier = config['non_outlier'],
+                 #label_data = config['labels'], 
+                 unknown_drop  = config['unknown_drop'], non_outlier = config['non_outlier'],
                  features_list = None
                  ):
         self.path_asv = path_asv
@@ -67,7 +68,7 @@ class data_create:
         self.exclude_ids = exclude_ids
         self.feature_transformer = feature_transformer
         self.label_list = label_list
-        self.label_data = label_data
+        #self.label_data = label_data
         self.unknown_drop = unknown_drop
         self.non_outlier = non_outlier
         self.features_list = features_list
@@ -133,7 +134,6 @@ class data_create:
                 asv_data = asv_data[tax_sorted.index]
             else:
                 asv_data = self.asv_data.drop('index',axis = 1)
-
 
         chem_data = self.chem_data
         #print(asv_data)
@@ -260,8 +260,6 @@ class data_create:
         yield asv_feature
         yield chem_data
 
-
-        
         #if self.label_list != None:
         #    label_data = chem_data[self.label_list]
 
@@ -304,12 +302,11 @@ from src.datasets.data_augumentation import augment_with_ctgan, augment_with_smo
 import platform
 
 def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer, 
-                          feature_selection,num_selected_features, data_name, data_inte, 
+                          feature_selection,num_selected_features, data_name, data_inte,
+                          labels, 
                           val_size = config['val_size'],
                           #transformer = config['transformer'],
                           #augmentation = config['augmentation'],
-                          softlabel = config['softlabel'],
-                          labels = config['labels'],
                           data_augumentation = config['data_augumentation'],
                           num_augumentation = config['num_augumentation'],
                           data_vis = config['data_vis'],
