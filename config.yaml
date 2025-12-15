@@ -116,8 +116,8 @@ fold_eval.py:
   feature_selection_dir: 'result_DRA_NN'
   carr_calc: False
   marginal_hist: False
-  k_fold: 10
-  model_name: 'AE_FiLM'
+  k_fold: 5
+  model_name: 'AE'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
@@ -146,15 +146,15 @@ fold_eval.py:
 main.py:
   result_dir: 'result_AE'
   reg_list: [
-            ['Available.P'],
+            #['Available.P'],
             #['pH'],
             #['Available.P', 'crop'], #, 'pH'
-            ['NO3.N',],
+            ['NO3.N'],
             #['pH', 'NO3.N',],
             #'pH'
             #['pH', 'Available.P',],
             #['pH','EC',],
-            ['NH4.N',],
+            ['NH4.N'],
             #['pH',CEC',],
             ['Exchangeable.K'],
             #]

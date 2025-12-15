@@ -55,6 +55,135 @@ def calculate_and_save_correlations(df, target_data, output_dir, reg_list):
 
 import platform
 
+class ContinuousStratifiedKFold:
+    """
+    連続値の目的変数に対して、分布を維持しながら層化抽出を行うK-Fold交差検証クラス。
+    各ビンのサンプル数がn_splits以上になるように動的にビンを統合する機能を持ちます。
+    """
+
+    def __init__(self, n_splits=5, shuffle=True, random_state=None, n_bins_factor=2):
+        """
+        Parameters:
+        -----------
+        n_splits : int
+            分割数 (Fold数)
+        shuffle : bool
+            データをシャッフルするかどうか
+        random_state : int or RandomState instance
+            乱数シード
+        n_bins_factor : int
+            初期ビン数を決定する際の係数。
+            スタージェスの公式で求めたビン数 × n_bins_factor で初期分割を行う。
+            値を大きくすると分布をより細かく捉えようとするが、統合処理のコストが増える。
+        """
+        self.n_splits = n_splits
+        self.shuffle = shuffle
+        self.random_state = random_state
+        self.n_bins_factor = n_bins_factor
+
+    def get_n_splits(self, X=None, y=None, groups=None):
+        return self.n_splits
+
+    def _make_bins(self, y):
+        """
+        目的変数をビニングし、StratifiedKFoldでエラーが出ないように
+        最小サンプル数を保証したカテゴリラベルを作成する。
+        """
+        y_arr = np.array(y)
+        n_samples = len(y_arr)
+        
+        # 1. 初期ビン数の決定 (スタージェスの公式 x 係数)
+        # 少なくとも n_splits 以上のビン数は確保する
+        base_bins = int(np.log2(n_samples) + 1)
+        n_bins = max(self.n_splits + 1, base_bins * self.n_bins_factor)
+
+        # 2. 初期ビニング (pd.cut で値の範囲に基づいて分割)
+        # pd.cutを使用することで、値の「密度」ではなく「距離」を重視する（ロングテール対策）
+        # ビンラベルを0, 1, 2... の数値にする
+        y_binned = pd.cut(y_arr, bins=n_bins, labels=False, include_lowest=True)
+        
+        # NaN埋め（万が一範囲外が出た場合）
+        if np.any(np.isnan(y_binned)):
+             y_binned = np.nan_to_num(y_binned, nan=0).astype(int)
+
+        # 3. ビンの統合処理 (サンプル数が n_splits 未満のビンを隣接ビンに吸収)
+        # ビンごとのカウントを集計
+        bin_counts = pd.Series(y_binned).value_counts().sort_index()
+        
+        # ビンIDとそのサンプル数を管理する辞書
+        current_bins = bin_counts.to_dict()
+        
+        # 存在するビンIDのリスト（ソート済み）
+        sorted_keys = sorted(current_bins.keys())
+        
+        # 統合マップ（旧ビンID -> 新ビンID）
+        merge_map = {k: k for k in sorted_keys}
+
+        i = 0
+        while i < len(sorted_keys):
+            current_key = sorted_keys[i]
+            current_count = current_bins[current_key]
+
+            # サンプル数が不足している場合
+            if current_count < self.n_splits:
+                # 統合先を探す（基本は次のビン、最後尾なら前のビン）
+                if i < len(sorted_keys) - 1:
+                    target_key = sorted_keys[i + 1]
+                    # 次のビンに現在のビンのカウントを加算
+                    current_bins[target_key] += current_count
+                    # マップ更新: 現在のキーをターゲットと同じにする
+                    merge_map[current_key] = target_key
+                    # 現在のビンは消滅扱いとして、ループを進める
+                    # (sorted_keys[i+1]のカウントが増えたので、次のループでそれが再評価される)
+                else:
+                    # 最後尾かつ不足している場合は、前のビンに統合
+                    # (前のビンは既にn_splits以上であることが保証されているはずだが念のため)
+                    target_key = sorted_keys[i - 1]
+                    current_bins[target_key] += current_count
+                    merge_map[current_key] = target_key
+            
+            # 再帰的にマッピングを解決する必要があるため、ここでmapは更新しない
+            # 統合されたかどうかにかかわらず次へ
+            i += 1
+
+        # マッピングの連鎖を解消 (例: 1->2, 2->3 なら 1->3 にする)
+        # 後ろから走査して解決
+        for k in sorted(merge_map.keys(), reverse=True):
+            if merge_map[k] != k:
+                target = merge_map[k]
+                # ターゲットがさらに別の場所にマップされているなら追跡
+                while merge_map[target] != target:
+                    target = merge_map[target]
+                merge_map[k] = target
+
+        # 新しいラベルを適用
+        new_labels = np.vectorize(merge_map.get)(y_binned)
+        
+        return new_labels
+
+    def split(self, X, y, groups=None):
+        """
+        データを分割するジェネレータ
+        
+        Parameters:
+        -----------
+        X : array-like, shape (n_samples, n_features)
+            特徴量行列
+        y : array-like, shape (n_samples,)
+            目的変数（連続値）
+        groups : array-like, optional
+            ここでは使用しないが、sklearnのインターフェース互換のために維持
+        """
+        y = np.array(y)
+        
+        # 動的ビニングを実行
+        y_binned = self._make_bins(y)
+        
+        # StratifiedKFold に委譲
+        skf = StratifiedKFold(n_splits=self.n_splits, shuffle=self.shuffle, random_state=self.random_state)
+        
+        return skf.split(X, y_binned)
+
 def fold_evaluate(reg_list, output_dir, device, 
                   transformer = config['transformer'],
                   #feature_path = config['feature_path'], target_path = config['target_path'], 
@@ -145,8 +274,11 @@ def fold_evaluate(reg_list, output_dir, device,
     if k == 'LOOCV':
         kf = LeaveOneOut()
     else:
-        #kf = KFold(n_splits=k, shuffle=True, random_state=42)
-        kf = StratifiedKFold(n_splits=k, shuffle=True, random_state=42)
+        if len(reg_list) > 1:
+            kf = KFold(n_splits=k, shuffle=True, random_state=42)
+        else:
+            #kf = StratifiedKFold(n_splits=k, shuffle=True, random_state=42)
+            kf = ContinuousStratifiedKFold(n_splits=k, shuffle=True, random_state=42)
     predictions = {}
     trues = {}
 
@@ -154,8 +286,8 @@ def fold_evaluate(reg_list, output_dir, device,
 
     scores = {}
 
-    for fold, (train_index, test_index) in enumerate(kf.split(X, Y['crop'])):
-    #for fold, (train_index, test_index) in enumerate(kf.split(X)):
+    #for fold, (train_index, test_index) in enumerate(kf.split(X, Y['crop'])):
+    for fold, (train_index, test_index) in enumerate(kf.split(X,Y[reg_list[0]])):
         index = [f'fold{fold+1}']
         X_train, X_test = X.iloc[train_index], X.iloc[test_index]
         Y_train, Y_test = Y.iloc[train_index], Y.iloc[test_index]
