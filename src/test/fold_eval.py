@@ -86,75 +86,93 @@ class ContinuousStratifiedKFold:
 
     def _make_bins(self, y):
         """
-        目的変数をビニングし、StratifiedKFoldでエラーが出ないように
-        最小サンプル数を保証したカテゴリラベルを作成する。
+        修正版: 無限ループ防止対策済み
         """
         y_arr = np.array(y)
         n_samples = len(y_arr)
         
-        # 1. 初期ビン数の決定 (スタージェスの公式 x 係数)
-        # 少なくとも n_splits 以上のビン数は確保する
+        # 【追加】絶対的なデータ数不足のチェック
+        if n_samples < self.n_splits:
+            raise ValueError(f"データ数({n_samples})が分割数({self.n_splits})未満です。交差検証できません。")
+
+        # 1. 初期ビン数の決定
         base_bins = int(np.log2(n_samples) + 1)
         n_bins = max(self.n_splits + 1, base_bins * self.n_bins_factor)
 
-        # 2. 初期ビニング (pd.cut で値の範囲に基づいて分割)
-        # pd.cutを使用することで、値の「密度」ではなく「距離」を重視する（ロングテール対策）
-        # ビンラベルを0, 1, 2... の数値にする
+        # 2. 初期ビニング
         y_binned = pd.cut(y_arr, bins=n_bins, labels=False, include_lowest=True)
-        
-        # NaN埋め（万が一範囲外が出た場合）
         if np.any(np.isnan(y_binned)):
              y_binned = np.nan_to_num(y_binned, nan=0).astype(int)
 
-        # 3. ビンの統合処理 (サンプル数が n_splits 未満のビンを隣接ビンに吸収)
-        # ビンごとのカウントを集計
+        # 3. ビンの統合処理
         bin_counts = pd.Series(y_binned).value_counts().sort_index()
-        
-        # ビンIDとそのサンプル数を管理する辞書
         current_bins = bin_counts.to_dict()
-        
-        # 存在するビンIDのリスト（ソート済み）
         sorted_keys = sorted(current_bins.keys())
         
-        # 統合マップ（旧ビンID -> 新ビンID）
+        # 統合マップ（初期状態は自分自身を指す）
         merge_map = {k: k for k in sorted_keys}
 
         i = 0
         while i < len(sorted_keys):
             current_key = sorted_keys[i]
+            
+            # 既に統合されて消滅したビンならスキップ
+            if merge_map[current_key] != current_key:
+                i += 1
+                continue
+                
             current_count = current_bins[current_key]
 
             # サンプル数が不足している場合
             if current_count < self.n_splits:
-                # 統合先を探す（基本は次のビン、最後尾なら前のビン）
+                # A. 次のビンがある場合 -> 次に統合 (Forward Merge)
                 if i < len(sorted_keys) - 1:
                     target_key = sorted_keys[i + 1]
-                    # 次のビンに現在のビンのカウントを加算
                     current_bins[target_key] += current_count
-                    # マップ更新: 現在のキーをターゲットと同じにする
                     merge_map[current_key] = target_key
-                    # 現在のビンは消滅扱いとして、ループを進める
-                    # (sorted_keys[i+1]のカウントが増えたので、次のループでそれが再評価される)
+                    # current_bins[current_key] = 0 # (論理的には0だが辞書に残してもよい)
+                
+                # B. 次のビンがない（最後尾）場合 -> 前のビンに統合 (Backward Merge)
                 else:
-                    # 最後尾かつ不足している場合は、前のビンに統合
-                    # (前のビンは既にn_splits以上であることが保証されているはずだが念のため)
-                    target_key = sorted_keys[i - 1]
-                    current_bins[target_key] += current_count
-                    merge_map[current_key] = target_key
-            
-            # 再帰的にマッピングを解決する必要があるため、ここでmapは更新しない
-            # 統合されたかどうかにかかわらず次へ
+                    # 前のビンが存在するか確認
+                    if i > 0:
+                        # 前のビン (i-1) がどこにマップされているかを探す（重要）
+                        # prev_key が既に current_key にマップされている場合（循環）を防ぐ
+                        prev_key = sorted_keys[i - 1]
+                        
+                        # 循環参照チェック:
+                        # もし前のビンが「自分(current)」を指していたら、それは「全データ合わせても足りない」状態
+                        if merge_map[prev_key] == current_key:
+                             # 仕方がないので何もしない（StratifiedKFold側でエラーになるが無限ループは回避）
+                             pass
+                        else:
+                            # 前のビンの「最終的な統合先」を探して、そこに自分を足す
+                            dest_key = prev_key
+                            while merge_map[dest_key] != dest_key:
+                                dest_key = merge_map[dest_key]
+                            
+                            # 循環防止: 最終統合先が自分自身ならマージしない
+                            if dest_key != current_key:
+                                current_bins[dest_key] += current_count
+                                merge_map[current_key] = dest_key
+
             i += 1
 
-        # マッピングの連鎖を解消 (例: 1->2, 2->3 なら 1->3 にする)
-        # 後ろから走査して解決
-        for k in sorted(merge_map.keys(), reverse=True):
-            if merge_map[k] != k:
-                target = merge_map[k]
-                # ターゲットがさらに別の場所にマップされているなら追跡
-                while merge_map[target] != target:
-                    target = merge_map[target]
-                merge_map[k] = target
+        # 4. マッピングの解決 (Resolve Chains)
+        # 無限ループ防止用のカウンターを追加
+        for k in sorted(merge_map.keys()):
+            target = merge_map[k]
+            traj = {k} # 軌跡を記録してサイクル検知
+            
+            while merge_map[target] != target:
+                target = merge_map[target]
+                if target in traj: # サイクル検知
+                    # サイクルが見つかった場合、最小のIDに強制統一してブレイク
+                    target = min(traj) 
+                    break
+                traj.add(target)
+            
+            merge_map[k] = target
 
         # 新しいラベルを適用
         new_labels = np.vectorize(merge_map.get)(y_binned)
