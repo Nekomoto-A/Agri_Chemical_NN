@@ -42,7 +42,7 @@ def onehot_encode_and_split(train_labels, val_labels, test_labels):
         
         # 2. One-Hot Encodingを実行
         # num_classesを指定しない場合、データ内の最大値+1がクラス数になります
-        combined_onehot = F.one_hot(combined)
+        combined_onehot = F.one_hot(combined).float()
         
         # 3. 元のデータセットごとに再分割
         out_train[key] = combined_onehot[:len_t]

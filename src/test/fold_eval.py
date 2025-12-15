@@ -183,7 +183,7 @@ def fold_evaluate(reg_list, output_dir, device,
         #test_df = pd.DataFrame(index=test_ids)
 
         if embedding == 'Onehot':
-            from datasets.emb_fns import onehot_encode_and_split
+            from src.datasets.emb_fns import onehot_encode_and_split
             label_train_embedded, label_val_embedded, label_test_embedded = onehot_encode_and_split(label_train_tensor, label_val_tensor, label_test_tensor,)
 
         if len(reg_list) > 1:

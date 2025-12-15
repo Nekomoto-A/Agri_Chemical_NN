@@ -132,8 +132,8 @@ class FiLMGenerator(nn.Module):
 
     def forward(self, label_emb):
         # [batch, output_dim * 2] -> [batch, output_dim], [batch, output_dim]
-        #out = self.mlp(label_emb)
-        out = self.mlp(label_emb.float())
+        out = self.mlp(label_emb)
+        #out = self.mlp(label_emb.float())
         gamma, beta = torch.split(out, self.output_dim, dim=1)
         return gamma, beta
 
