@@ -677,6 +677,9 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                   labels_val = None,
                   labels_test = None,
                   label_encoders = None,
+                  labels_train_original = None,
+                  labels_val_original = None,
+                  labels_test_original = None,
                   loss_sum = config['loss_sum'], shap_eval = config['shap_eval'], save_feature = config['save_feature'],
                   batch_size = config['batch_size'],
                   ae_dir = None
@@ -793,6 +796,12 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                         features = X_train, targets_dict = Y_train, 
                         output_dir = vis_dir,
                         )
+        save_tsne_with_labels(encoder = pretrained_encoder, 
+                              features = X_train, 
+                              targets_dict = labels_train_original, 
+                              label_encoders_dict = label_encoders, 
+                              output_dir = vis_dir, 
+                              )
 
     elif model_name == 'MoE':
         from src.models.MoE import MoEModel
@@ -1239,3 +1248,85 @@ def save_tsne_and_csv(encoder, features, targets_dict, output_dir):
         plt.close()
     
     print("All plots saved successfully.")
+
+import os
+import torch
+import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
+import numpy as np
+import pandas as pd
+
+def save_tsne_with_labels(encoder, features, targets_dict, label_encoders_dict, output_dir):
+    """
+    エンコーダー出力をt-SNEで可視化し、LabelEncoderで元のラベル名に戻してプロット・保存する。
+
+    Args:
+        encoder (nn.Module): 学習済みエンコーダー
+        features (torch.Tensor): 入力特徴量
+        targets_dict (dict): {'task_name': torch.Tensor(数値ラベル)}
+        label_encoders_dict (dict): {'task_name': LabelEncoderオブジェクト}
+        output_dir (str): 保存先ディレクトリ
+    """
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    # 1. 潜在特徴量の抽出
+    encoder.eval()
+    with torch.no_grad():
+        device = next(encoder.parameters()).device
+        inputs = features.to(device)
+        latent_features = encoder(inputs).cpu().numpy()
+
+    # 2. t-SNEによる次元削減
+    print("Running t-SNE...")
+    tsne = TSNE(n_components=2, random_state=42)
+    tsne_results = tsne.fit_transform(latent_features)
+
+    # 3. CSV用データの準備と保存
+    latent_df = pd.DataFrame(latent_features, columns=[f"dim_{i+1}" for i in range(latent_features.shape[1])])
+    latent_df.to_csv(os.path.join(output_dir, "latent_features.csv"), index=False)
+
+    # 目的変数データの整形
+    target_data_for_csv = {}
+    
+    for task_name, labels in targets_dict.items():
+        labels_np = labels.cpu().numpy().flatten() if torch.is_tensor(labels) else np.array(labels).flatten()
+        
+        # 数値ラベルを保存
+        target_data_for_csv[f"{task_name}_encoded"] = labels_np
+        
+        # --- 逆変換の実行 ---
+        if task_name in label_encoders_dict:
+            le = label_encoders_dict[task_name]
+            decoded_labels = le.inverse_transform(labels_np)
+            target_data_for_csv[f"{task_name}_original"] = decoded_labels
+            
+            # --- プロットの作成 ---
+            plt.figure(figsize=(10, 7))
+            unique_labels = np.unique(decoded_labels)
+            
+            # クラスごとにループしてプロットすることで凡例(legend)を作りやすくする
+            for label_val in unique_labels:
+                idx = (decoded_labels == label_val)
+                plt.scatter(
+                    tsne_results[idx, 0], 
+                    tsne_results[idx, 1], 
+                    label=label_val, 
+                    alpha=0.7, 
+                    edgecolors='w', 
+                    linewidths=0.5
+                )
+            
+            plt.legend(title=task_name, bbox_to_anchor=(1.05, 1), loc='upper left')
+            plt.title(f't-SNE Visualization: {task_name}')
+            plt.xlabel('t-SNE 1')
+            plt.ylabel('t-SNE 2')
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, f'tsne_{task_name}.png'), dpi=300)
+            plt.close()
+            print(f"Finished plotting for {task_name}")
+
+    # 目的変数CSVの保存
+    target_df = pd.DataFrame(target_data_for_csv)
+    target_df.to_csv(os.path.join(output_dir, "target_labels.csv"), index=False)
+    print(f"All data and plots saved to: {output_dir}")

@@ -83,3 +83,4 @@ if __name__ == '__main__':
     # 辞書ではなくTensorが直接返ってきているか確認
     print("Direct Tensor Output:", t_out)
     
+
