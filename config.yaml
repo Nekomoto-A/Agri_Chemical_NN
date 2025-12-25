@@ -117,7 +117,7 @@ fold_eval.py:
   carr_calc: False
   marginal_hist: False
   k_fold: 5
-  model_name: 'AE'
+  model_name: 'AE_FiLM'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
@@ -144,9 +144,9 @@ fold_eval.py:
   labels: ['crop']
   embedding: 'Onehot'
 main.py:
-  result_dir: 'result_AE'
+  result_dir: 'result_AE_FiLM'
   reg_list: [
-            #['Available.P'],
+            ['Available.P'],
             #['pH'],
             #['Available.P', 'crop'], #, 'pH'
             ['NO3.N'],

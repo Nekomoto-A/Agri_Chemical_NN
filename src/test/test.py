@@ -788,6 +788,12 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                         reg_list = reg_list,
                                         shared_learn = False,
                                         )
+        
+        save_tsne_and_csv(encoder = pretrained_encoder, 
+                        features = X_train, targets_dict = Y_train, 
+                        output_dir = vis_dir,
+                        )
+
     elif model_name == 'MoE':
         from src.models.MoE import MoEModel
         model = MoEModel(input_dim=input_dim, output_dims = output_dims, reg_list=reg_list, num_experts = 8, top_k = 4, )
@@ -1163,3 +1169,73 @@ def preprocess_onehot_labels(train_labels, val_labels, test_labels, manual_num_c
     test_oh = convert(t_test)
     
     return train_oh, val_oh, test_oh, num_classes
+
+import os
+import torch
+import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
+import numpy as np
+import pandas as pd  # CSV保存用に追加
+
+def save_tsne_and_csv(encoder, features, targets_dict, output_dir):
+    """
+    エンコーダー出力をt-SNEで可視化し、同時に特徴量とラベルをCSVとして保存する。
+    """
+    # 1. 出力先ディレクトリの作成
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    # 2. エンコーダーから潜在特徴量を抽出
+    encoder.eval()
+    with torch.no_grad():
+        device = next(encoder.parameters()).device
+        inputs = features.to(device)
+        latent_features = encoder(inputs).cpu().numpy()
+
+    # --- [追加] 3. 特徴量をCSVとして保存 ---
+    # カラム名を [dim_1, dim_2, ...] としたDataFrameを作成
+    latent_df = pd.DataFrame(
+        latent_features, 
+        columns=[f"dim_{i+1}" for i in range(latent_features.shape[1])]
+    )
+    latent_csv_path = os.path.join(output_dir, "latent_features.csv")
+    latent_df.to_csv(latent_csv_path, index=False)
+    print(f"Saved latent features to: {latent_csv_path}")
+
+    # --- [追加] 4. 目的変数（ラベル）をCSVとして保存 ---
+    # 各タスクのテンソルをnumpyに変換して辞書に再格納
+    labels_for_df = {}
+    for task_name, labels in targets_dict.items():
+        if torch.is_tensor(labels):
+            labels_for_df[task_name] = labels.cpu().numpy().flatten()
+        else:
+            labels_for_df[task_name] = np.array(labels).flatten()
+    
+    target_df = pd.DataFrame(labels_for_df)
+    target_csv_path = os.path.join(output_dir, "target_labels.csv")
+    target_df.to_csv(target_csv_path, index=False)
+    print(f"Saved target labels to: {target_csv_path}")
+
+    # 5. t-SNEによる次元削減
+    print("Running t-SNE...")
+    tsne = TSNE(n_components=2, random_state=42)
+    tsne_results = tsne.fit_transform(latent_features)
+
+    # 6. 各タスクごとに可視化して保存
+    for task_name in targets_dict.keys():
+        plt.figure(figsize=(10, 7))
+        label_values = target_df[task_name].values # 保存したDFから値を取得
+        
+        scatter = plt.scatter(
+            tsne_results[:, 0], 
+            tsne_results[:, 1], 
+            c=label_values, 
+            cmap='viridis', 
+            alpha=0.6
+        )
+        plt.colorbar(scatter, label=f'{task_name} value')
+        plt.title(f't-SNE Visualization: {task_name}')
+        plt.savefig(os.path.join(output_dir, f'tsne_{task_name}.png'), dpi=300)
+        plt.close()
+    
+    print("All plots saved successfully.")
