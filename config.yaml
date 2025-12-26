@@ -72,12 +72,13 @@ train_FT.py:
   num_epochs: 600
   early_stopping: False
   patience: 10
-  l1_lambda: 0.01
+  l1_lambda: 0.0
   tsne_plot_epoch_freq: 0
   tsne_perplexity: 30
   tsne_max_samples: 10000
   kl_anneal_epochs: 20
   kl_max_beta: 1.0
+  sparse_lambda: 0.1
 train_FT_DAE.py:
   lr: 0.01
   batch_size: 256
@@ -143,8 +144,9 @@ fold_eval.py:
   reg_loss_fanction: ['mae', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
   labels: ['crop']
   embedding: 'Onehot'
+  latent_dim: 64
 main.py:
-  result_dir: 'result_AE_FiLM'
+  result_dir: 'result_SAE_FiLM'
   reg_list: [
             ['Available.P'],
             #['pH'],
@@ -163,5 +165,3 @@ main.py:
             #['pH_dry_soil'], ['available_P'], ['EC_electric_conductivity'], ['Total_C'], ['Total_N'],
             #['pH_dry_soil', 'available_P', 'EC_electric_conductivity', 'Total_C', 'Total_N']
   ]
-
-

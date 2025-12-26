@@ -72,7 +72,8 @@ def train_pretraining(model, x_tr, x_val,  device, output_dir,
                       
                       tsne_plot_epoch_freq=config['tsne_plot_epoch_freq'], # デフォルト0 (実行しない)
                       tsne_perplexity=config['tsne_perplexity'],
-                      tsne_max_samples=config['tsne_max_samples']
+                      tsne_max_samples=config['tsne_max_samples'],
+                      sparse_lambda = config['sparse_lambda']
                       ):
     """
     オートエンコーダーの事前学習を実行します（EarlyStopping、グラフ保存対応）。
@@ -122,10 +123,12 @@ def train_pretraining(model, x_tr, x_val,  device, output_dir,
             
             # --- 修正点 (変更なし、確認) ---
             # 正しく引数の `model` が使われていることを確認
-            reconstructed_x = model(data)
+            reconstructed_x, encoded_features = model(data)
             # ---------------------------------
             
             loss = criterion(reconstructed_x, target)
+
+            sparsity_loss = torch.mean(torch.abs(encoded_features))
 
             l1_norm = 0.0
             if l1_lambda > 0:
@@ -135,7 +138,7 @@ def train_pretraining(model, x_tr, x_val,  device, output_dir,
                         l1_norm += torch.abs(param).sum()
             
             # 2. 最終的な損失 = 主損失 + L1ペナルティ
-            loss = loss + l1_lambda * l1_norm
+            loss = loss + l1_lambda * l1_norm + sparse_lambda * sparsity_loss
 
             loss.backward()
             optimizer.step()
@@ -150,7 +153,7 @@ def train_pretraining(model, x_tr, x_val,  device, output_dir,
         with torch.no_grad():
             for data, target in validation_loader:
                 data, target = data.to(device), target.to(device)
-                reconstructed_x = model(data)
+                reconstructed_x, _ = model(data)
                 loss = criterion(reconstructed_x, target)
                 val_loss += loss.item() * data.size(0) # バッチサイズを考慮した損失
         
@@ -201,8 +204,6 @@ def train_pretraining(model, x_tr, x_val,  device, output_dir,
                 output_dir=pre_dir,
                 perplexity=tsne_perplexity)
     
-    
-
     return model
 
 def train_pretraining_vae(model, x_tr, x_val, device, output_dir, 
@@ -374,7 +375,6 @@ def vae_loss_function(recon_x, x, mu, logvar, beta=1.0):
     total_loss = MSE + beta * KLD
     
     return total_loss, MSE, KLD
-
 
 def train_pretraining_gmvae(model, x_tr, x_val, device, output_dir, 
                       y_tr = None, y_val = None, label_encoders = None,

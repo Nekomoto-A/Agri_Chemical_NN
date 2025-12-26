@@ -1,74 +1,68 @@
 import torch
 import torch.nn as nn
 
-
 class VariationalAutoencoder(nn.Module):
     """
-    MTNNModelの共有層構造をベースにした変分オートエンコーダー (VAE)。
+    latent_dimを独立して指定可能にした変分オートエンコーダー (VAE)。
     
     [変更点]
-    1. エンコーダーが mu (平均) と logvar (分散の対数) を出力。
-    2. Reparameterization Trick を実装。
-    3. get_encoder() は可視化用に mu を出力するサブモデルを返す。
+    1. latent_dim を引数で直接指定できるように変更。
+    2. shared_layers はすべて中間層として使用。
+    3. デコーダーが latent_dim から始まり、shared_layers を逆順に辿るように自動構成。
     """
-    def __init__(self, input_dim, shared_layers=[512, 256, 128]):
+    def __init__(self, input_dim, shared_layers=[512, 256, 128], latent_dim=64):
         """
         Args:
             input_dim (int): 入力データの特徴量の数。
-            shared_layers (list of int): 中間層のサイズ。リストの最後の要素が潜在変数の次元(latent_dim)になります。
+            shared_layers (list of int): 中間層（エンコーダー）のサイズリスト。
+            latent_dim (int): 潜在変数の次元数（ボトルネックのサイズ）。
         """
         super(VariationalAutoencoder, self).__init__()
         
         self.input_dim = input_dim
-        self.latent_dim = shared_layers[-1] # 最後の層を潜在次元とする
+        self.latent_dim = latent_dim
         
         # --- 1. エンコーダー (Body) ---
-        # 潜在変数の直前の層までを作成
+        # shared_layers のすべてを中間層として構築
         self.encoder_body = nn.Sequential()
         in_features = self.input_dim
         
-        # 最後の層以外をループで構築
-        for i, out_features in enumerate(shared_layers[:-1]):
-            self.encoder_body.add_module(f"shared_fc_{i+1}", nn.Linear(in_features, out_features))
-            self.encoder_body.add_module(f"shared_batchnorm_{i+1}", nn.BatchNorm1d(out_features))
-            self.encoder_body.add_module(f"shared_relu_{i+1}", nn.ReLU())
+        for i, out_features in enumerate(shared_layers):
+            self.encoder_body.add_module(f"encoder_fc_{i+1}", nn.Linear(in_features, out_features))
+            self.encoder_body.add_module(f"encoder_batchnorm_{i+1}", nn.BatchNorm1d(out_features))
+            self.encoder_body.add_module(f"encoder_relu_{i+1}", nn.ReLU())
             in_features = out_features
             
-        # 最後の隠れ層のサイズ
+        # エンコーダーの最終出力サイズ
         last_hidden_dim = in_features
         
         # --- 2. 潜在変数への射影 (Heads) ---
-        # mu (平均) と logvar (分散の対数) 用の層。これらには活性化関数をかけないのが一般的。
+        # 平均(mu)と分散の対数(logvar)を出力
         self.fc_mu = nn.Linear(last_hidden_dim, self.latent_dim)
         self.fc_logvar = nn.Linear(last_hidden_dim, self.latent_dim)
 
         # --- 3. デコーダー ---
         self.decoder = nn.Sequential()
         
-        # エンコーダーと逆順の構成
-        decoder_layers_config = shared_layers[::-1] # 例: [128, 256, 512]
+        # エンコーダーと逆順の構成にするため、shared_layersを反転
+        # 例: [512, 256] -> [256, 512]
+        decoder_layers_config = shared_layers[::-1]
         
-        # 入力は latent_dim (z)
+        # 入力は latent_dim
         in_features = self.latent_dim
         
-        for i, out_features in enumerate(decoder_layers_config[1:]): 
+        for i, out_features in enumerate(decoder_layers_config): 
             self.decoder.add_module(f"decoder_fc_{i+1}", nn.Linear(in_features, out_features))
             self.decoder.add_module(f"decoder_batchnorm_{i+1}", nn.BatchNorm1d(out_features))
-            #self.decoder.add_module(f"decoder_relu_{i+1}", nn.ReLU())
             self.decoder.add_module(f"decoder_relu_{i+1}", nn.LeakyReLU())
             in_features = out_features
             
-        # 最後の層: 元の入力次元に戻す
+        # 最終層: 元の入力次元に戻す
         self.decoder.add_module("decoder_output_layer", nn.Linear(in_features, self.input_dim))
-        
-        # 注意: 入力が正規化(0-1)ならSigmoid推奨、標準化ならLinearのままでOK
-        # self.decoder.add_module("decoder_output_activation", nn.Sigmoid())
 
     def reparameterize(self, mu, logvar):
         """
-        再パラメータ化トリック:
-        z = mu + std * epsilon
-        学習時はノイズを加えてサンプリングし、推論(eval)時はmuをそのまま使うか、ノイズなしとする。
+        再パラメータ化トリック: z = mu + std * epsilon
         """
         if self.training:
             std = torch.exp(0.5 * logvar)
@@ -83,19 +77,17 @@ class VariationalAutoencoder(nn.Module):
         mu = self.fc_mu(h)
         logvar = self.fc_logvar(h)
         
-        # サンプリング (z)
+        # サンプリング
         z = self.reparameterize(mu, logvar)
         
         # デコード
         reconstructed_x = self.decoder(z)
         
-        # 学習のために mu と logvar も返す
         return reconstructed_x, mu, logvar
 
     def get_encoder(self):
         """
-        t-SNE可視化用。
-        入力 x を受け取り、潜在変数の代表値 mu を返すサブモデルを返します。
+        可視化用のサブモデルを返す。
         """
         class VAEEncoderWrapper(nn.Module):
             def __init__(self, body, head_mu):

@@ -219,7 +219,8 @@ def fold_evaluate(reg_list, output_dir, device,
                   data_inte = config['data_inte'],
                   loss_fanctions = config['reg_loss_fanction'],
                   labels = config['labels'],
-                  embedding = config['embedding'],
+                  embedding = config['embedding'], 
+                  latent_dim = config['latent_dim'], 
                   ):
     #if feature_selection_all:
     #   output_dir = os.path.join(fsdir, output_dir)
@@ -250,7 +251,7 @@ def fold_evaluate(reg_list, output_dir, device,
 
     if 'AE' in model_name:
         from src.training.training_foundation import pretrain_foundation
-        features_list, ae_dir = pretrain_foundation(model_name = model_name, device = device, out_dir = sub_dir)
+        features_list, ae_dir = pretrain_foundation(model_name = model_name, device = device, out_dir = sub_dir, latent_dim = latent_dim)
 
         if data_inte:
             X,Y = data_create(feature_path, target_path, reg_list, exclude_ids, feature_transformer='NON_TR',features_list=features_list)
@@ -347,6 +348,7 @@ def fold_evaluate(reg_list, output_dir, device,
                 vis_dir = vis_dir_main, model_name = model_name, train_ids = train_ids, test_ids = test_ids, features= features,
                 device = device,
                 reg_loss_fanction = loss_fanctions,
+                latent_dim = latent_dim, 
                 labels_train=label_train_embedded,
                 labels_val=label_val_embedded,
                 labels_test=label_test_embedded,
@@ -354,7 +356,8 @@ def fold_evaluate(reg_list, output_dir, device,
                 labels_train_original = label_train_tensor,
                 #labels_val_original = label_val_tensor,
                 #labels_test_original = label_test_tensor,
-                ae_dir = ae_dir
+                ae_dir = ae_dir, 
+
                 )
             
             for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
@@ -377,6 +380,7 @@ def fold_evaluate(reg_list, output_dir, device,
                     model_name = model_name, train_ids = train_ids, test_ids = test_ids, features = features,
                     device = device,
                     reg_loss_fanction = loss_fanctions,
+                    latent_dim = latent_dim, 
                     loss_sum = comp_method,
                     labels_train=label_train_embedded,
                     labels_val=label_val_embedded,
@@ -421,7 +425,8 @@ def fold_evaluate(reg_list, output_dir, device,
             scalers = scalers, predictions = predictions, trues = trues, input_dim = input_dim, method = method_st, index = index , reg_list = reg, csv_dir = csv_dir, 
             vis_dir = vis_dir_st, model_name = model_name, train_ids = train_ids, test_ids = test_ids, features = features,
             device = device,
-            reg_loss_fanction = loss_fanction,
+            reg_loss_fanction = loss_fanction, 
+            latent_dim = latent_dim, 
             labels_train=label_train_embedded,
             labels_val=label_val_embedded,
             labels_test=label_test_embedded,
@@ -589,6 +594,7 @@ def fold_evaluate(reg_list, output_dir, device,
     print(f"CSVファイル '{final_output}' を作成しました。")
 
     return avg_dict, std_dict
+
 
 def loop_evaluate(reg_list, output_dir, device,
                   feature_selection_all = config['feature_selection_all'], 

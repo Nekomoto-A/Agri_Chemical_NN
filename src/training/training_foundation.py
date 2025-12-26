@@ -14,7 +14,9 @@ script_name = os.path.basename(__file__)
 with open(yaml_path, "r", encoding="utf-8") as file:
     config = yaml.safe_load(file)['dataset.py']
 
-def pretrain_foundation(model_name, device, out_dir, reg_list = config['reg_list2'], exclude_ids = config['exclude_ids2']):
+def pretrain_foundation(model_name, device, out_dir, latent_dim, 
+                        reg_list = config['reg_list2'], exclude_ids = config['exclude_ids2'],
+                        ):
     os_name = platform.system()
     if os_name == 'Linux':
         feature_path = config['asv_path_linux']
@@ -36,7 +38,6 @@ def pretrain_foundation(model_name, device, out_dir, reg_list = config['reg_list
             le = LabelEncoder()
             Y[reg] = le.fit_transform(Y[reg])
             label_encoders[reg] = le
-
 
     x_train,x_val,y_train,y_val = train_test_split(X, Y ,test_size = 0.3,random_state=0)
 
@@ -68,7 +69,7 @@ def pretrain_foundation(model_name, device, out_dir, reg_list = config['reg_list
 
     if 'GMVAE' in model_name:
         from src.models.GMVAE import GMVAE
-        ae_model = GMVAE(input_dim=input_dim).to(device)
+        ae_model = GMVAE(input_dim=input_dim, latent_dim=latent_dim).to(device)
         
         from src.training.train_FT import train_pretraining_gmvae
         ae_model = train_pretraining_gmvae(model = ae_model, x_tr = x_train_tensor, x_val = x_val_tensor, device = device, output_dir = out_dir,
@@ -76,7 +77,7 @@ def pretrain_foundation(model_name, device, out_dir, reg_list = config['reg_list
                                     )
     elif 'DAE' in model_name:
         from src.models.AE import Autoencoder
-        ae_model = Autoencoder(input_dim=input_dim).to(device)
+        ae_model = Autoencoder(input_dim=input_dim, latent_dim=latent_dim).to(device)
 
         from src.training.train_FT_DAE import train_pretraining_DAE
         ae_model = train_pretraining_DAE(model = ae_model, x_tr = x_train_tensor, x_val = x_val_tensor, device = device, output_dir = out_dir,
@@ -85,7 +86,7 @@ def pretrain_foundation(model_name, device, out_dir, reg_list = config['reg_list
         
     elif 'VAE' in model_name:
         from src.models.VAE import VariationalAutoencoder
-        ae_model = VariationalAutoencoder(input_dim=input_dim).to(device)
+        ae_model = VariationalAutoencoder(input_dim=input_dim, latent_dim=latent_dim).to(device)
         
         from src.training.train_FT import train_pretraining_vae
         ae_model = train_pretraining_vae(model = ae_model, x_tr = x_train_tensor, x_val = x_val_tensor, device = device, output_dir = out_dir,
@@ -93,7 +94,7 @@ def pretrain_foundation(model_name, device, out_dir, reg_list = config['reg_list
                                     )
     else:
         from src.models.AE import Autoencoder
-        ae_model = Autoencoder(input_dim=input_dim).to(device)
+        ae_model = Autoencoder(input_dim=input_dim, latent_dim=latent_dim).to(device)
 
         from src.training.train_FT import train_pretraining
         ae_model = train_pretraining(model = ae_model, x_tr = x_train_tensor, x_val = x_val_tensor, device = device, output_dir = out_dir,

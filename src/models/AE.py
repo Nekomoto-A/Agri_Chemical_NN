@@ -3,68 +3,62 @@ import torch.nn as nn
 
 class Autoencoder(nn.Module):
     """
-    MTNNModelの共有層をエンコーダーとして使用するオートエンコーダー。
-    
-    [改善点]
-    1. デコーダーにもBatchNorm1dを追加し、学習を安定化。
-    2. デコーダー最終層の活性化関数についてコメントを追記。
+    共有層（shared_layers）の後に、任意の次元数（latent_dim）を持つ
+    ボトルネック層を追加したオートエンコーダー。
     """
-    def __init__(self, input_dim, shared_layers=[512, 256, 128]):
+    def __init__(self, input_dim, shared_layers=[512, 256, 128], latent_dim=64):
         """
         Args:
             input_dim (int): 入力データの特徴量の数。
-            shared_layers (list of int): 共有層（エンコーダー）の各全結合層の出力ユニット数のリスト。
+            shared_layers (list of int): 共有層の中間層ユニット数のリスト。
+            latent_dim (int): エンコーダーの最終的な出力次元数（ボトルネック）。
         """
         super(Autoencoder, self).__init__()
         
         self.input_dim = input_dim
+        self.latent_dim = latent_dim
         
         # --- 1. エンコーダー ---
         self.encoder = nn.Sequential()
         in_features = self.input_dim
         
+        # 中間層の構築
         for i, out_features in enumerate(shared_layers):
             self.encoder.add_module(f"shared_fc_{i+1}", nn.Linear(in_features, out_features))
             self.encoder.add_module(f"shared_batchnorm_{i+1}", nn.BatchNorm1d(out_features))
             self.encoder.add_module(f"shared_relu_{i+1}", nn.ReLU())
             in_features = out_features
             
-        # --- 2. デコーダー（エンコーダーと対称的な構造） ---
+        # 最終的な出力を任意の次元数(latent_dim)に調整する層
+        self.encoder.add_module("latent_layer", nn.Linear(in_features, latent_dim))
+        # ※ ここにBatchNormやReLUを入れるかは用途によりますが、今回は学習安定化のため追加します
+        self.encoder.add_module("latent_batchnorm", nn.BatchNorm1d(latent_dim))
+        self.encoder.add_module("latent_relu", nn.ReLU())
+
+        # --- 2. デコーダー ---
         self.decoder = nn.Sequential()
         
-        decoder_layers_config = shared_layers[::-1] # 例: [256, 128] -> [128, 256]
+        # デコーダーはエンコーダーの逆順で構築
+        # latent_dim -> shared_layersの逆順 -> input_dim
+        decoder_layers_config = shared_layers[::-1]
         
-        # in_features はエンコーダーの最終出力 (例: 128)
-        
-        for i, out_features in enumerate(decoder_layers_config[1:]): # 例: ループは [256] のみ実行
-            # 例: 128 -> 256
-            self.decoder.add_module(f"decoder_fc_{i+1}", nn.Linear(in_features, out_features))
-            # --- 改善点: BatchNorm1d を追加 ---
+        in_features_dec = latent_dim
+        for i, out_features in enumerate(decoder_layers_config):
+            self.decoder.add_module(f"decoder_fc_{i+1}", nn.Linear(in_features_dec, out_features))
             self.decoder.add_module(f"decoder_batchnorm_{i+1}", nn.BatchNorm1d(out_features))
-            # ------------------------------------
             self.decoder.add_module(f"decoder_relu_{i+1}", nn.ReLU())
-            in_features = out_features # 例: 256
+            in_features_dec = out_features
             
-        # 最後の層: 元の入力次元に戻します。
-        # 例: 256 -> input_dim
-        self.decoder.add_module("decoder_output_layer", nn.Linear(in_features, self.input_dim))
-        
-        # --- 最終層の活性化関数についての注意 ---
-        # 入力データを 0〜1 の範囲に正規化 (MinMaxScaler) した場合:
-        # self.decoder.add_module("decoder_output_activation", nn.Sigmoid())
-        
-        # 入力データを標準化 (StandardScaler, 平均0, 分散1) した場合、
-        # または正規化していない場合（非推奨）:
-        # 活性化関数は Linear (なし) のままでOKです。
+        # 最後の出力層: 元の入力次元に戻す
+        self.decoder.add_module("decoder_output_layer", nn.Linear(in_features_dec, self.input_dim))
 
     def forward(self, x):
         encoded_features = self.encoder(x)
         reconstructed_x = self.decoder(encoded_features)
-        return reconstructed_x
+        return reconstructed_x, encoded_features
 
     def get_encoder(self):
         return self.encoder
-
 
 class FineTuningModel(nn.Module):
     def __init__(self, pretrained_encoder, last_shared_layer_dim, output_dims, reg_list, task_specific_layers=[64], shared_learn = True):
@@ -188,7 +182,7 @@ class LabelAwareOutputScaler(nn.Module):
 class FineTuningModelWithFiLM(nn.Module):
     def __init__(self, pretrained_encoder, last_shared_layer_dim, output_dims, reg_list, 
                  label_embedding_dim,
-                 task_specific_layers=[64], shared_learn=True):
+                 task_specific_layers=[32], shared_learn=True):
         
         super(FineTuningModelWithFiLM, self).__init__()
         self.reg_list = reg_list

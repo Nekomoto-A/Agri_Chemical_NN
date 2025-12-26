@@ -668,21 +668,21 @@ def calculate_initial_scales(targets, labels_onehot, method='max', fallback_valu
 
     return initial_scales
 
-
 def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predictions, trues, 
                   input_dim, method, index, reg_list, csv_dir, vis_dir, model_name, train_ids, test_ids, features,
-                  device,  
+                  device, 
                   reg_loss_fanction, 
-                  labels_train = None,
-                  labels_val = None,
-                  labels_test = None,
-                  label_encoders = None,
-                  labels_train_original = None,
-                  labels_val_original = None,
-                  labels_test_original = None,
+                  latent_dim, 
+                  labels_train = None, 
+                  labels_val = None, 
+                  labels_test = None, 
+                  label_encoders = None, 
+                  labels_train_original = None, 
+                  labels_val_original = None, 
+                  labels_test_original = None, 
                   loss_sum = config['loss_sum'], shap_eval = config['shap_eval'], save_feature = config['save_feature'],
-                  batch_size = config['batch_size'],
-                  ae_dir = None
+                  batch_size = config['batch_size'], 
+                  ae_dir = None, 
                   ):
 
     output_dims = []
@@ -727,27 +727,27 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
     elif 'AE' in model_name:
         if 'GMVAE' in model_name:
             from src.models.GMVAE import GMVAE
-            ae_model = GMVAE(input_dim=input_dim).to(device)
+            ae_model = GMVAE(input_dim=input_dim, latent_dim=latent_dim).to(device)
             ae_model.load_state_dict(torch.load(ae_dir))
             pretrained_encoder = ae_model.get_encoder()
             
             from src.models.VAE import FineTuningModel_vae
             model = FineTuningModel_vae(pretrained_encoder=pretrained_encoder,
-                                    latent_dim = 128,
+                                    latent_dim = latent_dim,
                                     output_dims = output_dims,
                                     reg_list = reg_list,
                                     shared_learn = False,
                                     )
         elif 'DAE' in model_name:
             from src.models.AE import Autoencoder
-            ae_model = Autoencoder(input_dim=input_dim).to(device)
+            ae_model = Autoencoder(input_dim=input_dim, latent_dim=latent_dim).to(device)
             ae_model.load_state_dict(torch.load(ae_dir))
             pretrained_encoder = ae_model.get_encoder()
 
             
             from src.models.AE import FineTuningModel
             model = FineTuningModel(pretrained_encoder=pretrained_encoder,
-                                    last_shared_layer_dim = 128,
+                                    last_shared_layer_dim = latent_dim,
                                     output_dims = output_dims,
                                     reg_list = reg_list,
                                     shared_learn = False,
@@ -755,13 +755,13 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
             
         elif 'VAE' in model_name:
             from src.models.VAE import VariationalAutoencoder
-            ae_model = VariationalAutoencoder(input_dim=input_dim).to(device)
+            ae_model = VariationalAutoencoder(input_dim=input_dim, latent_dim=latent_dim).to(device)
             ae_model.load_state_dict(torch.load(ae_dir))
             pretrained_encoder = ae_model.get_encoder()
             
             from src.models.VAE import FineTuningModel_vae
             model = FineTuningModel_vae(pretrained_encoder=pretrained_encoder,
-                                    latent_dim = 128,
+                                    latent_dim = latent_dim,
                                     output_dims = output_dims,
                                     reg_list = reg_list,
                                     shared_learn = False,
@@ -769,7 +769,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
 
         else:
             from src.models.AE import Autoencoder
-            ae_model = Autoencoder(input_dim=input_dim).to(device)
+            ae_model = Autoencoder(input_dim=input_dim, latent_dim=latent_dim).to(device)
 
             ae_model.load_state_dict(torch.load(ae_dir))
             pretrained_encoder = ae_model.get_encoder()
@@ -777,7 +777,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
             if 'FiLM' in model_name:
                 from src.models.AE import FineTuningModelWithFiLM
                 model = FineTuningModelWithFiLM(pretrained_encoder=pretrained_encoder,
-                                            last_shared_layer_dim = 128,
+                                            last_shared_layer_dim = latent_dim,
                                             output_dims = output_dims,
                                             reg_list = reg_list,
                                             label_embedding_dim = labels_train.shape[1],
@@ -786,7 +786,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
             else:
                 from src.models.AE import FineTuningModel
                 model = FineTuningModel(pretrained_encoder=pretrained_encoder,
-                                        last_shared_layer_dim = 128,
+                                        last_shared_layer_dim = latent_dim,
                                         output_dims = output_dims,
                                         reg_list = reg_list,
                                         shared_learn = False,
@@ -1330,3 +1330,4 @@ def save_tsne_with_labels(encoder, features, targets_dict, label_encoders_dict, 
     target_df = pd.DataFrame(target_data_for_csv)
     target_df.to_csv(os.path.join(output_dir, "target_labels.csv"), index=False)
     print(f"All data and plots saved to: {output_dir}")
+    
