@@ -1012,8 +1012,26 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         predicts, true, r2_results, mse_results = test_FiLM(X_test,Y_test, X_val, Y_val, labels_test, labels_val,
                                                           model_trained,reg_list,scalers,output_dir=vis_dir,device = device, test_ids = test_ids)
 
-        
+    elif 'FDS' in model_name:
+        from src.training.train_FDS import training_MT_FDS
+        model_trained = training_MT_FDS(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, 
+                                    model = model, 
+                                    #optimizer = optimizer, 
+                                    scalers = scalers,
+                                    train_ids = train_ids,
+                                    reg_loss_fanction = reg_loss_fanction,
+                                    output_dim=output_dims,
+                                    reg_list = reg_list, output_dir = vis_dir, 
+                                    model_name = model_name,
+                                    loss_sum = loss_sum,
+                                    device = device,
+                                    batch_size = batch_size
 
+                                    )
+
+        predicts, true, r2_results, mse_results = test_MT(X_test,Y_test, X_val, Y_val, 
+                                                          model_trained,reg_list,scalers,output_dir=vis_dir,device = device, test_ids = test_ids)
+    
     else:
         #optimizer = optim.Adam(model.parameters(), lr=0.001)
         model_trained = training_MT(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, 
