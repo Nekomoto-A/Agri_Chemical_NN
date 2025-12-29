@@ -563,12 +563,6 @@ def test_MT(x_te, y_te, x_val, y_val, model, reg_list, scalers, output_dir, devi
 
 
 from src.training.train import training_MT
-from src.training.train_GP import training_MT_GP
-from src.test.test_GP import test_MT_GP
-
-from src.training.train_HBM import training_MT_HBM
-from src.test.test_HBM import test_MT_HBM
-
 import gpytorch
 
 from src.models.MT_CNN import MTCNNModel
@@ -580,7 +574,6 @@ from src.models.MT_CNN_soft import MTCNN_SPS
 from src.models.MT_CNN_SA import MTCNNModel_SA
 from src.models.MT_CNN_Di import MTCNNModel_Di
 from src.models.MT_BNN_MG import MTBNNModel_MG
-from src.models.MT_GP import MultitaskGPModel
 from src.models.HBM import MultitaskModel
 
 import numpy as np
@@ -783,6 +776,13 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                             label_embedding_dim = labels_train.shape[1],
                                             shared_learn = False,
                                             )
+            elif 'DKL' in model_name:
+                from src.models.MT_GP import GPFineTuningModel
+                model = GPFineTuningModel(pretrained_encoder=pretrained_encoder,
+                                        last_shared_layer_dim = latent_dim,
+                                        reg_list = reg_list,
+                                        shared_learn = False,
+                                        )
             else:
                 from src.models.AE import FineTuningModel
                 model = FineTuningModel(pretrained_encoder=pretrained_encoder,
@@ -890,106 +890,106 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         from src.test.test_BNN import test_BNN_MT
         predicts, true, r2_results, mse_results = test_BNN_MT(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir)
 
-    elif 'GP' in model_name:
-        model_trained,likelihood_trained  = training_MT_GP(x_tr = X_train, y_tr = y_train, model = model,likelihood = likelihood, 
-                                                   reg_list = reg_list
-                                                   ) 
+    # elif 'GP' in model_name:
+    #     model_trained,likelihood_trained  = training_MT_GP(x_tr = X_train, y_tr = y_train, model = model,likelihood = likelihood, 
+    #                                                reg_list = reg_list
+    #                                                ) 
 
-        predicts, true, r2_results, mse_results = test_MT_GP(x_te = X_test,y_te = Y_test,model = model_trained,
-                                                             reg_list = reg_list,scalers = scalers,likelihood = likelihood_trained
-                                                             )
+    #     predicts, true, r2_results, mse_results = test_MT_GP(x_te = X_test,y_te = Y_test,model = model_trained,
+    #                                                          reg_list = reg_list,scalers = scalers,likelihood = likelihood_trained
+    #                                                          )
         
-    elif 'BM' in model_name:
-        model_trained, method_bm = training_MT_HBM(x_tr = X_train, y_tr = y_train, model = model, location_indices = location_train,#output_dim, 
-                   reg_list = reg_list, #output_dir, model_name, likelihood, #optimizer, 
-                   output_dir=vis_dir
-                    )
+    # elif 'BM' in model_name:
+    #     model_trained, method_bm = training_MT_HBM(x_tr = X_train, y_tr = y_train, model = model, location_indices = location_train,#output_dim, 
+    #                reg_list = reg_list, #output_dir, model_name, likelihood, #optimizer, 
+    #                output_dir=vis_dir
+    #                 )
 
-        predicts, true, r2_results, mse_results = test_MT_HBM(x_te = X_test, y_te = Y_test, loc_idx_test = location_test, model = model, trained_model = model_trained, 
-                                                              reg_list = reg_list, scalers = scalers,output_dir = vis_dir, method_bm =method_bm)
-    elif 'SEM' in model_name:
-        from src.training.train_SEM import train_pls_sem
-        model_trained = train_pls_sem(X_train,Y_train, reg_list, features)
-        from src.test.test_SEM import test_pls_sem
-        predicts, true, r2_results, mse_results = test_pls_sem(X_test,Y_test,model_trained,reg_list,features,scalers,output_dir=vis_dir)
+    #     predicts, true, r2_results, mse_results = test_MT_HBM(x_te = X_test, y_te = Y_test, loc_idx_test = location_test, model = model, trained_model = model_trained, 
+    #                                                           reg_list = reg_list, scalers = scalers,output_dir = vis_dir, method_bm =method_bm)
+    # elif 'SEM' in model_name:
+    #     from src.training.train_SEM import train_pls_sem
+    #     model_trained = train_pls_sem(X_train,Y_train, reg_list, features)
+    #     from src.test.test_SEM import test_pls_sem
+    #     predicts, true, r2_results, mse_results = test_pls_sem(X_test,Y_test,model_trained,reg_list,features,scalers,output_dir=vis_dir)
 
-    elif ('Stacking' in model_name) and (len(reg_list) >= 2):
-        from src.training.train_lf import train_stacking
-        meta_model, final_models = train_stacking(x_train = X_train, y_train = Y_train, x_val = X_val, y_val = Y_val, 
-                                                  reg_list = reg_list, input_dim = input_dim, device = device, scalers = scalers, 
-                                                  reg_loss_fanction = reg_loss_fanction, train_ids = train_ids, output_dir = vis_dir, 
-                                                  base_batch_size = batch_size, )
-        from src.test.test_lf import test_stacking
-        predicts, true, r2_results, mse_results = test_stacking(x_te = X_test, y_te = Y_test, final_models = final_models, meta_model = meta_model, reg_list = reg_list, 
-                                                                scalers = scalers, output_dir = vis_dir, device = device)
-        model_trained = {'metamodel':meta_model, 'base_models':final_models}
-    elif 'MoE' in model_name:
-        from src.training.train_MoE import training_MoE
-        model_trained = training_MoE(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model,
-                                     output_dim = output_dims, reg_list = reg_list, output_dir = vis_dir, device = device, batch_size = batch_size,
-                                  scalers = scalers, train_ids = train_ids, reg_loss_fanction = reg_loss_fanction,
-                                )
-        from src.test.test_MoE import test_MoE
-        test_MoE(x_te = X_test,y_te = Y_test, model = model_trained, reg_list = reg_list, 
-                 scalers = scalers, output_dir = vis_dir, device = device, )
-    elif model_name == 'PNN':
-        from src.training.train_PNN import training_MT_PNN
-        model_trained = training_MT_PNN(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model, 
-                                        reg_list = reg_list, output_dir = vis_dir, model_name = model_name, device = device, batch_size = batch_size, train_ids = train_ids,) 
-        from src.test.test_PNN import test_MT_PNN
-        predicts, true, r2_results, mse_results = test_MT_PNN(x_te = X_test, y_te = Y_test, model = model_trained, reg_list = reg_list, 
-                                                                #scalers, 
-                                                                output_dir = vis_dir, device = device, 
-                                                                #features, n_samples_mc=100, shap_eval=False
-                                                                )
-    elif model_name == 'PNN_t':
-        from src.training.train_PNN_t import training_MT_PNN_t
-        model_trained = training_MT_PNN_t(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model, 
-                                        reg_list = reg_list, output_dir = vis_dir, model_name = model_name, device = device, batch_size = batch_size, train_ids = train_ids,) 
-        from src.test.test_PNN_t import test_MT_PNN_t
-        predicts, true, r2_results, mse_results = test_MT_PNN_t(x_te = X_test, y_te = Y_test, model = model_trained, reg_list = reg_list, 
-                                                                #scalers, 
-                                                                output_dir = vis_dir, device = device, 
-                                                                #features, n_samples_mc=100, shap_eval=False
-                                                                )
+    # elif ('Stacking' in model_name) and (len(reg_list) >= 2):
+    #     from src.training.train_lf import train_stacking
+    #     meta_model, final_models = train_stacking(x_train = X_train, y_train = Y_train, x_val = X_val, y_val = Y_val, 
+    #                                               reg_list = reg_list, input_dim = input_dim, device = device, scalers = scalers, 
+    #                                               reg_loss_fanction = reg_loss_fanction, train_ids = train_ids, output_dir = vis_dir, 
+    #                                               base_batch_size = batch_size, )
+    #     from src.test.test_lf import test_stacking
+    #     predicts, true, r2_results, mse_results = test_stacking(x_te = X_test, y_te = Y_test, final_models = final_models, meta_model = meta_model, reg_list = reg_list, 
+    #                                                             scalers = scalers, output_dir = vis_dir, device = device)
+    #     model_trained = {'metamodel':meta_model, 'base_models':final_models}
+    # elif 'MoE' in model_name:
+    #     from src.training.train_MoE import training_MoE
+    #     model_trained = training_MoE(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model,
+    #                                  output_dim = output_dims, reg_list = reg_list, output_dir = vis_dir, device = device, batch_size = batch_size,
+    #                               scalers = scalers, train_ids = train_ids, reg_loss_fanction = reg_loss_fanction,
+    #                             )
+    #     from src.test.test_MoE import test_MoE
+    #     test_MoE(x_te = X_test,y_te = Y_test, model = model_trained, reg_list = reg_list, 
+    #              scalers = scalers, output_dir = vis_dir, device = device, )
+    # elif model_name == 'PNN':
+    #     from src.training.train_PNN import training_MT_PNN
+    #     model_trained = training_MT_PNN(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model, 
+    #                                     reg_list = reg_list, output_dir = vis_dir, model_name = model_name, device = device, batch_size = batch_size, train_ids = train_ids,) 
+    #     from src.test.test_PNN import test_MT_PNN
+    #     predicts, true, r2_results, mse_results = test_MT_PNN(x_te = X_test, y_te = Y_test, model = model_trained, reg_list = reg_list, 
+    #                                                             #scalers, 
+    #                                                             output_dir = vis_dir, device = device, 
+    #                                                             #features, n_samples_mc=100, shap_eval=False
+    #                                                             )
+    # elif model_name == 'PNN_t':
+    #     from src.training.train_PNN_t import training_MT_PNN_t
+    #     model_trained = training_MT_PNN_t(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model, 
+    #                                     reg_list = reg_list, output_dir = vis_dir, model_name = model_name, device = device, batch_size = batch_size, train_ids = train_ids,) 
+    #     from src.test.test_PNN_t import test_MT_PNN_t
+    #     predicts, true, r2_results, mse_results = test_MT_PNN_t(x_te = X_test, y_te = Y_test, model = model_trained, reg_list = reg_list, 
+    #                                                             #scalers, 
+    #                                                             output_dir = vis_dir, device = device, 
+    #                                                             #features, n_samples_mc=100, shap_eval=False
+    #                                                             )
         
-    elif model_name == 'PNN_gamma':
-        from src.training.train_PNN_gamma import training_MT_PNN_gamma
-        model_trained = training_MT_PNN_gamma(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model, 
-                                        reg_list = reg_list, output_dir = vis_dir, model_name = model_name, device = device, batch_size = batch_size, train_ids = train_ids,) 
-        from src.test.test_PNN_gamma import test_MT_PNN_gamma
-        predicts, true, r2_results, mse_results = test_MT_PNN_gamma(x_te = X_test, y_te = Y_test, model = model_trained, reg_list = reg_list, 
-                                                                #scalers, 
-                                                                output_dir = vis_dir, device = device, 
-                                                                #features, n_samples_mc=100, shap_eval=False
-                                                                )
+    # elif model_name == 'PNN_gamma':
+    #     from src.training.train_PNN_gamma import training_MT_PNN_gamma
+    #     model_trained = training_MT_PNN_gamma(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model, 
+    #                                     reg_list = reg_list, output_dir = vis_dir, model_name = model_name, device = device, batch_size = batch_size, train_ids = train_ids,) 
+    #     from src.test.test_PNN_gamma import test_MT_PNN_gamma
+    #     predicts, true, r2_results, mse_results = test_MT_PNN_gamma(x_te = X_test, y_te = Y_test, model = model_trained, reg_list = reg_list, 
+    #                                                             #scalers, 
+    #                                                             output_dir = vis_dir, device = device, 
+    #                                                             #features, n_samples_mc=100, shap_eval=False
+    #                                                             )
         
-    elif model_name == 'MDN':
-        from src.training.train_MDN import training_MT_MDN
-        model_trained = training_MT_MDN(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model, 
-                                        reg_list = reg_list, output_dir = vis_dir, model_name = model_name, device = device, batch_size = batch_size, train_ids = train_ids,) 
-        from src.test.test_MDN import test_MT_MDN
-        predicts, true, r2_results, mse_results = test_MT_MDN(x_te = X_test, y_te = Y_test, model = model_trained, reg_list = reg_list, 
-                                                                #scalers, 
-                                                                output_dir = vis_dir, device = device, 
-                                                                #features, n_samples_mc=100, shap_eval=False
-                                                                )
-    elif model_name == 'NN_gate':
-        from src.training.train_gate import training_MT_gate
-        model_trained = training_MT_gate(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model, 
-                                    #optimizer = optimizer, 
-                                    scalers = scalers,
-                                    train_ids = train_ids,
-                                    reg_loss_fanction = reg_loss_fanction,
-                                    output_dim=output_dims,
-                                    reg_list = reg_list, output_dir = vis_dir, 
-                                    model_name = model_name,
-                                    loss_sum = loss_sum,
-                                    device = device,
-                                    batch_size = batch_size
-                                    )
-        from src.test.test_gate import test_MT_gate
-        predicts, true, r2_results, mse_results = test_MT_gate(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir,device = device)
+    # elif model_name == 'MDN':
+    #     from src.training.train_MDN import training_MT_MDN
+    #     model_trained = training_MT_MDN(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model, 
+    #                                     reg_list = reg_list, output_dir = vis_dir, model_name = model_name, device = device, batch_size = batch_size, train_ids = train_ids,) 
+    #     from src.test.test_MDN import test_MT_MDN
+    #     predicts, true, r2_results, mse_results = test_MT_MDN(x_te = X_test, y_te = Y_test, model = model_trained, reg_list = reg_list, 
+    #                                                             #scalers, 
+    #                                                             output_dir = vis_dir, device = device, 
+    #                                                             #features, n_samples_mc=100, shap_eval=False
+    #                                                             )
+    # elif model_name == 'NN_gate':
+    #     from src.training.train_gate import training_MT_gate
+    #     model_trained = training_MT_gate(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model, 
+    #                                 #optimizer = optimizer, 
+    #                                 scalers = scalers,
+    #                                 train_ids = train_ids,
+    #                                 reg_loss_fanction = reg_loss_fanction,
+    #                                 output_dim=output_dims,
+    #                                 reg_list = reg_list, output_dir = vis_dir, 
+    #                                 model_name = model_name,
+    #                                 loss_sum = loss_sum,
+    #                                 device = device,
+    #                                 batch_size = batch_size
+    #                                 )
+    #     from src.test.test_gate import test_MT_gate
+    #     predicts, true, r2_results, mse_results = test_MT_gate(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir,device = device)
 
     elif "FiLM" in model_name:
         from src.training.train_FiLM import training_FiLM
@@ -1032,6 +1032,23 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         predicts, true, r2_results, mse_results = test_MT(X_test,Y_test, X_val, Y_val, 
                                                           model_trained,reg_list,scalers,output_dir=vis_dir,device = device, test_ids = test_ids)
     
+    elif 'DKL' in model_name:
+        from src.training.train_GP import training_MT_DKL
+        model_trained = training_MT_DKL(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, 
+                                        model = model, reg_list = reg_list, output_dir = vis_dir, 
+                                        model_name = model_name, loss_sum = loss_sum, device = device, 
+                                        batch_size = batch_size, 
+                                        label_tr = labels_train, label_val = labels_val,
+                                        scalers = scalers, 
+                                        train_ids = train_ids,
+                                        )
+
+        from src.test.test_GP import test_MT_DKL
+        predicts, true, r2_results, mse_results = test_MT_DKL(X_test,Y_test, 
+                                                          model_trained,reg_list,scalers,
+                                                          output_dir=vis_dir,
+                                                          device = device, test_ids = test_ids)
+
     else:
         #optimizer = optim.Adam(model.parameters(), lr=0.001)
         model_trained = training_MT(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, 

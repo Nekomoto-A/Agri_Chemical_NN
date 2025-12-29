@@ -47,7 +47,7 @@ train.py:
   tracenorm_rho: 3.0
   tracenorm_lambda: 1.0
   lasso: True
-  lasso_alpha: 0.001
+  lasso_alpha: 0.0
   AdaBN: False
   FDS: 'DWMixup'
 train_GP.py:
@@ -70,7 +70,7 @@ train_lf.py:
 train_FT.py:
   lr: 0.01
   batch_size: 256
-  num_epochs: 100
+  num_epochs: 600
   early_stopping: False
   patience: 10
   l1_lambda: 0.0
@@ -79,7 +79,7 @@ train_FT.py:
   tsne_max_samples: 10000
   kl_anneal_epochs: 20
   kl_max_beta: 1.0
-  sparse_lambda: 0.0
+  sparse_lambda: 0.1
 train_FT_DAE.py:
   lr: 0.01
   batch_size: 256
@@ -119,7 +119,7 @@ fold_eval.py:
   carr_calc: False
   marginal_hist: False
   k_fold: 5
-  model_name: 'AE_FDS'
+  model_name: 'AE_DKL'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
@@ -147,10 +147,10 @@ fold_eval.py:
   embedding: 'Onehot'
   latent_dim: 64
 main.py:
-  result_dir: 'result_AE_FDS'
+  result_dir: 'result_D'
   reg_list: [
             ['Available.P'],
-            #['pH'],
+            ['pH'],
             #['Available.P', 'crop'], #, 'pH'
             ['NO3.N'],
             #['pH', 'NO3.N',],
@@ -160,6 +160,8 @@ main.py:
             ['NH4.N'],
             #['pH',CEC',],
             ['Exchangeable.K'],
+            
+            [CEC],
             #]
             #['pH', 'Available.P'],
             #['pH', 'Available.P', 'EC', 'NH4.N', 'NO3.N', 'Exchangeable.K'],

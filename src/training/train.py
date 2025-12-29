@@ -851,8 +851,6 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                             )
 
 
-
-
     #personal_losses = []
     personal_losses = {}
     for reg,out,fn in zip(reg_list, output_dim, reg_loss_fanction):

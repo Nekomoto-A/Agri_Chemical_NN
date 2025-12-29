@@ -343,7 +343,7 @@ def train_pretraining_vae(model, x_tr, x_val, device, output_dir,
     
     # グラフの保存 (関数がある前提)
     loss_path = os.path.join(pre_dir, 'VAE_loss.png')
-    # save_loss_plot(train_loss_history, val_loss_history, loss_path)
+    save_loss_plot(train_loss_history, val_loss_history, loss_path)
 
     # 最終的なt-SNE
     model.eval()

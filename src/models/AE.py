@@ -6,7 +6,7 @@ class Autoencoder(nn.Module):
     共有層（shared_layers）の後に、任意の次元数（latent_dim）を持つ
     ボトルネック層を追加したオートエンコーダー。
     """
-    def __init__(self, input_dim, shared_layers=[512, 256, 128], latent_dim=64):
+    def __init__(self, input_dim, shared_layers=[1024, 512, 256, 128], latent_dim=64):
         """
         Args:
             input_dim (int): 入力データの特徴量の数。
