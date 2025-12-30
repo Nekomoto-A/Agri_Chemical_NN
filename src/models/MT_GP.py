@@ -18,7 +18,9 @@ class GPRegressionLayer(ApproximateGP):
         
         # 平均関数とカーネル（共分散関数）の定義
         self.mean_module = gpytorch.means.ConstantMean()
-        self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
+        #self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(ard_num_dims=input_dim))
+        self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=2.5, ard_num_dims=input_dim))
+        #self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.LinearKernel())
 
     def forward(self, x):
         mean_x = self.mean_module(x)
@@ -43,7 +45,8 @@ class GPFineTuningModel(nn.Module):
         for _ in reg_list:
             # 各タスクにGPレイヤーとガウス尤度を割り当て
             self.gp_layers.append(GPRegressionLayer(input_dim=last_shared_layer_dim))
-            self.likelihoods.append(gpytorch.likelihoods.GaussianLikelihood())
+            #self.likelihoods.append(gpytorch.likelihoods.GaussianLikelihood())
+            self.likelihoods.append(gpytorch.likelihoods.StudentTLikelihood())
 
     def forward(self, x):
         # 1. 特徴抽出
@@ -74,9 +77,13 @@ class GPFineTuningModel(nn.Module):
                 # 観測値の分布（ノイズを含む予測）を取得
                 observed_pred = self.likelihoods[i](self.gp_layers[i](shared_features))
                 
+                pred_mean = observed_pred.mean.mean(0) 
+                pred_std = observed_pred.stddev.mean(0) # 標準偏差も同様にサンプル間の平均をとる
+
                 mc_outputs[reg] = {
-                    'mean': observed_pred.mean,          # 予測平均
-                    'std': observed_pred.stddev          # 予測標準偏差（不確かさ）
+                    #'mean': observed_pred.mean,          # 予測平均
+                    #'std': observed_pred.stddev          # 予測標準偏差（不確かさ）
+                    'mean': pred_mean,          # 予測平均
+                    'std': pred_std          # 予測標準偏差（不確かさ）
                 }
         return mc_outputs
-    

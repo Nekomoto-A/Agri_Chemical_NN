@@ -17,7 +17,7 @@ import yaml
 yaml_path = 'config.yaml'
 script_name = os.path.basename(__file__)
 with open(yaml_path, "r", encoding="utf-8") as file:
-    config = yaml.safe_load(file)['train.py']
+    config = yaml.safe_load(file)[script_name]
 
 class MultiTaskDataset(Dataset):
     """
@@ -55,14 +55,69 @@ class MultiTaskDataset(Dataset):
         
         return x_sample, emb_sample, y_sample
 
+import torch
+
+def initialize_gp_params_from_ae(gp_model, train_x, device, train_y_list=None):
+    """
+    AEの潜在空間の分布に基づいてGPのパラメータを初期化する。
+    
+    Args:
+        gp_model (GPFineTuningModel): 初期化対象のモデル
+        train_x (torch.Tensor): 入力データ（AEに通す前の元のデータ）
+        train_y_list (list of torch.Tensor, optional): 各タスクのターゲット値のリスト
+    """
+    gp_model.eval()
+    with torch.no_grad():
+        # 1. AE（エンコーダー）を通して潜在特徴量を取得
+        # gp_model.shared_block は AE の encoder 部分
+        latent_features = gp_model.shared_block(train_x.to(device))
+        
+        # 潜在空間の統計量を計算
+        latent_mean = latent_features.mean(dim=0)
+        latent_std = latent_features.std(dim=0)
+
+        print(latent_mean)
+        print(latent_std)
+
+        # 0除算を防ぐため、非常に小さい値を除去
+        latent_std = torch.clamp(latent_std, min=1e-6)
+
+        for i, gp_layer in enumerate(gp_model.gp_layers):
+            # --- A. 誘導点 (Inducing Points) の初期化 ---
+            # 訓練データの中からランダムに選び、実際のデータ分布に配置する
+            num_inducing = gp_layer.variational_strategy.inducing_points.size(0)
+            indices = torch.randperm(latent_features.size(0))[:num_inducing]
+            initial_inducing_points = latent_features[indices]
+            
+            # パラメータの値を直接書き換える
+            gp_layer.variational_strategy.inducing_points.copy_(initial_inducing_points)
+            
+            # --- B. 長さスケール (Lengthscale) の初期化 ---
+            # 特徴量の標準偏差の平均値を初期の長さスケールとして設定
+            # これにより、カーネルがデータの密度に対して広すぎず狭すぎない状態から開始できる
+            avg_std = latent_std.mean()
+            gp_layer.covar_module.base_kernel.lengthscale = avg_std
+
+            # --- C. 出力スケール & 尤度ノイズ (Outputscale & Noise) の初期化 ---
+            if train_y_list is not None:
+                y = train_y_list[i]
+                y_var = y.var()
+                # 出力スケール（信号の強さ）をターゲットの分散に合わせる
+                gp_layer.covar_module.outputscale = y_var
+                # 尤度のノイズ初期値をターゲットの分散の10%程度に設定（任意）
+                gp_model.likelihoods[i].noise = y_var * 0.1
+
+    print("GP parameters have been initialized based on AE latent distribution.")
+    #gp_model.train()
+
 def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir, 
                     model_name,loss_sum, device, batch_size, #optimizer, 
                 label_tr, label_val,
                 scalers, 
                 train_ids, 
                 #reg_loss_fanction,
-
                 label_encoders = None, #scheduler = None, 
+
                 epochs = config['epochs'], patience = config['patience'],early_stopping = config['early_stopping'],
                 #loss_sum = config['loss_sum'],
                 visualize = config['visualize'], val = config['validation'], least_epoch = config['least_epoch'],
@@ -72,11 +127,6 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
                 adabn = config['AdaBN']
                 ):
     
-    lr = lr[0]
-    optimizer = optim.Adam(model.parameters() , lr=lr,
-                            weight_decay = 0.01
-                            )
-        
     best_loss = float('inf')  # 初期値は無限大
     train_loss_history = {}
     val_loss_history = {}
@@ -90,6 +140,25 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
 
     val_dataset = MultiTaskDataset(x_val, label_val, y_val)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+    initialize_gp_params_from_ae(model, x_tr, device)
+
+    lr = lr[0]
+    # optimizer = optim.Adam(model.parameters() , lr=lr,
+    #                         weight_decay = 0.01
+    #                         )
+
+
+    optimizer = torch.optim.Adam([
+        # GPレイヤー（Variational parameters + Kernel hyperparameters）
+        {'params': model.gp_layers.parameters(), 'lr': lr},
+        
+        # 尤度関数のパラメータ（観測ノイズ Noise）
+        {'params': model.likelihoods.parameters(), 'lr': lr},
+        
+        # もしエンコーダーも微調整するなら、ここに追加（今回は不要）
+        # {'params': model.shared_block.parameters(), 'lr': 1e-4}, 
+    ], lr=lr)
 
         #personal_losses = []
     personal_losses = {}
@@ -112,8 +181,13 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
             for param in model.parameters():
                 param.requires_grad = True
 
+
     for likelihood in model.likelihoods:
         likelihood.train()
+
+    # これが False だと Optimizer に入れても更新されません
+    # print('params')
+    # print(model.gp_layers[0].covar_module.base_kernel.raw_lengthscale.requires_grad)
 
     for epoch in range(epochs):
         if visualize == True:
@@ -145,7 +219,9 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
                 true_tr = y_batch[reg].to(device)
                 output = outputs[reg] 
 
-                loss = -personal_losses[reg](output, true_tr).sum()
+                #loss = -personal_losses[reg](output, true_tr).sum()
+                #loss = -personal_losses[reg](output, true_tr).mean()
+                loss = -personal_losses[reg](output, true_tr.squeeze(-1)).mean()
                 train_losses[reg] = loss
   
                 running_train_losses[reg] += loss.item()
@@ -201,7 +277,9 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
                     for reg in reg_list:
                         true_val = y_val_batch[reg].to(device)
 
-                        loss = -personal_losses[reg](outputs[reg], true_val).sum()
+                        #loss = -personal_losses[reg](outputs[reg], true_val).sum()
+                        #loss = -personal_losses[reg](outputs[reg], true_val).mean()
+                        loss = -personal_losses[reg](outputs[reg], true_val.squeeze(-1)).mean()
 
                         #val_loss_history.setdefault(reg, []).append(loss.item())
                         running_val_losses[reg] += loss.item()
@@ -261,6 +339,19 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
                         # ベストモデルの復元
                         # 学習過程の可視化
 
+
+    # for i in range(len(reg_list)):
+    #     raw_noise = model.likelihoods[i].noise.item()
+    #     raw_lengthscale = model.gp_layers[i].covar_module.base_kernel.lengthscale.mean().item()
+    #     raw_outputscale = model.gp_layers[i].covar_module.outputscale.item()
+    #     constant_mean = model.gp_layers[i].mean_module.constant.item()
+                
+    #             # .detach().cpu().numpy() などで変換する
+    #     ls_values = model.gp_layers[i].covar_module.base_kernel.lengthscale.detach().squeeze().tolist()
+    #     print(f"Task {i} lengthscales: {ls_values}")
+
+    #     print(f"Task {i} -> Noise: {raw_noise:.4f}, LS: {raw_lengthscale:.4f}, OS: {raw_outputscale:.4f}, Mean: {constant_mean:.4f}")
+        
     train_dir = os.path.join(output_dir, 'train')
     for reg in val_loss_history.keys():
         reg_dir = os.path.join(train_dir, f'{reg}')

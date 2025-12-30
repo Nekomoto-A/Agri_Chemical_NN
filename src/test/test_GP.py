@@ -37,79 +37,220 @@ def normalized_medae_iqr(y_true, y_pred):
     
     return medae / iqr
 
+import numpy as np
+import matplotlib.pyplot as plt
+import os
+from sklearn.metrics import mean_absolute_error
+
 def test_MT_DKL(x_te, y_te, model, reg_list, scalers, output_dir, device, test_ids, n_samples_mc=100):
     x_te = x_te.to(device)
     predicts, trues = {}, {}
-    stds = None # 標準偏差 (MC or Aleatoric) 用
-    model.eval()
-    with torch.no_grad():
-        outputs, _ = model(x_te)
-
+    
+    # 1. predictメソッドを使用して平均と標準偏差を取得
+    # これにより、GPの不確実性（observed_pred.stddev）が取得されます
+    mc_results = model.predict(x_te)
+    
     r2_scores, mse_scores = [], []
     
-    # --- 3. タスクごとに結果を処理 ---
     for reg in reg_list:
-        # 回帰タスクの処理
         if torch.is_floating_point(y_te[reg]):
+            # 予測値（平均）と標準偏差の取得
+            pred_mean_tensor = mc_results[reg]['mean']#.mean(0)
+
+            pred_std_tensor = mc_results[reg]['std']#.mean(0)
+
+            #print(pred_std_tensor)
+
             true_tensor = y_te[reg]
             
-            pred_tensor_for_eval = outputs[reg].mean
-
+            # --- 2. スケーリングの逆変換 ---
             if reg in scalers:
                 scaler = scalers[reg]
-
-                pred = scaler.inverse_transform(pred_tensor_for_eval.cpu().detach().numpy().reshape(-1, 1))
-                true = scaler.inverse_transform(true_tensor.cpu().detach().numpy())
+                # 平均値の逆変換
+                pred_mean = scaler.inverse_transform(pred_mean_tensor.cpu().numpy().reshape(-1, 1))
+                true = scaler.inverse_transform(true_tensor.cpu().numpy())
+                
+                # 標準偏差の逆変換（標準偏差はスケーリングの倍率のみを掛ける）
+                # 例: (x - mean) / scale の場合、stdには scale を掛ける
+                if hasattr(scaler, 'scale_'):
+                    pred_std = pred_std_tensor.cpu().numpy().reshape(-1, 1) * scaler.scale_
+                else:
+                    # スケーラーがscale_を持っていない場合のフォールバック（簡易版）
+                    pred_std = pred_std_tensor.cpu().numpy().reshape(-1, 1)
             else:
-                # スケーラーなし
-                pred = pred_tensor_for_eval.cpu().detach().numpy().reshape(-1, 1)
-                true = true_tensor.cpu().detach().numpy()
-            
-            #print(f'output:{pred.shape}, true:{true.shape}')
+                pred_mean = pred_mean_tensor.cpu().numpy().reshape(-1, 1)
+                pred_std = pred_std_tensor.cpu().numpy().reshape(-1, 1)
+                true = true_tensor.cpu().numpy()
 
-            predicts[reg], trues[reg] = pred, true
-            
-            # --- 4. 結果のプロット（エラーバー付き） ---
-            # ( ... 元のコードと同じ ... )
+            predicts[reg], trues[reg] = pred_mean, true
+
+            # print(pred_mean.shape)
+            # print(true.shape)
+            # print(pred_std.shape)
+
+            y_true = np.array(true).flatten()
+            y_pred = np.array(pred_mean).flatten()
+            y_err = np.array(pred_std).flatten()
+
+            # --- 3. 結果のプロット（エラーバー付き） ---
             result_dir = os.path.join(output_dir, reg)
             os.makedirs(result_dir, exist_ok=True)
             
-            plt.figure(figsize=(12, 12))
+            plt.figure(figsize=(10, 10))
 
-            plt.scatter(true.flatten(), pred.flatten(), color='royalblue', alpha=0.7)
+            # エラーバー付き散布図
+            # yerr=pred_std.flatten() で各点の不確かさを表示
+            plt.errorbar(
+                y_true, #.flatten(), 
+                y_pred, #.flatten(), 
+                yerr=y_err, #.flatten(), 
+                fmt='o', 
+                color='royalblue', 
+                ecolor='lightsteelblue', 
+                elinewidth=1, 
+                capsize=2, 
+                alpha=0.6, 
+                label='Predictions with ±1σ'
+            )
     
-            min_val = min(np.min(true), np.min(pred))
-            max_val = max(np.max(true), np.max(pred))
-            plt.plot([min_val, max_val], [min_val, max_val], 'r--', label='y=x')
+            min_val = min(np.min(true), np.min(pred_mean))
+            max_val = max(np.max(true), np.max(pred_mean))
+            plt.plot([min_val, max_val], [min_val, max_val], 'r--', label='y=x (Ideal)')
+            
             plt.xlabel('True Values')
             plt.ylabel('Predicted Values')
-            plt.title(f'True vs Predicted for {reg}')
+            plt.title(f'True vs Predicted with Uncertainty for {reg}')
             plt.legend()
-            plt.grid(True)
+            plt.grid(True, linestyle='--', alpha=0.7)
 
-            plt.savefig(os.path.join(result_dir, 'true_predict_with_ci.png'))
+            plt.savefig(os.path.join(result_dir, 'true_predict_with_uncertainty.png'))
             plt.close()
             
-            # 誤差のヒストグラム (変更なし)
-            plt.figure()
-            plt.hist((true - pred).flatten(), bins=30, color='skyblue', edgecolor='black')
-            plt.title("Histogram of Prediction Error")
-            plt.xlabel("True - Predicted")
-            plt.ylabel("Frequency")
-            plt.grid(True)
-            plt.savefig(os.path.join(result_dir, 'loss_hist.png'))
-            plt.close()
-
-            # 評価指標の計算 (変更なし)
-            corr_matrix = np.corrcoef(true.flatten(), pred.flatten())
-            r2 = corr_matrix[0, 1]
+            # --- 4. 評価指標の計算 ---
+            corr_matrix = np.corrcoef(true.flatten(), pred_mean.flatten())
+            r2 = corr_matrix[0, 1] if not np.isnan(corr_matrix[0, 1]) else 0
             r2_scores.append(r2)
             
+            # カスタム指標の呼び出し、定義されていなければMAE
             try:
-                mae = normalized_medae_iqr(true, pred) # カスタム指標
+                mae = normalized_medae_iqr(true, pred_mean)
             except NameError:
-                print(f"WARN: normalized_medae_iqr が定義されていません。タスク {reg} の評価に MAE (mean_absolute_error) を使用します。")
-                mae = mean_absolute_error(true, pred)
+                mae = mean_absolute_error(true, pred_mean)
             mse_scores.append(mae)
 
     return predicts, trues, r2_scores, mse_scores
+
+# def test_MT_DKL(x_te, y_te, model, reg_list, scalers, output_dir, device, test_ids, n_samples_mc=100):
+
+#     x_te = x_te.to(device)
+
+#     predicts, trues = {}, {}
+#     model.eval()
+#     with torch.no_grad():
+#         outputs, _ = model(x_te)
+
+#     r2_scores, mse_scores = [], []
+
+#     # --- 3. タスクごとに結果を処理 ---
+#     for reg in reg_list:
+#         # 回帰タスクの処理
+#         if torch.is_floating_point(y_te[reg]):
+#             true_tensor = y_te[reg]
+#             pred_tensor_for_eval = outputs[reg].mean
+#             if reg in scalers:
+#                 scaler = scalers[reg]
+#                 pred = scaler.inverse_transform(pred_tensor_for_eval.cpu().detach().numpy().reshape(-1, 1))
+#                 true = scaler.inverse_transform(true_tensor.cpu().detach().numpy())
+#             else:
+#                 # スケーラーなし
+#                 pred = pred_tensor_for_eval.cpu().detach().numpy().reshape(-1, 1)
+#                 true = true_tensor.cpu().detach().numpy()
+#             #print(f'output:{pred.shape}, true:{true.shape}')
+#             predicts[reg], trues[reg] = pred, true
+#             # --- 4. 結果のプロット（エラーバー付き） ---
+
+#             # ( ... 元のコードと同じ ... )
+
+#             result_dir = os.path.join(output_dir, reg)
+
+#             os.makedirs(result_dir, exist_ok=True)
+
+           
+
+#             plt.figure(figsize=(12, 12))
+
+
+
+#             plt.scatter(true.flatten(), pred.flatten(), color='royalblue', alpha=0.7)
+
+   
+
+#             min_val = min(np.min(true), np.min(pred))
+
+#             max_val = max(np.max(true), np.max(pred))
+
+#             plt.plot([min_val, max_val], [min_val, max_val], 'r--', label='y=x')
+
+#             plt.xlabel('True Values')
+
+#             plt.ylabel('Predicted Values')
+
+#             plt.title(f'True vs Predicted for {reg}')
+
+#             plt.legend()
+
+#             plt.grid(True)
+
+
+
+#             plt.savefig(os.path.join(result_dir, 'true_predict_with_ci.png'))
+
+#             plt.close()
+
+           
+
+#             # 誤差のヒストグラム (変更なし)
+
+#             plt.figure()
+
+#             plt.hist((true - pred).flatten(), bins=30, color='skyblue', edgecolor='black')
+
+#             plt.title("Histogram of Prediction Error")
+
+#             plt.xlabel("True - Predicted")
+
+#             plt.ylabel("Frequency")
+
+#             plt.grid(True)
+
+#             plt.savefig(os.path.join(result_dir, 'loss_hist.png'))
+
+#             plt.close()
+
+
+
+#             # 評価指標の計算 (変更なし)
+
+#             corr_matrix = np.corrcoef(true.flatten(), pred.flatten())
+
+#             r2 = corr_matrix[0, 1]
+
+#             r2_scores.append(r2)
+
+           
+
+#             try:
+
+#                 mae = normalized_medae_iqr(true, pred) # カスタム指標
+
+#             except NameError:
+
+#                 print(f"WARN: normalized_medae_iqr が定義されていません。タスク {reg} の評価に MAE (mean_absolute_error) を使用します。")
+
+#                 mae = mean_absolute_error(true, pred)
+
+#             mse_scores.append(mae)
+
+
+
+#     return predicts, trues, r2_scores, mse_scores

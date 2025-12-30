@@ -51,8 +51,17 @@ train.py:
   AdaBN: False
   FDS: 'DWMixup'
 train_GP.py:
-  learning_rate: 0.1
-  epochs: 60
+  epochs: 1000
+  patience: 10
+  early_stopping: True
+  visualize: False
+  validation: True
+  least_epoch: 0
+  learning_rate: [0.01]
+  weights: [0.1, 0.9, 1.0, 1.0, 1.0, 1.0]
+  vis_step: 5
+  tr_loss: False
+  AdaBN: False
 train_HBM.py:
   learning_method: 'mcmc'
   num_samples: 3000
@@ -71,7 +80,7 @@ train_FT.py:
   lr: 0.01
   batch_size: 256
   num_epochs: 600
-  early_stopping: False
+  early_stopping: True
   patience: 10
   l1_lambda: 0.0
   tsne_plot_epoch_freq: 0
@@ -79,7 +88,7 @@ train_FT.py:
   tsne_max_samples: 10000
   kl_anneal_epochs: 20
   kl_max_beta: 1.0
-  sparse_lambda: 0.1
+  sparse_lambda: 0.01
 train_FT_DAE.py:
   lr: 0.01
   batch_size: 256
@@ -141,11 +150,11 @@ fold_eval.py:
   feature_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\taxon_data\lv6.csv'
   target_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\chem_data.xlsx'
   data_inte: False
-  transformer: [None, None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
+  transformer: [SS, None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
   reg_loss_fanction: ['mae', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
   labels: ['crop']
   embedding: 'Onehot'
-  latent_dim: 64
+  latent_dim: 20
 main.py:
   result_dir: 'result_D'
   reg_list: [
