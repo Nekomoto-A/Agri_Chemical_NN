@@ -128,7 +128,7 @@ fold_eval.py:
   carr_calc: False
   marginal_hist: False
   k_fold: 5
-  model_name: 'AE_DKL'
+  model_name: 'VAE'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
@@ -150,13 +150,13 @@ fold_eval.py:
   feature_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\taxon_data\lv6.csv'
   target_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\chem_data.xlsx'
   data_inte: False
-  transformer: [SS, None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
+  transformer: [log, None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
   reg_loss_fanction: ['mae', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
   labels: ['crop']
   embedding: 'Onehot'
-  latent_dim: 20
+  latent_dim: 32
 main.py:
-  result_dir: 'result_D'
+  result_dir: 'result_VAE'
   reg_list: [
             ['Available.P'],
             ['pH'],

@@ -76,8 +76,8 @@ def initialize_gp_params_from_ae(gp_model, train_x, device, train_y_list=None):
         latent_mean = latent_features.mean(dim=0)
         latent_std = latent_features.std(dim=0)
 
-        print(latent_mean)
-        print(latent_std)
+        # print(latent_mean)
+        # print(latent_std)
 
         # 0除算を防ぐため、非常に小さい値を除去
         latent_std = torch.clamp(latent_std, min=1e-6)
@@ -339,19 +339,6 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
                         # ベストモデルの復元
                         # 学習過程の可視化
 
-
-    # for i in range(len(reg_list)):
-    #     raw_noise = model.likelihoods[i].noise.item()
-    #     raw_lengthscale = model.gp_layers[i].covar_module.base_kernel.lengthscale.mean().item()
-    #     raw_outputscale = model.gp_layers[i].covar_module.outputscale.item()
-    #     constant_mean = model.gp_layers[i].mean_module.constant.item()
-                
-    #             # .detach().cpu().numpy() などで変換する
-    #     ls_values = model.gp_layers[i].covar_module.base_kernel.lengthscale.detach().squeeze().tolist()
-    #     print(f"Task {i} lengthscales: {ls_values}")
-
-    #     print(f"Task {i} -> Noise: {raw_noise:.4f}, LS: {raw_lengthscale:.4f}, OS: {raw_outputscale:.4f}, Mean: {constant_mean:.4f}")
-        
     train_dir = os.path.join(output_dir, 'train')
     for reg in val_loss_history.keys():
         reg_dir = os.path.join(train_dir, f'{reg}')

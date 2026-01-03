@@ -736,7 +736,6 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
             ae_model = Autoencoder(input_dim=input_dim, latent_dim=latent_dim).to(device)
             ae_model.load_state_dict(torch.load(ae_dir))
             pretrained_encoder = ae_model.get_encoder()
-
             
             from src.models.AE import FineTuningModel
             model = FineTuningModel(pretrained_encoder=pretrained_encoder,
@@ -791,6 +790,10 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                         reg_list = reg_list,
                                         shared_learn = False,
                                         )
+                
+        from src.training.training_foundation import evaluate_and_save_errors
+        evaluate_and_save_errors(model = ae_model, data_tensor = X_train, indices = train_ids, 
+                             device = device, out_dir = vis_dir, filename_prefix = 'finetuning_train')
         
         save_tsne_and_csv(encoder = pretrained_encoder, 
                         features = X_train, targets_dict = Y_train, 

@@ -85,9 +85,6 @@ def train_pretraining(model, x_tr, x_val,  device, output_dir,
     3. オプティマイザの学習率をハードコード(0.001)から引数 `lr` を使うように修正。
     """
 
-    pre_dir = os.path.join(output_dir, 'AE_pretrain')
-    os.makedirs(pre_dir, exist_ok=True)
-
     print("--- 事前学習フェーズ開始 ---")
     model.to(device)
     
@@ -110,7 +107,7 @@ def train_pretraining(model, x_tr, x_val,  device, output_dir,
     optimizer = optim.Adam(model.parameters(), lr=lr)
     # --------------------------
 
-    pre_path = os.path.join(pre_dir, 'AE_early_stopping.pt')
+    pre_path = os.path.join(output_dir, 'AE_early_stopping.pt')
     early_stopping = EarlyStopping(patience=patience, verbose=False, path=pre_path)
 
     for epoch in range(num_epochs):
@@ -169,7 +166,7 @@ def train_pretraining(model, x_tr, x_val,  device, output_dir,
                       x_val=x_val,   # 検証データ全体
                       device=device, 
                       epoch_str=f"{epoch+1}", 
-                      output_dir=pre_dir,
+                      output_dir=output_dir,
                       perplexity=tsne_perplexity,
                       max_samples=tsne_max_samples) # [追加]
 
@@ -187,7 +184,7 @@ def train_pretraining(model, x_tr, x_val,  device, output_dir,
         model.load_state_dict(torch.load(early_stopping.path))
     
     # --- グラフの保存 ---
-    loss_path = os.path.join(pre_dir, 'AE_loss.png')
+    loss_path = os.path.join(output_dir, 'AE_loss.png')
     save_loss_plot(train_loss_history, val_loss_history, loss_path)
 
     #if tsne_plot_epoch_freq > 0:
@@ -201,7 +198,7 @@ def train_pretraining(model, x_tr, x_val,  device, output_dir,
                 y_val = y_val,
                 label_encoders = label_encoders,
                 epoch_str="final", # 学習後のため "final" とする
-                output_dir=pre_dir,
+                output_dir=output_dir,
                 perplexity=tsne_perplexity)
     
     return model
@@ -228,9 +225,6 @@ def train_pretraining_vae(model, x_tr, x_val, device, output_dir,
     VAEの事前学習を実行します（KLアニーリング実装済み）。
     """
 
-    pre_dir = os.path.join(output_dir, 'VAE_pretrain')
-    os.makedirs(pre_dir, exist_ok=True)
-
     print("--- VAE 事前学習フェーズ開始 (KL Annealing) ---")
     model.to(device)
     
@@ -246,7 +240,7 @@ def train_pretraining_vae(model, x_tr, x_val, device, output_dir,
 
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
-    pre_path = os.path.join(pre_dir, 'VAE_early_stopping.pt')
+    pre_path = os.path.join(output_dir, 'VAE_early_stopping.pt')
     # EarlyStoppingクラスの定義によりますが、パス等を渡します
     if early_stopping_config:
         early_stopping = EarlyStopping(patience=patience, verbose=False, path=pre_path)
@@ -318,7 +312,7 @@ def train_pretraining_vae(model, x_tr, x_val, device, output_dir,
         if tsne_plot_epoch_freq > 0 and (epoch + 1) % tsne_plot_epoch_freq == 0:
             plot_tsne(model=model, 
                       x_train=x_tr, x_val=x_val, device=device, 
-                      epoch_str=f"{epoch+1}", output_dir=pre_dir,
+                      epoch_str=f"{epoch+1}", output_dir=output_dir,
                       perplexity=tsne_perplexity, max_samples=tsne_max_samples,
                       y_train=y_tr, y_val=y_val, label_encoders=label_encoders)
 
@@ -342,7 +336,7 @@ def train_pretraining_vae(model, x_tr, x_val, device, output_dir,
             print("Warning: No early stopping checkpoint found. Using final model.")
     
     # グラフの保存 (関数がある前提)
-    loss_path = os.path.join(pre_dir, 'VAE_loss.png')
+    loss_path = os.path.join(output_dir, 'VAE_loss.png')
     save_loss_plot(train_loss_history, val_loss_history, loss_path)
 
     # 最終的なt-SNE
@@ -351,7 +345,7 @@ def train_pretraining_vae(model, x_tr, x_val, device, output_dir,
         plot_tsne(model=model, 
                     x_train=x_tr, x_val=x_val, device=device, 
                     y_train=y_tr, y_val=y_val, label_encoders=label_encoders,
-                    epoch_str="final", output_dir=pre_dir,
+                    epoch_str="final", output_dir=output_dir,
                     perplexity=tsne_perplexity)
 
     return model
@@ -389,10 +383,6 @@ def train_pretraining_gmvae(model, x_tr, x_val, device, output_dir,
     GMVAE (Gaussian Mixture VAE) の事前学習を実行します。
     """
 
-    # ディレクトリ名を GMVAE 用に変更
-    pre_dir = os.path.join(output_dir, 'GMVAE_pretrain') 
-    os.makedirs(pre_dir, exist_ok=True)
-
     print("--- GMVAE 事前学習フェーズ開始 ---")
     model.to(device)
     
@@ -408,7 +398,7 @@ def train_pretraining_gmvae(model, x_tr, x_val, device, output_dir,
 
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
-    pre_path = os.path.join(pre_dir, 'GMVAE_early_stopping.pt')
+    pre_path = os.path.join(output_dir, 'GMVAE_early_stopping.pt')
     early_stopping = EarlyStopping(patience=patience, verbose=False, path=pre_path)
 
     for epoch in range(num_epochs):
@@ -463,7 +453,7 @@ def train_pretraining_gmvae(model, x_tr, x_val, device, output_dir,
         if tsne_plot_epoch_freq > 0 and (epoch + 1) % tsne_plot_epoch_freq == 0:
             plot_tsne(model=model, 
                       x_train=x_tr, x_val=x_val, device=device, 
-                      epoch_str=f"{epoch+1}", output_dir=pre_dir,
+                      epoch_str=f"{epoch+1}", output_dir=output_dir,
                       perplexity=tsne_perplexity, max_samples=tsne_max_samples,
                       y_train=y_tr, y_val=y_val, label_encoders=label_encoders)
 
@@ -478,7 +468,7 @@ def train_pretraining_gmvae(model, x_tr, x_val, device, output_dir,
         model.load_state_dict(torch.load(early_stopping.path))
     
     # グラフの保存
-    loss_path = os.path.join(pre_dir, 'GMVAE_loss.png')
+    loss_path = os.path.join(output_dir, 'GMVAE_loss.png')
     save_loss_plot(train_loss_history, val_loss_history, loss_path)
 
     # 最終的なt-SNE
@@ -487,7 +477,7 @@ def train_pretraining_gmvae(model, x_tr, x_val, device, output_dir,
     plot_tsne(model=model, 
                 x_train=x_tr, x_val=x_val, device=device, 
                 y_train=y_tr, y_val=y_val, label_encoders=label_encoders,
-                epoch_str="final", output_dir=pre_dir,
+                epoch_str="final", output_dir=output_dir,
                 perplexity=tsne_perplexity)
 
     return model
