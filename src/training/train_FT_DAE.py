@@ -69,8 +69,8 @@ def train_pretraining_DAE(model, x_tr, x_val,  device, output_dir,
                       y_tr = None, y_val = None, label_encoders = None,
                       early_stopping_config=config['early_stopping'], batch_size=config['batch_size'], num_epochs = config['num_epochs'], lr=config['lr'], 
                       patience=config['patience'], l1_lambda = config['l1_lambda'],
-
-                      noise_std=config.get('noise_std', 0.1), # configになければデフォルト0.1
+                      
+                      noise_type = config['noise_type'], noise_ratio = config['noise_ratio'], 
                       
                       tsne_plot_epoch_freq=config['tsne_plot_epoch_freq'], 
                       tsne_perplexity=config['tsne_perplexity'],
@@ -87,11 +87,8 @@ def train_pretraining_DAE(model, x_tr, x_val,  device, output_dir,
     3. 損失は、モデルの出力とノイズなしのターゲット(target)で計算します。
     """
 
-    pre_dir = os.path.join(output_dir, 'AE_pretrain')
-    os.makedirs(pre_dir, exist_ok=True)
-
-    print("--- 事前学習フェーズ開始 (デノイジング・オートエンコーダー) ---")
-    print(f"  [情報] ノイズの標準偏差 (noise_std): {noise_std}") # ノイズレベルを表示
+    print(f"--- 事前学習フェーズ開始 ({noise_type}ノイズ) ---")
+    print(f" [情報] ノイズ設定: タイプ={noise_type}, 強度/割合={noise_ratio}")
     model.to(device)
     
     # 損失履歴を保存するリスト
@@ -106,11 +103,23 @@ def train_pretraining_DAE(model, x_tr, x_val,  device, output_dir,
     validation_loader = DataLoader(pretrain_dataset_val, batch_size=batch_size, shuffle=False)
 
     criterion = nn.MSELoss()
-    
     optimizer = optim.Adam(model.parameters(), lr=lr)
     
-    pre_path = os.path.join(pre_dir, 'AE_early_stopping.pt')
+    pre_path = os.path.join(output_dir, 'AE_early_stopping.pt')
     early_stopping = EarlyStopping(patience=patience, verbose=False, path=pre_path)
+
+    # ノイズ付与用の関数を内部定義（可読性向上のため）
+    def apply_noise(data, n_type, n_ratio):
+        if n_type == 'gaussian':
+            # ガウスノイズを追加
+            return data + torch.randn_like(data) * n_ratio
+        elif n_type == 'mask':
+            # マスキングノイズ：n_ratioの確率で0にする
+            # 1 - n_ratio の確率で 1、n_ratio の確率で 0 となるマスクを作成
+            mask = torch.bernoulli(torch.full_like(data, 1 - n_ratio))
+            return data * mask
+        else:
+            return data
 
     for epoch in range(num_epochs):
         # --- 訓練フェーズ ---
@@ -119,16 +128,16 @@ def train_pretraining_DAE(model, x_tr, x_val,  device, output_dir,
         for data, target in train_loader:
             data, target = data.to(device), target.to(device)
             
-            # --- [修正] 入力にガウスノイズを追加 ---
             # data (入力用) にノイズを加える
             # target (教師用) はノイズなしのまま
-            noisy_data = data + (torch.randn_like(data) * noise_std)
+            #noisy_data = data + (torch.randn_like(data) * noise_std)
+            noisy_data = apply_noise(data, noise_type, noise_ratio)
             # (オプション: 必要に応じて torch.clamp(noisy_data, min, max) でクリップ)
             
             optimizer.zero_grad()
             
             # ノイズありデータをモデルに入力
-            reconstructed_x = model(noisy_data)
+            reconstructed_x, _ = model(noisy_data)
             
             # 損失は「復元結果」と「ノイズなしのターゲット」で計算
             loss = criterion(reconstructed_x, target)
@@ -156,12 +165,12 @@ def train_pretraining_DAE(model, x_tr, x_val,  device, output_dir,
                 data, target = data.to(device), target.to(device)
                 
                 # --- [修正] 検証データにもノイズを追加 ---
-                noisy_data = data + (torch.randn_like(data) * noise_std)
+                #noisy_data = data + (torch.randn_like(data) * noise_std)
+                noisy_data = apply_noise(data, noise_type, noise_ratio)
                 # (オプション: クリップ)
                 
                 # ノイズありデータをモデルに入力
-                reconstructed_x = model(noisy_data)
-                
+                reconstructed_x, _ = model(noisy_data)
                 # 損失は「復元結果」と「ノイズなしのターゲット」で計算
                 loss = criterion(reconstructed_x, target)
                 val_loss += loss.item() * data.size(0) 
@@ -179,20 +188,19 @@ def train_pretraining_DAE(model, x_tr, x_val,  device, output_dir,
                       x_val=x_val,   
                       device=device, 
                       epoch_str=f"{epoch+1}", 
-                      output_dir=pre_dir,
+                      output_dir=output_dir,
                       perplexity=tsne_perplexity,
                       max_samples=tsne_max_samples) 
 
         if early_stopping_config:
             early_stopping(avg_val_loss, model)
-            
             if early_stopping.early_stop:
                 break
                 
     if early_stopping_config:
         model.load_state_dict(torch.load(early_stopping.path))
     
-    loss_path = os.path.join(pre_dir, 'AE_loss.png')
+    loss_path = os.path.join(output_dir, 'AE_loss.png')
     save_loss_plot(train_loss_history, val_loss_history, loss_path)
 
     if tsne_plot_epoch_freq > 0:
@@ -205,9 +213,8 @@ def train_pretraining_DAE(model, x_tr, x_val,  device, output_dir,
                   y_val = y_val,
                   label_encoders = label_encoders,
                   epoch_str="final", 
-                  output_dir=pre_dir,
+                  output_dir=output_dir,
                   perplexity=tsne_perplexity)
-
     return model
 
 # --- plot_tsne 関数 (変更なし、参照用) ---

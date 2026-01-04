@@ -664,7 +664,7 @@ def training_FiLM(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir,
                 lasso = config['lasso'],
                 lasso_alpha = config['lasso_alpha'],
 
-                adabn = config['AdaBN']
+                #adabn = config['AdaBN']
                 ):
     
     # TensorBoardのライターを初期化
@@ -790,20 +790,6 @@ def training_FiLM(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir,
     #val_dataset = CustomDatasetAdv(x_val, y_val)
     val_dataset = MultiTaskDataset(x_val, label_val, y_val)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-
-    if 'AE' in model_name:
-        if adabn:
-            # --- Step 2: AdaBN の適用 (学習の前処理) ---
-            # ファインチューニングの前に、ターゲットデータの分布をBatchNormに覚えさせます
-            from src.training.train_FT import apply_adabn
-            apply_adabn(model, train_loader, device)
-
-            # --- Step 3: ファインチューニング (学習ループ) ---
-            print("\nファインチューニングを開始...")
-            
-            # 重要: AdaBNで require_grad=False になっているため、学習したい層のロックを解除
-            for param in model.parameters():
-                param.requires_grad = True
         
     # modelが 'quantiles' 属性を持っていれば、分位点回帰モデルと判定
     has_quantile_regression = hasattr(model, 'quantiles')

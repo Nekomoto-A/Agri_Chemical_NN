@@ -676,6 +676,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                   loss_sum = config['loss_sum'], shap_eval = config['shap_eval'], save_feature = config['save_feature'],
                   batch_size = config['batch_size'], 
                   ae_dir = None, 
+                  adapte = config['Adapte']
                   ):
 
     output_dims = []
@@ -697,88 +698,86 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
             output_dims.append(len(torch.unique(all)))
     #output_dims = np.ones(len(reg_list), dtype="int16")
 
-    if model_name == 'CNN':
-        model = MTCNNModel(input_dim = input_dim,output_dims = output_dims,reg_list=reg_list)
-    #elif model_name == 'NN':
-    #    model = MTNNModel(input_dim = input_dim,output_dims = output_dims, hidden_layers=[128, 64, 64])
-    elif model_name == 'CNN_catph':
-        model = MTCNN_catph(input_dim = input_dim,reg_list=reg_list)
-    elif model_name == 'CNN_soft':
-        model = MTCNN_SPS(input_dim = input_dim,output_dims = output_dims,reg_list=reg_list)
-    elif model_name == 'CNN_attention':
-        model = MTCNNModel_Attention(input_dim = input_dim,output_dims = output_dims)
-    elif model_name == 'CNN_SA':
-        model = MTCNNModel_SA(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
-    elif model_name == 'CNN_Di':
-        model = MTCNNModel_Di(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
-    elif model_name == 'BNN':
-        from src.models.MT_BNN import BNNMTModel
-        print(reg_list)
-        model = BNNMTModel(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
-    elif model_name == 'BNN_MG':
-        model = MTBNNModel_MG(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
-    elif 'AE' in model_name:
+    # if model_name == 'CNN':
+    #     model = MTCNNModel(input_dim = input_dim,output_dims = output_dims,reg_list=reg_list)
+    # #elif model_name == 'NN':
+    # #    model = MTNNModel(input_dim = input_dim,output_dims = output_dims, hidden_layers=[128, 64, 64])
+    # elif model_name == 'CNN_catph':
+    #     model = MTCNN_catph(input_dim = input_dim,reg_list=reg_list)
+    # elif model_name == 'CNN_soft':
+    #     model = MTCNN_SPS(input_dim = input_dim,output_dims = output_dims,reg_list=reg_list)
+    # elif model_name == 'CNN_attention':
+    #     model = MTCNNModel_Attention(input_dim = input_dim,output_dims = output_dims)
+    # elif model_name == 'CNN_SA':
+    #     model = MTCNNModel_SA(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
+    # elif model_name == 'CNN_Di':
+    #     model = MTCNNModel_Di(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
+    # elif model_name == 'BNN':
+    #     from src.models.MT_BNN import BNNMTModel
+    #     print(reg_list)
+    #     model = BNNMTModel(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
+    # elif model_name == 'BNN_MG':
+    #     model = MTBNNModel_MG(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
+    
+    if 'AE' in model_name:
         if 'GMVAE' in model_name:
             from src.models.GMVAE import GMVAE
             ae_model = GMVAE(input_dim=input_dim, latent_dim=latent_dim).to(device)
             ae_model.load_state_dict(torch.load(ae_dir))
+            if adapte == 'AdaBN':
+                from src.training.adapt_AE import apply_adabn
+                ae_model = apply_adabn(ae_model, X_train, device, batch_size=32)
+            else:
+                from src.training.adapt_AE import train_adapted_model
+                ae_model, _ = train_adapted_model(ae_model, X_train, X_val, device)
             pretrained_encoder = ae_model.get_encoder()
-            
-            from src.models.VAE import FineTuningModel_vae
-            model = FineTuningModel_vae(pretrained_encoder=pretrained_encoder,
-                                    latent_dim = latent_dim,
-                                    output_dims = output_dims,
-                                    reg_list = reg_list,
-                                    shared_learn = False,
-                                    )
-        elif 'DAE' in model_name:
-            from src.models.AE import Autoencoder
-            ae_model = Autoencoder(input_dim=input_dim, latent_dim=latent_dim).to(device)
-            ae_model.load_state_dict(torch.load(ae_dir))
-            pretrained_encoder = ae_model.get_encoder()
-            
-            from src.models.AE import FineTuningModel
-            model = FineTuningModel(pretrained_encoder=pretrained_encoder,
-                                    last_shared_layer_dim = latent_dim,
-                                    output_dims = output_dims,
-                                    reg_list = reg_list,
-                                    shared_learn = False,
-                                    )
             
         elif 'VAE' in model_name:
             from src.models.VAE import VariationalAutoencoder
             ae_model = VariationalAutoencoder(input_dim=input_dim, latent_dim=latent_dim).to(device)
             ae_model.load_state_dict(torch.load(ae_dir))
+            if adapte == 'AdaBN':
+                from src.training.adapt_AE import apply_adabn
+                ae_model = apply_adabn(ae_model, X_train, device, batch_size=32)
+            else:
+                from src.training.adapt_AE import train_adapted_model
+                ae_model, _ = train_adapted_model(ae_model, X_train, X_val, device)
             pretrained_encoder = ae_model.get_encoder()
-            
-            from src.models.VAE import FineTuningModel_vae
-            model = FineTuningModel_vae(pretrained_encoder=pretrained_encoder,
-                                    latent_dim = latent_dim,
-                                    output_dims = output_dims,
+
+        else: 
+            from src.models.AE import Autoencoder
+            ae_model = Autoencoder(input_dim=input_dim, latent_dim=latent_dim).to(device)
+            ae_model.load_state_dict(torch.load(ae_dir))
+            if adapte == 'AdaBN':
+                from src.training.adapt_AE import apply_adabn
+                ae_model = apply_adabn(ae_model, X_train, device, batch_size=32)
+            else:
+                from src.training.adapt_AE import train_adapted_model
+                ae_model, _ = train_adapted_model(ae_model, X_train, X_val, device)
+            pretrained_encoder = ae_model.get_encoder()
+
+        if 'FiLM' in model_name:
+            from src.models.AE import FineTuningModelWithFiLM
+            model = FineTuningModelWithFiLM(pretrained_encoder=pretrained_encoder,
+                                        last_shared_layer_dim = latent_dim,
+                                        output_dims = output_dims,
+                                        reg_list = reg_list,
+                                        label_embedding_dim = labels_train.shape[1],
+                                        shared_learn = False,
+                                        )
+        elif 'DKL' in model_name:
+            from src.models.MT_GP import GPFineTuningModel
+            model = GPFineTuningModel(pretrained_encoder=pretrained_encoder,
+                                    last_shared_layer_dim = latent_dim,
                                     reg_list = reg_list,
                                     shared_learn = False,
                                     )
-
         else:
-            from src.models.AE import Autoencoder
-            ae_model = Autoencoder(input_dim=input_dim, latent_dim=latent_dim).to(device)
-
-            ae_model.load_state_dict(torch.load(ae_dir))
-            pretrained_encoder = ae_model.get_encoder()
-
-            if 'FiLM' in model_name:
-                from src.models.AE import FineTuningModelWithFiLM
-                model = FineTuningModelWithFiLM(pretrained_encoder=pretrained_encoder,
-                                            last_shared_layer_dim = latent_dim,
-                                            output_dims = output_dims,
-                                            reg_list = reg_list,
-                                            label_embedding_dim = labels_train.shape[1],
-                                            shared_learn = False,
-                                            )
-            elif 'DKL' in model_name:
-                from src.models.MT_GP import GPFineTuningModel
-                model = GPFineTuningModel(pretrained_encoder=pretrained_encoder,
-                                        last_shared_layer_dim = latent_dim,
+            if 'VAE' in model_name:
+                from src.models.VAE import FineTuningModel_vae
+                model = FineTuningModel_vae(pretrained_encoder=pretrained_encoder,
+                                        latent_dim = latent_dim,
+                                        output_dims = output_dims,
                                         reg_list = reg_list,
                                         shared_learn = False,
                                         )
@@ -790,7 +789,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                         reg_list = reg_list,
                                         shared_learn = False,
                                         )
-                
+
         from src.training.training_foundation import evaluate_and_save_errors
         evaluate_and_save_errors(model = ae_model, data_tensor = X_train, indices = train_ids, 
                              device = device, out_dir = vis_dir, filename_prefix = 'finetuning_train')
@@ -806,68 +805,68 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                               output_dir = vis_dir, 
                               )
 
-    elif model_name == 'MoE':
-        from src.models.MoE import MoEModel
-        model = MoEModel(input_dim=input_dim, output_dims = output_dims, reg_list=reg_list, num_experts = 8, top_k = 4, )
-    elif model_name == 'NN_Q':
-        from src.models.MT_NN_Q import MTNNQuantileModel
-        quantiles = [0.1, 0.5, 0.9]
-        model = MTNNQuantileModel(input_dim=input_dim, reg_list=reg_list, quantiles=quantiles, )
-    elif model_name == 'PNN':
-        from src.models.MT_PNN import ProbabilisticMTNNModel
-        model = ProbabilisticMTNNModel(input_dim=input_dim, output_dims=output_dims, reg_list=reg_list)
-    elif model_name == 'PNN_t':
-        from src.models.MT_PNN_t import t_ProbabilisticMTNNModel
-        model = t_ProbabilisticMTNNModel(input_dim=input_dim, output_dims=output_dims, reg_list=reg_list, task_dfs=[5.0])
-    elif model_name == 'PNN_gamma':
-        from src.models.MT_PNN_gamma import Gamma_ProbabilisticMTNNModel
-        model = Gamma_ProbabilisticMTNNModel(input_dim=input_dim, output_dims=output_dims, reg_list=reg_list)
-    elif model_name == 'MDN':
-        from src.models.MT_MDN import MDN_MTNNModel
-        model = MDN_MTNNModel(input_dim = input_dim, output_dims = output_dims, reg_list = reg_list, n_components = 1)
-    elif model_name == 'NN_Uncertainly':
-        from src.models.MT_NN_Uncertainly import MTNNModelWithUncertainty
-        model = MTNNModelWithUncertainty(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
-    elif model_name == 'NN':
-        model = MTNNModel(input_dim = input_dim, output_dims = output_dims,reg_list = reg_list)
-    elif model_name == 'NN_gate':
-        from src.models.MT_NN_gate import gate_MTNNModel
-        model = gate_MTNNModel(input_dim = input_dim, output_dims = output_dims,reg_list = reg_list, gated_tasks = ['Available_P'])
-    elif model_name == 'GP':
-        if len(reg_list) > 1:
-            likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(num_tasks=len(reg_list))
-            #likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(
-            #        num_tasks=len(reg_list),
-            #        noise_constraint=gpytorch.constraints.GreaterThan(1e-4) # ノイズが1e-4より小さくならないようにする
-            #    ).double()
-            y_train = torch.empty(len(X_train),len(reg_list))
-            for i,reg in enumerate(reg_list):
-                y_train[:,i] = Y_train[reg].view(-1)
-        else:
-            likelihood = gpytorch.likelihoods.GaussianLikelihood()
-            #likelihood = gpytorch.likelihoods.GaussianLikelihood(
-            #    noise_constraint=gpytorch.constraints.GreaterThan(1e-4) # ノイズが1e-4より小さくならないようにする
-            #        ).double()
-            y_train = Y_train[reg_list[0]].view(-1)
-        #print(y_train)
+    # elif model_name == 'MoE':
+    #     from src.models.MoE import MoEModel
+    #     model = MoEModel(input_dim=input_dim, output_dims = output_dims, reg_list=reg_list, num_experts = 8, top_k = 4, )
+    # elif model_name == 'NN_Q':
+    #     from src.models.MT_NN_Q import MTNNQuantileModel
+    #     quantiles = [0.1, 0.5, 0.9]
+    #     model = MTNNQuantileModel(input_dim=input_dim, reg_list=reg_list, quantiles=quantiles, )
+    # elif model_name == 'PNN':
+    #     from src.models.MT_PNN import ProbabilisticMTNNModel
+    #     model = ProbabilisticMTNNModel(input_dim=input_dim, output_dims=output_dims, reg_list=reg_list)
+    # elif model_name == 'PNN_t':
+    #     from src.models.MT_PNN_t import t_ProbabilisticMTNNModel
+    #     model = t_ProbabilisticMTNNModel(input_dim=input_dim, output_dims=output_dims, reg_list=reg_list, task_dfs=[5.0])
+    # elif model_name == 'PNN_gamma':
+    #     from src.models.MT_PNN_gamma import Gamma_ProbabilisticMTNNModel
+    #     model = Gamma_ProbabilisticMTNNModel(input_dim=input_dim, output_dims=output_dims, reg_list=reg_list)
+    # elif model_name == 'MDN':
+    #     from src.models.MT_MDN import MDN_MTNNModel
+    #     model = MDN_MTNNModel(input_dim = input_dim, output_dims = output_dims, reg_list = reg_list, n_components = 1)
+    # elif model_name == 'NN_Uncertainly':
+    #     from src.models.MT_NN_Uncertainly import MTNNModelWithUncertainty
+    #     model = MTNNModelWithUncertainty(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
+    # elif model_name == 'NN':
+    #     model = MTNNModel(input_dim = input_dim, output_dims = output_dims,reg_list = reg_list)
+    # elif model_name == 'NN_gate':
+    #     from src.models.MT_NN_gate import gate_MTNNModel
+    #     model = gate_MTNNModel(input_dim = input_dim, output_dims = output_dims,reg_list = reg_list, gated_tasks = ['Available_P'])
+    # elif model_name == 'GP':
+    #     if len(reg_list) > 1:
+    #         likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(num_tasks=len(reg_list))
+    #         #likelihood = gpytorch.likelihoods.MultitaskGaussianLikelihood(
+    #         #        num_tasks=len(reg_list),
+    #         #        noise_constraint=gpytorch.constraints.GreaterThan(1e-4) # ノイズが1e-4より小さくならないようにする
+    #         #    ).double()
+    #         y_train = torch.empty(len(X_train),len(reg_list))
+    #         for i,reg in enumerate(reg_list):
+    #             y_train[:,i] = Y_train[reg].view(-1)
+    #     else:
+    #         likelihood = gpytorch.likelihoods.GaussianLikelihood()
+    #         #likelihood = gpytorch.likelihoods.GaussianLikelihood(
+    #         #    noise_constraint=gpytorch.constraints.GreaterThan(1e-4) # ノイズが1e-4より小さくならないようにする
+    #         #        ).double()
+    #         y_train = Y_train[reg_list[0]].view(-1)
+    #     #print(y_train)
 
-        model = MultitaskGPModel(train_x = X_train, train_y = y_train, likelihood = likelihood, num_tasks = len(reg_list))
-    elif model_name == 'HBM':
-        #print(labels_train)
-        location_train = labels_train['prefandcrop']
-        location_test = labels_test['prefandcrop']
+    #     model = MultitaskGPModel(train_x = X_train, train_y = y_train, likelihood = likelihood, num_tasks = len(reg_list))
+    # elif model_name == 'HBM':
+    #     #print(labels_train)
+    #     location_train = labels_train['prefandcrop']
+    #     location_test = labels_test['prefandcrop']
 
-        X_train = X_train.to(torch.float32)
-        X_test = X_test.to(torch.float32)
-        y_train = torch.empty(len(X_train),len(reg_list))
-        for reg in reg_list:
-            Y_train[reg] = Y_train[reg].to(torch.float32)
-            Y_test[reg] = Y_test[reg].to(torch.float32)
-        for i,reg in enumerate(reg_list):
-            y_train[:,i] = Y_train[reg].view(-1).to(torch.float32)
+    #     X_train = X_train.to(torch.float32)
+    #     X_test = X_test.to(torch.float32)
+    #     y_train = torch.empty(len(X_train),len(reg_list))
+    #     for reg in reg_list:
+    #         Y_train[reg] = Y_train[reg].to(torch.float32)
+    #         Y_test[reg] = Y_test[reg].to(torch.float32)
+    #     for i,reg in enumerate(reg_list):
+    #         y_train[:,i] = Y_train[reg].view(-1).to(torch.float32)
 
-        #model =MT_HBM(x = X_train, location_idx = location_idx, num_locations = num_locations,num_tasks = len(reg_list))
-        model = MultitaskModel(task_names=reg_list, num_features = input_dim)
+    #     #model =MT_HBM(x = X_train, location_idx = location_idx, num_locations = num_locations,num_tasks = len(reg_list))
+    #     model = MultitaskModel(task_names=reg_list, num_features = input_dim)
 
     model.to(device)
 
@@ -1012,7 +1011,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                     )
         
         from src.test.test_FiLM import test_FiLM
-        predicts, true, r2_results, mse_results = test_FiLM(X_test,Y_test, X_val, Y_val, labels_test, labels_val,
+        predicts, true, r2_results, mse_results = test_FiLM(X_test,Y_test, labels_test,
                                                           model_trained,reg_list,scalers,output_dir=vis_dir,device = device, test_ids = test_ids)
 
     elif 'FDS' in model_name:
