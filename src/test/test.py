@@ -729,7 +729,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                 ae_model = apply_adabn(ae_model, X_train, device, batch_size=32)
             else:
                 from src.training.adapt_AE import train_adapted_model
-                ae_model, _ = train_adapted_model(ae_model, X_train, X_val, device)
+                ae_model, _ = train_adapted_model(ae_model, X_train, X_val, device, vis_dir)
             pretrained_encoder = ae_model.get_encoder()
             
         elif 'VAE' in model_name:
@@ -741,7 +741,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                 ae_model = apply_adabn(ae_model, X_train, device, batch_size=32)
             else:
                 from src.training.adapt_AE import train_adapted_model
-                ae_model, _ = train_adapted_model(ae_model, X_train, X_val, device)
+                ae_model, _ = train_adapted_model(ae_model, X_train, X_val, device, vis_dir)
             pretrained_encoder = ae_model.get_encoder()
 
         else: 
@@ -753,7 +753,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                 ae_model = apply_adabn(ae_model, X_train, device, batch_size=32)
             else:
                 from src.training.adapt_AE import train_adapted_model
-                ae_model, _ = train_adapted_model(ae_model, X_train, X_val, device)
+                ae_model, _ = train_adapted_model(ae_model, X_train, X_val, device, vis_dir)
             pretrained_encoder = ae_model.get_encoder()
 
         if 'FiLM' in model_name:

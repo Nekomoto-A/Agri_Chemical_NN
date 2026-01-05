@@ -673,7 +673,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
             #Y_val_tensor.append(torch.tensor(y_val[reg].values, dtype=torch.int64))
             #Y_test_tensor.append(torch.tensor(y_test[reg].values, dtype=torch.int64))
 
-            print(y_train_split_pp)
+            #print(y_train_split_pp)
 
             Y_train_tensor[reg] = torch.tensor(y_train_split_pp, dtype=torch.int64)
             if isinstance(val_size, (int, float)):
@@ -694,8 +694,6 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
     #print(Y_test_tensor)
     
     data = []
-    data_cov = []
-    #data = {}
     
     if len(reg_list) >= 2:
         corr_dir = os.path.join(fold, f'corr')
@@ -765,7 +763,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
         all_df = pd.concat([y_train_split, y_test, y_val], ignore_index=True)
         le = LabelEncoder()
         
-        print(all_df[label])
+        #print(all_df[label])
 
         all_df[label] = le.fit_transform(all_df[label])
         label_encoders[label] = le

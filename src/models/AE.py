@@ -61,7 +61,6 @@ class Autoencoder(nn.Module):
         # 最後の出力層: 元の入力次元に戻す
         self.decoder.add_module("decoder_output_layer", nn.Linear(in_features_dec, self.input_dim))
         
-
     def forward(self, x):
         encoded_features = self.encoder(x)
         reconstructed_x = self.decoder(encoded_features)
@@ -302,9 +301,10 @@ class FineTuningModelWithFiLM(nn.Module):
             
             # --- ★改良点: 出力分布の補正 ---
             # ラベル情報に基づいて、最終的な値のレンジを調整する
-            final_output = scaler(raw_output, label_emb)
+            #final_output = scaler(raw_output, label_emb)
             
-            outputs[reg] = final_output
+            #outputs[reg] = final_output
+            outputs[reg] = raw_output
             
         return outputs, modulated_features
 

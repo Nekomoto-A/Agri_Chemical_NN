@@ -44,10 +44,24 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
+import os
 
-def train_adapted_model(pretrained_ae, x_train, x_val, device, epochs=50, batch_size=128, lr=1e-3):
+from src.training.train_FT import EarlyStopping
+
+# --- 訓練用関数（EarlyStopping 組み込み版） ---
+def train_adapted_model(
+    pretrained_ae, 
+    x_train, 
+    x_val, 
+    device, 
+    output_dir, 
+    epochs=300, 
+    batch_size=32, 
+    lr=1e-2, 
+    patience=10
+    ):
     """
-    既存モデルにアダプターを挿入し、アダプターとデコーダーの両方を新規データに適応させる関数。
+    アダプターとデコーダーを学習させ、EarlyStoppingを適用する関数。
     """
     #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
@@ -58,7 +72,7 @@ def train_adapted_model(pretrained_ae, x_train, x_val, device, epochs=50, batch_
     train_loader = DataLoader(TensorDataset(x_train), batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(TensorDataset(x_val), batch_size=batch_size)
     
-    # 【変更点】アダプターとデコーダーの両方のパラメータを最適化対象に設定
+    # 最適化対象の設定（アダプターとデコーダー）
     optimizer = optim.Adam([
         {'params': model.adapter.parameters()},
         {'params': model.decoder.parameters()}
@@ -66,9 +80,15 @@ def train_adapted_model(pretrained_ae, x_train, x_val, device, epochs=50, batch_
     
     criterion = nn.MSELoss()
     
+    # --- EarlyStoppingの初期化 ---
+    # pathは保存先ファイル名。必要に応じて変更してください。
+    model_dir = os.path.join(output_dir, 'best_adapter_model.pt')
+    early_stopping = EarlyStopping(patience=patience, verbose=True, path=model_dir)
+    
     history = {'train_loss': [], 'val_loss': []}
 
     for epoch in range(epochs):
+        # --- 学習フェーズ ---
         model.train()
         train_loss = 0
         for batch in train_loader:
@@ -80,7 +100,7 @@ def train_adapted_model(pretrained_ae, x_train, x_val, device, epochs=50, batch_
             optimizer.step()
             train_loss += loss.item()
             
-        # バリデーション
+        # --- 検証フェーズ ---
         model.eval()
         val_loss = 0
         with torch.no_grad():
@@ -95,7 +115,17 @@ def train_adapted_model(pretrained_ae, x_train, x_val, device, epochs=50, batch_
         history['train_loss'].append(avg_train)
         history['val_loss'].append(avg_val)
         
-        if (epoch + 1) % 10 == 0:
-            print(f"Epoch [{epoch+1}/{epochs}] Train Loss: {avg_train:.6f} | Val Loss: {avg_val:.6f}")
+        print(f"Epoch [{epoch+1}/{epochs}] Train Loss: {avg_train:.6f} | Val Loss: {avg_val:.6f}")
+
+        # --- EarlyStoppingの判定 ---
+        early_stopping(avg_val, model)
+        
+        if early_stopping.early_stop:
+            print("Early stopping triggered. Training stopped.")
+            break
+            
+    # --- 最良の状態の重みをロード ---
+    model.load_state_dict(torch.load('best_adapter_model.pt'))
+    print("Best model weights restored.")
             
     return model, history
