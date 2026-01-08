@@ -37,7 +37,7 @@ from matplotlib.lines import Line2D
 #     else:
 #         return labels, reduced_features
 
-def reduce_feature(model, X1, model_name, X2=None, batch_size=32, device='cpu'):
+def reduce_feature(model, X1, X2=None, batch_size=32, device='cpu'):
     """
     モデルの中間層の出力を取得し、UMAPで次元削減する関数。
     バッチ処理に対応し、実行デバイスを指定可能です。
@@ -69,7 +69,7 @@ def reduce_feature(model, X1, model_name, X2=None, batch_size=32, device='cpu'):
                 batch_data = data[i:i+batch_size].to(device)
 
                 # モデルにバッチデータを入力し、中間層の特徴量を取得
-                _, shared_features_batch = model(batch_data)
+                _, shared_features_batch= model(batch_data)
 
                 # 特徴量をフラットなベクトルに変換
                 shared_features_batch = shared_features_batch.reshape(shared_features_batch.shape[0], -1)
@@ -108,140 +108,6 @@ def reduce_feature(model, X1, model_name, X2=None, batch_size=32, device='cpu'):
         return reduced_features
     else:
         return labels, reduced_features
-
-# t-SNE による可視化関数
-# def visualize_tsne(model, X, Y, reg_list, output_dir,file_name, model_name, scalers, batch_size,device, X2 = None, Y2 = None, label_encoders = None):
-#     #print(reduced_features)
-#     if X2 != None:
-#         #print(Y2)
-#         labels, reduced_features = reduce_feature(model,X, model_name,X2 = X2 ,batch_size = batch_size, device = device)
-#         for i,reg in enumerate(reg_list):
-#             reg_dir = os.path.join(output_dir, f'{reg}')
-#             os.makedirs(reg_dir,exist_ok=True)
-#             sub_dir = os.path.join(reg_dir, f'{file_name}')
-
-#             #Y_single1 = Y[i].detach().numpy()
-#             Y_single1 = Y[reg].detach().numpy()
-#             #print(Y_single1.shape)
-#             #print(Y_single1)
-#             #Y_single2 = Y2[i].detach().numpy()
-#             Y_single2 = Y2[reg].detach().numpy()
-#             #print(Y_single2.shape)
-#             #print(Y_single2)
-#             Y_single = np.concatenate([Y_single1,Y_single2])
-
-#             if '_rank' in reg:
-#                 Y_single = np.argmax(Y_single)
-
-#             #print(Y_single)
-#             marker_map = {1: 'o', 0: 's'}
-#             # プロット
-#             plt.figure(figsize=(8, 6))
-#             if Y is not None:
-#                 if np.issubdtype(Y_single.dtype, np.integer):
-#                     if label_encoders != None:
-#                         Y_single = label_encoders[reg].inverse_transform(Y_single)
-#                     # 色とマーカーの一覧（足りなければ増やす）
-#                     color_list = plt.cm.tab10.colors  # 10色
-#                     # ラベル → 色/形 マッピングを自動で作成
-#                     unique_colors = np.unique(Y_single)
-#                     color_map = {label: color_list[i % len(color_list)] for i, label in enumerate(unique_colors)}
-
-#                     #handles = []  # 凡例用のハンドル
-
-#                     for lc in np.unique(Y_single):
-#                         for ls in np.unique(labels):
-#                             mask = (labels == ls) & (Y_single == lc)
-#                             plt.scatter(reduced_features[:, 0][mask], reduced_features[:, 1][mask],
-#                                 c=color_map[lc],
-#                                 marker=marker_map[ls],
-#                                 label=f'{lc}',
-#                                 edgecolor='k', s=80)
-#                             #if ls == 1:  # 最初の形状だけ凡例を追加（例：'X'）
-#                             #    handles.append(sc)
-#                     # 色ラベルの凡例を手動で作成
-#                     color_handles = []
-#                     for lc, color in color_map.items():
-#                         color_handles.append(Line2D([0], [0], marker='o', color='w', markerfacecolor=color, markersize=10, label=f'{lc}'))
-#                     plt.legend(handles=color_handles, loc='upper left')
-
-#                 else:
-#                     if reg in scalers:
-#                         Y_single = scalers[reg].inverse_transform(Y_single)
-#                     cmap = plt.cm.coolwarm  # 他に 'plasma', 'coolwarm', 'inferno' なども
-#                     # 連続値ラベルの場合
-#                     #scaler = MinMaxScaler()
-#                     #Y_single = scaler.fit_transform(Y_single)
-#                     for ls in np.unique(labels):
-#                         mask = labels == ls
-#                         plt.scatter(reduced_features[:, 0][mask], reduced_features[:, 1][mask],
-#                                     c=Y_single[mask],
-#                                     cmap=cmap,
-#                                     marker=marker_map[ls],
-#                                     edgecolor='k', s=80)
-#                         #scatter = plt.scatter(reduced_features[:, 0], reduced_features[:, 1], c=Y_single, cmap='viridis')
-#                     sc = plt.scatter([], [], c=[], cmap=cmap)  # ダミーで色範囲の情報を保持
-#                     cbar = plt.colorbar(sc)
-#                     cbar.set_label(f'{reg}')
-#                     #plt.legend()
-#             else:
-#                 # ラベルなし
-#                 plt.scatter(reduced_features[:, 0], reduced_features[:, 1], alpha=0.7)
-            
-#             #plt.title("t-SNE Visualization of Shared Layer Features")
-            
-#             plt.xlabel("t-SNE Component 1")
-#             plt.ylabel("t-SNE Component 2")
-#             plt.tight_layout()
-#             #plt.show()
-#             plt.savefig(sub_dir)
-#             plt.close()
-#     else:
-#         reduced_features = reduce_feature(model,X, model_name, batch_size = batch_size, device = device)
-
-#         for i,reg in enumerate(reg_list):
-#             reg_dir = os.path.join(output_dir, f'{reg}')
-#             os.makedirs(reg_dir,exist_ok=True)
-#             sub_dir = os.path.join(reg_dir, f'{file_name}')
-
-#             Y_single = Y[reg].detach().numpy()
-#             if reg in scalers:
-#                 Y_single = scalers[reg].inverse_transform(Y_single)
-#             cmap = plt.cm.coolwarm  # 他に 'plasma', 'coolwarm', 'inferno' なども
-#             # プロット
-#             plt.figure(figsize=(8, 6))
-#             if Y is not None:
-#                 if np.issubdtype(Y_single.dtype, np.integer):  
-#                     if label_encoders != None:
-#                         Y_single = label_encoders[reg].inverse_transform(Y_single)
-#                     # カテゴリ（離散ラベル）の場合（20クラス未満）
-#                     scatter = plt.scatter(reduced_features[:, 0], reduced_features[:, 1], c=Y_single, cmap='tab10')
-#                     plt.legend(*scatter.legend_elements(), title="Classes")
-#                 else:
-#                     # 連続値ラベルの場合
-#                     #scaler = MinMaxScaler()
-#                     #Y_single = scaler.fit_transform(Y_single)
-#                     plt.scatter(reduced_features[:, 0], reduced_features[:, 1],
-#                                     c=Y_single,
-#                                     cmap=cmap,
-#                                     #marker=marker_map[ls],
-#                                     edgecolor='k', 
-#                                     s=80
-#                                     )
-#                     sc = plt.scatter([], [], c=[], cmap=cmap)  # ダミーで色範囲の情報を保持
-#                     cbar = plt.colorbar(sc)
-#                     cbar.set_label(f'{reg}')
-#             else:
-#                 # ラベルなし
-#                 plt.scatter(reduced_features[:, 0], reduced_features[:, 1], alpha=0.7)
-            
-#             #plt.title("t-SNE Visualization of Shared Layer Features")
-#             plt.xlabel("t-SNE Component 1")
-#             plt.ylabel("t-SNE Component 2")
-#             plt.tight_layout()
-#             #plt.show()
-#             plt.savefig(sub_dir)
-#             plt.close()
 
 # t-SNE による可視化関数
 def visualize_tsne(model, X, Y, reg_list, output_dir, file_name, model_name, scalers, batch_size, device, X2=None, Y2=None, label_encoders=None):
@@ -348,4 +214,112 @@ def visualize_tsne(model, X, Y, reg_list, output_dir, file_name, model_name, sca
         plt.ylabel("Component 2")
         plt.tight_layout()
         plt.savefig(sub_dir)
+        plt.close()
+
+
+import os
+import torch
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
+from matplotlib.lines import Line2D
+
+def reduce_feature_film(model, X, L, batch_size=32, device='cpu'):
+    """
+    FiLM層の出力を取得し、t-SNEで次元削減する。
+    L: ラベル埋め込み（One-hot等）
+    """
+    model.eval()
+    all_features = []
+    
+    with torch.no_grad():
+        for i in range(0, len(X), batch_size):
+            batch_X = X[i:i+batch_size].to(device)
+            batch_L = L[i:i+batch_size].to(device)
+
+            # モデルのforwardから latent_features (FiLM出力) を取得
+            _, latent_features_batch = model(batch_X, batch_L)
+
+            # 特徴量を平坦化して保存
+            latent_features_batch = latent_features_batch.reshape(latent_features_batch.shape[0], -1)
+            all_features.append(latent_features_batch.cpu())
+    
+    combined_features = torch.cat(all_features, dim=0).numpy()
+    
+    # t-SNEの実行
+    reducer = TSNE(n_components=2, perplexity=20, random_state=42, init='random')
+    reduced_features = reducer.fit_transform(combined_features)
+    
+    return reduced_features
+
+def visualize_tsne_film(model, X, L, Y, reg_list, output_dir, file_name, batch_size, device, scalers=None, label_encoders=None):
+    """
+    FiLM層出力を可視化する。
+    1. 目的変数ごとに色分けした図
+    2. 入力ラベル（One-hot）のクラスごとに色分けした図
+    をそれぞれ保存する。
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # 1. 特徴抽出と次元削減（一度だけ実行）
+    print("Running t-SNE...")
+    reduced_features = reduce_feature_film(model, X, L, batch_size=batch_size, device=device)
+
+    # --- A. ラベルデータ（One-hot入力）による色分け ---
+    # One-hotをクラスIndexに変換 (batch, num_classes) -> (batch,)
+    label_indices = torch.argmax(L, dim=1).cpu().numpy()
+    
+    plt.figure(figsize=(10, 8))
+    unique_labels = np.unique(label_indices)
+    colors = plt.cm.get_cmap('Set1')(np.linspace(0, 1, len(unique_labels)))
+    
+    for idx, label_val in enumerate(unique_labels):
+        mask = (label_indices == label_val)
+        plt.scatter(reduced_features[mask, 0], reduced_features[mask, 1], 
+                    label=f'Label Class {label_val}', alpha=0.6, s=50, edgecolors='k')
+    
+    plt.title(f"t-SNE clustered by Input Labels\n{file_name}")
+    plt.legend()
+    plt.savefig(os.path.join(output_dir, f"tsne_by_label_{file_name}.png"))
+    plt.close()
+
+    # --- B. 目的変数（ターゲット）ごとの色分け ---
+    for reg in reg_list:
+        reg_dir = os.path.join(output_dir, f'target_{reg}')
+        os.makedirs(reg_dir, exist_ok=True)
+        
+        target_vals = Y[reg].detach().cpu().numpy().flatten()
+        nan_mask = np.isnan(target_vals)
+        valid_mask = ~nan_mask
+        
+        plt.figure(figsize=(10, 8))
+        
+        # 欠損値のプロット
+        if np.any(nan_mask):
+            plt.scatter(reduced_features[nan_mask, 0], reduced_features[nan_mask, 1], 
+                        c='black', marker='x', label='Missing', alpha=0.3)
+
+        # 有効データのプロット
+        valid_features = reduced_features[valid_mask]
+        valid_targets = target_vals[valid_mask]
+
+        # 連続値かカテゴリ値かで処理を分岐
+        if len(np.unique(valid_targets)) < 20: # カテゴリ
+            if label_encoders and reg in label_encoders:
+                valid_targets = label_encoders[reg].inverse_transform(valid_targets.astype(int))
+            
+            scatter = plt.scatter(valid_features[:, 0], valid_features[:, 1], 
+                                  c=plt.cm.tab10(np.linspace(0, 1, len(np.unique(valid_targets)))),
+                                  edgecolor='k', s=60)
+            plt.legend(*scatter.legend_elements(), title=reg)
+        else: # 連続値
+            if scalers and reg in scalers:
+                valid_targets = scalers[reg].inverse_transform(valid_targets.reshape(-1, 1)).flatten()
+            
+            scatter = plt.scatter(valid_features[:, 0], valid_features[:, 1], 
+                                  c=valid_targets, cmap='coolwarm', edgecolor='k', s=60)
+            plt.colorbar(scatter, label=reg)
+
+        plt.title(f"t-SNE colored by {reg}\n{file_name}")
+        plt.savefig(os.path.join(reg_dir, f"tsne_by_target_{file_name}.png"))
         plt.close()

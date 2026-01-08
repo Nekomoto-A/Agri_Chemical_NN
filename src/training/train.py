@@ -162,8 +162,8 @@ class WeightedRootMSELoss(nn.Module):
         
         # 1. 通常の二乗誤差 (SE) を計算
         # (y_true - y_pred)**2
-        #squared_errors = torch.pow(y_true - y_pred, 2)
-        squared_errors = torch.abs(y_true - y_pred)
+        squared_errors = torch.pow(y_true - y_pred, 2)
+        #squared_errors = torch.abs(y_true - y_pred)
         
         # 2. 重みを計算 (sqrt(y_true + epsilon))
         # y_true が万が一負の値だった場合に NaN になるのを防ぐため、
@@ -818,7 +818,18 @@ class LDSMSELoss(nn.Module):
         # 平均を返してスカラーにする
         return weighted_loss.mean()
 
+class MAPELoss(nn.Module):
+    def __init__(self, eps=1e-8):
+        super(MAPELoss, self).__init__()
+        self.eps = eps
 
+    def forward(self, y_pred, y_true):
+        # 誤差の絶対値
+        abs_error = torch.abs(y_true - y_pred)
+        # 真の値で割り、相対誤差を計算（ゼロ除算防止にepsを加算）
+        relative_error = abs_error / (torch.abs(y_true) + self.eps)
+        # 平均を返す
+        return torch.mean(relative_error)
 
 def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, model_name,loss_sum, device, batch_size, #optimizer, 
                 scalers, 
@@ -895,6 +906,8 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                 print(f'最dai値：{y_tr_max}')
             elif fn == 'msle':
                 personal_losses[reg] = MSLELoss()
+            elif fn == 'mape':
+                personal_losses[reg] = MAPELoss()
             elif fn == 'dwmse':
                 num_bins = 5
                 counts, bin_edges = torch.histogram(

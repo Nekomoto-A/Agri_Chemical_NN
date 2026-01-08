@@ -30,8 +30,8 @@ train.py:
   early_stopping: True
   patience: 10
   least_epoch: 0
-  visualize: False
-  epochs: 200
+  visualize: True
+  epochs: False
   vis_step: 5
   validation: True
   lambda: 0.1
@@ -88,7 +88,7 @@ train_FT.py:
   tsne_max_samples: 10000
   kl_anneal_epochs: 20
   kl_max_beta: 1.0
-  sparse_lambda: 0.01
+  sparse_lambda: 0.0
 train_FT_DAE.py:
   lr: 0.01
   batch_size: 256
@@ -144,7 +144,7 @@ fold_eval.py:
     '063_20_Naga_Onio', '064_20_Naga_Onio', '065_20_Naga_Onio', '066_20_Naga_Onio',
     '067_20_Naga_Pump', '050_20_Sait_Stra', '048_20_Sait_Yama',  '049_20_Sait_Yama', 
 
-    '214_21_Miyz_Edam', '273_22_Naga_Rice'
+    '214_21_Miyz_Edam', '273_22_Naga_Rice', '235_21_Miyz_Spin'
 
   ]
   feature_path_linux: 'data/raw/riken/taxon_data/lv6.csv' #'/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/lv6.csv' # # #
@@ -158,7 +158,7 @@ fold_eval.py:
   embedding: 'Onehot'
   latent_dim: 32
 main.py:
-  result_dir: 'result_AE_FiLM_QT'
+  result_dir: 'result_AE_FiLM_vis'
   reg_list: [
             ['Available.P'],
             ['pH'],

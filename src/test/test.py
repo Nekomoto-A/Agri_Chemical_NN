@@ -1223,68 +1223,92 @@ from sklearn.manifold import TSNE
 import numpy as np
 import pandas as pd  # CSV保存用に追加
 
-def save_tsne_and_csv(encoder, features, targets_dict, output_dir):
-    """
-    エンコーダー出力をt-SNEで可視化し、同時に特徴量とラベルをCSVとして保存する。
-    """
-    # 1. 出力先ディレクトリの作成
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+from sklearn.ensemble import RandomForestRegressor  # 追加
+from sklearn.model_selection import cross_val_score  # 交差検証用に追加
+from sklearn.metrics import mean_absolute_error, make_scorer # 追加
 
-    # 2. エンコーダーから潜在特徴量を抽出
+def save_tsne_and_csv(encoder, features, targets_dict, output_dir):
+    # パスのクリーンアップ（前回のエラー対策）
+    #if isinstance(output_dir, str):
+    #    output_dir = output_dir.replace("[", "").replace("]", "").replace("'", "").replace('"', "")
+    
+    #if not os.path.exists(output_dir):
+    #    os.makedirs(output_dir, exist_ok=True)
+
+    # 特徴量抽出
     encoder.eval()
     with torch.no_grad():
         device = next(encoder.parameters()).device
         inputs = features.to(device)
         latent_features = encoder(inputs).cpu().numpy()
 
-    # --- [追加] 3. 特徴量をCSVとして保存 ---
-    # カラム名を [dim_1, dim_2, ...] としたDataFrameを作成
     latent_df = pd.DataFrame(
         latent_features, 
         columns=[f"dim_{i+1}" for i in range(latent_features.shape[1])]
     )
-    latent_csv_path = os.path.join(output_dir, "latent_features.csv")
-    latent_df.to_csv(latent_csv_path, index=False)
-    print(f"Saved latent features to: {latent_csv_path}")
 
-    # --- [追加] 4. 目的変数（ラベル）をCSVとして保存 ---
-    # 各タスクのテンソルをnumpyに変換して辞書に再格納
-    labels_for_df = {}
+    # --- スコアラの定義 ---
+    # greater_is_better=False にすることで、値が小さいほど「良い」と判断させます
+    custom_scorer = make_scorer(normalized_medae_iqr, greater_is_better=False)
+
+    report_lines = []
+    print("Evaluating models with MAE and Normalized IQR Score...")
+
     for task_name, labels in targets_dict.items():
-        if torch.is_tensor(labels):
-            labels_for_df[task_name] = labels.cpu().numpy().flatten()
-        else:
-            labels_for_df[task_name] = np.array(labels).flatten()
-    
-    target_df = pd.DataFrame(labels_for_df)
-    target_csv_path = os.path.join(output_dir, "target_labels.csv")
-    target_df.to_csv(target_csv_path, index=False)
-    print(f"Saved target labels to: {target_csv_path}")
+        clean_name = str(task_name).replace("[", "").replace("]", "").replace("'", "").replace('"', "")
+        y_true = labels.cpu().numpy().flatten() if torch.is_tensor(labels) else np.array(labels).flatten()
+        latent_df[clean_name] = y_true
 
-    # 5. t-SNEによる次元削減
+        rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
+
+        # 1. 通常のMAEでの交差検証
+        mae_cv = cross_val_score(rf_model, latent_features, y_true, cv=5, scoring='neg_mean_absolute_error')
+        avg_mae = -np.mean(mae_cv)
+
+        # 2. 正規化指標での交差検証
+        norm_cv = cross_val_score(rf_model, latent_features, y_true, cv=5, scoring=custom_scorer)
+        avg_norm = -np.mean(norm_cv)
+
+        # レポート追加
+        res = f"Task: {clean_name:<15} | MAE: {avg_mae:.4f} | Norm_IQR_Score: {avg_norm:.4f}"
+        report_lines.append(res)
+        print(res)
+
+        # 予測値の算出と保存
+        rf_model.fit(latent_features, y_true)
+        latent_df[f"pred_{clean_name}"] = rf_model.predict(latent_features)
+
+    # CSV保存（PermissionError対策）
+    csv_path = os.path.join(output_dir, "latent_features_with_predictions.csv")
+    try:
+        latent_df.to_csv(csv_path, index=False)
+    except PermissionError:
+        csv_path = csv_path.replace(".csv", "_new.csv")
+        latent_df.to_csv(csv_path, index=False)
+
+    # スコアをテキストに保存
+    txt_path = os.path.join(output_dir, "evaluation_report.txt")
+    with open(txt_path, "w") as f:
+        f.write("Random Forest Regression Performance Report\n")
+        f.write("Normalized Score = MAE / IQR (Lower is better)\n")
+        f.write("="*65 + "\n")
+        f.writelines("\n".join(report_lines))
+    
+    print(f"Results saved to: {output_dir}")
+
+    # 7. t-SNEによる次元削減と可視化（以降は元のコードと同様）
     print("Running t-SNE...")
     tsne = TSNE(n_components=2, random_state=42)
     tsne_results = tsne.fit_transform(latent_features)
 
-    # 6. 各タスクごとに可視化して保存
     for task_name in targets_dict.keys():
         plt.figure(figsize=(10, 7))
-        label_values = target_df[task_name].values # 保存したDFから値を取得
-        
-        scatter = plt.scatter(
-            tsne_results[:, 0], 
-            tsne_results[:, 1], 
-            c=label_values, 
-            cmap='viridis', 
-            alpha=0.6
-        )
+        label_values = latent_df[task_name].values 
+        scatter = plt.scatter(tsne_results[:, 0], tsne_results[:, 1], c=label_values, cmap='viridis', alpha=0.6)
         plt.colorbar(scatter, label=f'{task_name} value')
         plt.title(f't-SNE Visualization: {task_name}')
         plt.savefig(os.path.join(output_dir, f'tsne_{task_name}.png'), dpi=300)
         plt.close()
-    
-    print("All plots saved successfully.")
 
 import os
 import torch
@@ -1321,7 +1345,12 @@ def save_tsne_with_labels(encoder, features, targets_dict, label_encoders_dict, 
 
     # 3. CSV用データの準備と保存
     latent_df = pd.DataFrame(latent_features, columns=[f"dim_{i+1}" for i in range(latent_features.shape[1])])
-    latent_df.to_csv(os.path.join(output_dir, "latent_features.csv"), index=False)
+    for task_name, labels in targets_dict.items():
+        if torch.is_tensor(labels):
+            latent_df[task_name] = labels.cpu().numpy().flatten()
+        else:
+            latent_df[task_name] = np.array(labels).flatten()
+    latent_df.to_csv(os.path.join(output_dir, "latent_features_labels.csv"), index=False)
 
     # 目的変数データの整形
     target_data_for_csv = {}

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset, Dataset, WeightedRandomSampler
-from src.experiments.visualize import visualize_tsne
+from src.experiments.visualize import visualize_tsne_film
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 import numpy as np
@@ -645,6 +645,19 @@ class GaussianNLLLoss(nn.Module):
         
         return loss
 
+class MAPELoss(nn.Module):
+    def __init__(self, eps=1e-8):
+        super(MAPELoss, self).__init__()
+        self.eps = eps
+
+    def forward(self, y_pred, y_true):
+        # 誤差の絶対値
+        abs_error = torch.abs(y_true - y_pred)
+        # 真の値で割り、相対誤差を計算（ゼロ除算防止にepsを加算）
+        relative_error = abs_error / (torch.abs(y_true) + self.eps)
+        # 平均を返す
+        return torch.mean(relative_error)
+
 def training_FiLM(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, model_name,loss_sum, device, batch_size, #optimizer, 
                 label_tr, label_val,
                 scalers, 
@@ -701,8 +714,6 @@ def training_FiLM(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir,
             elif fn == 'uwmse':
                 personal_losses[reg] = UncertaintyWeightedMSELoss(reduction='mean')
             elif fn == 'nwmse':
-                #print(f'mokutekihennsuu{y_tr[reg]}')
-                #y_tr_min = torch.nanmin(y_tr[reg])
                 target_tensor = y_tr[reg]
                 tr_notnan = target_tensor[~torch.isnan(target_tensor)]
                 y_tr_min = torch.min(tr_notnan)
@@ -721,6 +732,8 @@ def training_FiLM(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir,
                 print(f'最dai値：{y_tr_max}')
             elif fn == 'msle':
                 personal_losses[reg] = MSLELoss()
+            elif fn == 'mape':
+                personal_losses[reg] = MAPELoss()
             elif fn == 'dwmse':
                 num_bins = 5
                 counts, bin_edges = torch.histogram(
@@ -795,14 +808,14 @@ def training_FiLM(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir,
     has_quantile_regression = hasattr(model, 'quantiles')
 
     for epoch in range(epochs):
-        if visualize == True:
-            if epoch == 0:
-                vis_name = f'{epoch}epoch.png'
-                visualize_tsne(model = model, model_name = model_name,scalers = scalers, 
-                               batch_size = batch_size, device = device, 
-                               X = x_tr, Y = y_tr, reg_list = reg_list, output_dir = output_dir, file_name = vis_name,
-                               #X2 = x_val,Y2 = y_val
-                               )
+        # if visualize == True:
+        #     if epoch == 0:
+        #         vis_name = f'{epoch}epoch.png'
+        #         visualize_tsne(model = model, model_name = model_name,scalers = scalers, 
+        #                        batch_size = batch_size, device = device, 
+        #                        X = x_tr, Y = y_tr, reg_list = reg_list, output_dir = output_dir, file_name = vis_name,
+        #                        #X2 = x_val,Y2 = y_val
+        #                        )
 
         running_train_losses = {key: 0.0 for key in ['SUM'] + reg_list}
         #for x_batch, y_batch in train_loader:
@@ -965,11 +978,10 @@ def training_FiLM(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir,
             if visualize == True:
                 if (epoch + 1) % vis_step == 0:
                     vis_name = f'{epoch+1}epoch.png'
-                    visualize_tsne(model = model, model_name = model_name,scalers = scalers, 
-                                   batch_size = batch_size, device = device, 
-                                   X = x_tr, Y = y_tr, reg_list = reg_list, output_dir = output_dir, file_name = vis_name, label_encoders = label_encoders,
-                                   #X2 = x_val,Y2 = y_val
-                                   )
+                    visualize_tsne_film(model = model, X = x_tr, L = label_tr, Y = y_tr, 
+                                        reg_list = reg_list, output_dir = output_dir, 
+                                        file_name = vis_name, batch_size = batch_size, 
+                                        device = device, scalers=None, label_encoders=None)
             
             if tr_loss:
                 from src.training.tr_loss import calculate_and_save_mae_plot_html

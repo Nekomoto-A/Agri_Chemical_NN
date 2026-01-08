@@ -242,6 +242,8 @@ class LabelAwareOutputScaler(nn.Module):
         # 最終的な補正: y = y_raw * scale + shift
         return raw_output * scale + shift
 
+# --- FiLMGenerator, FiLMLayer, LabelAwareOutputScaler は変更なし ---
+
 class FineTuningModelWithFiLM(nn.Module):
     def __init__(self, pretrained_encoder, last_shared_layer_dim, output_dims, reg_list, 
                  label_embedding_dim,
@@ -257,11 +259,9 @@ class FineTuningModelWithFiLM(nn.Module):
         self.encoder_film = FiLMLayer(label_embedding_dim, last_shared_layer_dim)
         
         self.task_specific_heads = nn.ModuleList()
-        # ★追加: タスクごとの出力スケーラーを保持するリスト
         self.output_scalers = nn.ModuleList()
 
         for out_dim in output_dims:
-            # 1. ヘッドの構築 (既存と同じ)
             layers = nn.ModuleList()
             input_dim = last_shared_layer_dim
             for hidden_dim in task_specific_layers:
@@ -270,43 +270,47 @@ class FineTuningModelWithFiLM(nn.Module):
                 layers.append(FiLMLayer(label_embedding_dim, hidden_dim))
                 input_dim = hidden_dim
             
-            # 最終層 (活性化関数なし)
+            # 最終層を明確に区別するために記録しておく
             layers.append(nn.Linear(input_dim, out_dim))
             self.task_specific_heads.append(layers)
-
-            # ★2. 出力スケーラーの追加
-            # 各タスクの出力次元(out_dim)に合わせて作成
             self.output_scalers.append(LabelAwareOutputScaler(label_embedding_dim, out_dim))
 
     def forward(self, x, label_emb):
+        # 1. 共有エンコーダーとFiLM変調
         shared_features = self.shared_block(x)
         modulated_features = self.encoder_film(shared_features, label_emb)
         
         outputs = {}
-        # reg_list, head, scaler をまとめてループ
+        latent_features = {} # ★追加: 可視化用の中間出力を格納
+        
         iterator = zip(self.reg_list, self.task_specific_heads, self.output_scalers)
         
         for reg, head_layers, scaler in iterator:
             current_features = modulated_features
             
             # --- ヘッド内の処理 ---
-            for layer in head_layers:
+            # 最後の層（Linear層）を除いた全ての層を適用
+            for layer in head_layers[:-1]: 
                 if isinstance(layer, FiLMLayer):
                     current_features = layer(current_features, label_emb)
                 else:
                     current_features = layer(current_features)
             
-            # ここでの current_features は、最後の Linear を通った直後の "生の予測値"
-            raw_output = current_features
+            # ★ここが「出力直前の中間層出力」です
+            # 可視化用にデータを保存（勾配計算から切り離したい場合は .detach() を検討してください）
+            #latent_features[reg] = current_features
+            latent_features = current_features 
             
-            # --- ★改良点: 出力分布の補正 ---
-            # ラベル情報に基づいて、最終的な値のレンジを調整する
-            #final_output = scaler(raw_output, label_emb)
+            # 最後の層を適用して raw_output を得る
+            raw_output = head_layers[-1](current_features)
             
-            #outputs[reg] = final_output
-            outputs[reg] = raw_output
+            # ラベル情報を基に出力をスケーリング
+            warped_output = scaler(raw_output, label_emb)
+            outputs[reg] = warped_output
             
-        return outputs, modulated_features
+        # latent_features も一緒に返すように変更
+        #return outputs, modulated_features, latent_features
+        return outputs, latent_features
 
     def predict_with_mc_dropout(self, x, label_emb, n_samples=100):
         # (変更なし: forwardの呼び出し方は同じなのでそのまま利用可能)
