@@ -690,8 +690,6 @@ def training_FiLM(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir,
                             )
 
 
-
-
     #personal_losses = []
     personal_losses = {}
     for reg,out,fn in zip(reg_list, output_dim, reg_loss_fanction):

@@ -1,95 +1,88 @@
 import torch
 import torch.nn as nn
-import os
 
-class CNNAutoencoder(nn.Module):
-    """
-    CNNベースのオートエンコーダークラス
-    """
-    def __init__(self, input_dim, conv_layers=[(64, 3, 1, 1)], hidden_dim=128):
-        super(CNNAutoencoder, self).__init__()
+# --- 追加: 形状を自動調整する層 ---
+class Ensure3D(nn.Module):
+    def forward(self, x):
+        # 入力が (Batch, Length) の2次元の場合、(Batch, 1, Length) に変換
+        if x.dim() == 2:
+            return x.unsqueeze(1)
+        # すでに (Batch, Channel, Length) の3次元ならそのまま返す
+        return x
 
-        # --- 1. エンコーダーの定義 ---
-        # 畳み込み部分
-        self.encoder_conv = nn.Sequential()
-        in_channels = 1
-        # 畳み込み層のパラメータを保存しておくリスト
-        self.conv_params = []
+class ConvolutionalAutoencoder(nn.Module):
+    def __init__(self, input_dim, shared_layers=[32, 64, 128], latent_dim=64):
+        super(ConvolutionalAutoencoder, self).__init__()
         
-        for i, (out_channels, kernel_size, stride, padding) in enumerate(conv_layers):
-            self.encoder_conv.add_module(f"conv{i+1}", nn.Conv1d(in_channels, out_channels, kernel_size, stride, padding))
-            self.encoder_conv.add_module(f"batchnorm{i+1}", nn.BatchNorm1d(out_channels))
-            self.encoder_conv.add_module(f"relu{i+1}", nn.ReLU())
-            self.encoder_conv.add_module(f"maxpool{i+1}", nn.MaxPool1d(2))
+        self.input_dim = input_dim
+        self.latent_dim = latent_dim
+        
+        # --- 1. エンコーダー ---
+        # 最初に Ensure3D() を入れることで、どんな入力も (N, 1, L) になる
+        self.encoder_conv = nn.Sequential(Ensure3D()) 
+        
+        in_channels = 1 
+        for i, out_channels in enumerate(shared_layers):
+            self.encoder_conv.add_module(f"conv_{i+1}", nn.Conv1d(in_channels, out_channels, kernel_size=5, stride=2, padding=1))
+            self.encoder_conv.add_module(f"bn_{i+1}", nn.BatchNorm1d(out_channels))
+            self.encoder_conv.add_module(f"relu_{i+1}", nn.LeakyReLU())
             in_channels = out_channels
-            # デコーダーで逆の操作をするためにパラメータを保存
-            self.conv_params.append((out_channels, kernel_size, stride, padding))
 
-        # 全結合層への入力サイズを計算
+        # 以降、形状計算と層の定義（前回の修正内容を維持）
         with torch.no_grad():
-            dummy_input = torch.zeros(1, 1, input_dim)
+            # Ensure3D が入っているので、2次元のダミー入力でもエラーにならない
+            dummy_input = torch.zeros(1, input_dim) 
             conv_output = self.encoder_conv(dummy_input)
-            self.conv_output_shape = conv_output.shape
-            self.total_features = conv_output.numel()
-        
-        # 全結合部分 (潜在空間への写像)
+            self.conv_shape = conv_output.shape[1:] 
+            self.flatten_dim = conv_output.view(1, -1).size(1)
+
         self.encoder_fc = nn.Sequential(
-            nn.Linear(self.total_features, hidden_dim),
-            nn.ReLU()
+            nn.Flatten(),
+            nn.Linear(self.flatten_dim, latent_dim),
+            nn.BatchNorm1d(latent_dim),
+            nn.LeakyReLU(), 
+            nn.Sigmoid()
         )
 
-        # --- 2. デコーダーの定義 ---
-        # 全結合部分 (潜在空間から復元開始)
+        # --- 2. デコーダー ---
         self.decoder_fc = nn.Sequential(
-            nn.Linear(hidden_dim, self.total_features),
-            nn.ReLU()
+            nn.Linear(latent_dim, self.flatten_dim),
+            nn.LeakyReLU()
         )
-
-        # 畳み込み部分 (転置畳み込みで画像サイズを復元)
+        
         self.decoder_conv = nn.Sequential()
+        decoder_channels = shared_layers[::-1]
+        in_ch = shared_layers[-1]
         
-        # エンコーダーの畳み込み層を逆順にたどる
-        temp_in_channels = self.conv_output_shape[1] # エンコーダー最後の出力チャネル数から開始
+        for i, out_ch in enumerate(decoder_channels[1:] + [1]):
+            self.decoder_conv.add_module(f"deconv_{i+1}", nn.ConvTranspose1d(in_ch, out_ch, kernel_size=3, stride=2, padding=1, output_padding=1))
+            if i < len(decoder_channels) - 1:
+                self.decoder_conv.add_module(f"deconv_bn_{i+1}", nn.BatchNorm1d(out_ch))
+                self.decoder_conv.add_module(f"deconv_relu_{i+1}", nn.LeakyReLU())
+            in_ch = out_ch
+
+        with torch.no_grad():
+            dummy_dec_input = torch.zeros(1, *self.conv_shape)
+            dummy_dec_output = self.decoder_conv(dummy_dec_input)
+            self.reconstructed_size = dummy_dec_output.view(1, -1).size(1)
         
-        for i, (out_channels, kernel_size, stride, padding) in reversed(list(enumerate(self.conv_params))):
-            # MaxPool1d(2)の逆操作として、stride=2を持つ転置畳み込みを使う
-            # 前の層の出力チャネルが、今の層の入力チャネルになる
-            in_ch = self.conv_params[i-1][0] if i > 0 else 1
-
-            self.decoder_conv.add_module(f"deconv{i+1}", nn.ConvTranspose1d(temp_in_channels, in_ch, kernel_size, stride=2, padding=padding, output_padding=1))
-            self.decoder_conv.add_module(f"deconv_batchnorm{i+1}", nn.BatchNorm1d(in_ch))
-            self.decoder_conv.add_module(f"deconv_relu{i+1}", nn.ReLU())
-            temp_in_channels = in_ch
-            
-        # 最終出力層（活性化関数は入力データの性質に合わせる。今回は線形のまま）
-        # サイズを元に戻すための調整
-        final_deconv = nn.Conv1d(temp_in_channels, 1, kernel_size=3, stride=1, padding=1)
-        self.decoder_conv.add_module("final_deconv", final_deconv)
-
+        self.final_output_layer = nn.Linear(self.reconstructed_size, input_dim)
 
     def forward(self, x):
-        """
-        フォワードパスの定義
-        Args:
-            x (torch.Tensor): 入力データ (batch_size, 1, input_dim)
-        Returns:
-            torch.Tensor: 復元されたデータ
-            torch.Tensor: 潜在空間のベクトル
-        """
-        # --- エンコード処理 ---
-        x = x.unsqueeze(1)
-        encoded_conv = self.encoder_conv(x)
-        encoded_flat = encoded_conv.view(encoded_conv.size(0), -1)
-        latent_space = self.encoder_fc(encoded_flat)
-
-        # --- デコード処理 ---
-        decoded_flat = self.decoder_fc(latent_space)
-        decoded_conv_input = decoded_flat.view(self.conv_output_shape)
-        reconstructed_x = self.decoder_conv(decoded_conv_input)
+        # エンコーダー内部で形状調整されるので、ここでは単純に呼ぶだけ
+        encoded_features = self.encoder_fc(self.encoder_conv(x))
         
-        # 元の入力サイズと完全に一致させるためのトリミング（必要に応じて）
-        # パディングやストライドの関係で1,2要素ずれることがあるため
-        if reconstructed_x.size(2) != x.size(2):
-            reconstructed_x = reconstructed_x[:, :, :x.size(2)]
+        # デコード処理
+        dec_fc_out = self.decoder_fc(encoded_features)
+        dec_conv_input = dec_fc_out.view(-1, self.conv_shape[0], self.conv_shape[1])
+        reconstructed_conv = self.decoder_conv(dec_conv_input)
+        
+        reconstructed_flat = reconstructed_conv.view(x.size(0), -1)
+        reconstructed_x = self.final_output_layer(reconstructed_flat)
+            
+        return reconstructed_x, encoded_features
 
-        return reconstructed_x, latent_space
+    def get_encoder(self):
+        # エンコーダーを返すと、自動的に Ensure3D -> Conv... -> FC の順で実行される
+        return nn.Sequential(self.encoder_conv, self.encoder_fc)
+    

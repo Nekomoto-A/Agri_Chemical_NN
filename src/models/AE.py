@@ -38,6 +38,7 @@ class Autoencoder(nn.Module):
         #self.encoder.add_module("latent_batchnorm", nn.LayerNorm(latent_dim))
         #self.encoder.add_module("latent_relu", nn.ReLU())
         self.encoder.add_module("latent_relu", nn.LeakyReLU())
+        self.encoder.add_module("sigmoid", nn.Sigmoid())
 
         # --- 2. デコーダー ---
         self.decoder = nn.Sequential()
@@ -68,60 +69,6 @@ class Autoencoder(nn.Module):
 
     def get_encoder(self):
         return self.encoder
-
-# import torch
-# import torch.nn as nn
-
-# class Autoencoder(nn.Module):
-#     def __init__(self, input_dim, shared_layers=[1024, 512, 256, 128], latent_dim=64):
-#         super(Autoencoder, self).__init__()
-        
-#         self.input_dim = input_dim
-#         self.latent_dim = latent_dim
-        
-#         # --- 1. エンコーダー ---
-#         self.encoder = nn.Sequential()
-#         in_features = self.input_dim
-        
-#         for i, out_features in enumerate(shared_layers):
-#             self.encoder.add_module(f"shared_fc_{i+1}", nn.Linear(in_features, out_features))
-#             # 中間層は BatchNorm1d のままでも、LayerNorm に変更してもOK
-#             # ここでは安定性を重視して LayerNorm に変更する例を示します
-#             self.encoder.add_module(f"shared_layernorm_{i+1}", nn.LayerNorm(out_features))
-#             self.encoder.add_module(f"shared_relu_{i+1}", nn.ReLU())
-#             in_features = out_features
-            
-#         # ボトルネック層
-#         self.encoder.add_module("latent_layer", nn.Linear(in_features, latent_dim))
-        
-#         # 【重要】GPへの入力となる最終層に LayerNorm を適用
-#         # これにより、特徴量が平均0, 分散1に近い状態になり、GPの長さスケールが最適化しやすくなります
-#         self.encoder.add_module("latent_layernorm", nn.LayerNorm(latent_dim))
-        
-#         # GPに渡す場合、ReLUを最後に入れると値が正の範囲に限定されます。
-#         # 表現力を広げるためにあえてReLUを外す、もしくは恒等関数とする選択肢もあります。
-#         # self.encoder.add_module("latent_relu", nn.ReLU()) 
-
-#         # --- 2. デコーダー ---
-#         self.decoder = nn.Sequential()
-#         decoder_layers_config = shared_layers[::-1]
-        
-#         in_features_dec = latent_dim
-#         for i, out_features in enumerate(decoder_layers_config):
-#             self.decoder.add_module(f"decoder_fc_{i+1}", nn.Linear(in_features_dec, out_features))
-#             self.decoder.add_module(f"decoder_layernorm_{i+1}", nn.LayerNorm(out_features))
-#             self.decoder.add_module(f"decoder_relu_{i+1}", nn.ReLU())
-#             in_features_dec = out_features
-            
-#         self.decoder.add_module("decoder_output_layer", nn.Linear(in_features_dec, self.input_dim))
-
-#     def forward(self, x):
-#         encoded_features = self.encoder(x)
-#         reconstructed_x = self.decoder(encoded_features)
-#         return reconstructed_x, encoded_features
-
-#     def get_encoder(self):
-#         return self.encoder
 
 class FineTuningModel(nn.Module):
     def __init__(self, pretrained_encoder, last_shared_layer_dim, output_dims, reg_list, task_specific_layers=[64], shared_learn = True):

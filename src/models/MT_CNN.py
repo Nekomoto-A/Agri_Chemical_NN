@@ -28,7 +28,6 @@ class MTCNNModel(nn.Module):
         with torch.no_grad():
             dummy_input = torch.zeros(1, 1, input_dim)  # (バッチサイズ, チャネル数, シーケンス長)
             conv_output = self.sharedconv(dummy_input)  # 畳み込みを通した結果
-            # 修正案
             dummy_flat = conv_output.view(1, -1) # バッチサイズ1で平坦化
             total_features = dummy_flat.size(1)  # 2番目の次元（特徴量数）を取得
             #total_features = conv_output.numel()  # 出力の全要素数

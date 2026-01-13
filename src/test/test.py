@@ -727,7 +727,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
             if adapte == 'AdaBN':
                 from src.training.adapt_AE import apply_adabn
                 ae_model = apply_adabn(ae_model, X_train, device, batch_size=32)
-            else:
+            elif adapte == 'Adapter':
                 from src.training.adapt_AE import train_adapted_model
                 ae_model, _ = train_adapted_model(ae_model, X_train, X_val, device, vis_dir)
             pretrained_encoder = ae_model.get_encoder()
@@ -739,9 +739,21 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
             if adapte == 'AdaBN':
                 from src.training.adapt_AE import apply_adabn
                 ae_model = apply_adabn(ae_model, X_train, device, batch_size=32)
-            else:
+            elif adapte == 'Adapter':
                 from src.training.adapt_AE import train_adapted_model
                 ae_model, _ = train_adapted_model(ae_model, X_train, X_val, device, vis_dir)
+            pretrained_encoder = ae_model.get_encoder()
+
+        elif 'CAE' in model_name:
+            from src.models.CAE import ConvolutionalAutoencoder
+            ae_model = ConvolutionalAutoencoder(input_dim=input_dim, latent_dim=latent_dim).to(device)
+            ae_model.load_state_dict(torch.load(ae_dir))
+            if adapte == 'AdaBN':
+                from src.training.adapt_AE import apply_adabn
+                ae_model = apply_adabn(ae_model, X_train, device, batch_size=32)
+            elif adapte == 'Adapter':
+                from src.training.adapt_AE import train_adapted_model_cae
+                ae_model, _ = train_adapted_model_cae(ae_model, X_train, X_val, device, vis_dir)
             pretrained_encoder = ae_model.get_encoder()
 
         else: 
@@ -751,7 +763,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
             if adapte == 'AdaBN':
                 from src.training.adapt_AE import apply_adabn
                 ae_model = apply_adabn(ae_model, X_train, device, batch_size=32)
-            else:
+            elif adapte == 'Adapter':
                 from src.training.adapt_AE import train_adapted_model
                 ae_model, _ = train_adapted_model(ae_model, X_train, X_val, device, vis_dir)
             pretrained_encoder = ae_model.get_encoder()
@@ -768,6 +780,13 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         elif 'DKL' in model_name:
             from src.models.MT_GP import GPFineTuningModel
             model = GPFineTuningModel(pretrained_encoder=pretrained_encoder,
+                                    last_shared_layer_dim = latent_dim,
+                                    reg_list = reg_list,
+                                    shared_learn = False,
+                                    )
+        elif 'WGP' in model_name:
+            from src.models.WGP import WarpedGPFineTuningModel
+            model = WarpedGPFineTuningModel(pretrained_encoder=pretrained_encoder,
                                     last_shared_layer_dim = latent_dim,
                                     reg_list = reg_list,
                                     shared_learn = False,
@@ -994,8 +1013,8 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
     #     predicts, true, r2_results, mse_results = test_MT_gate(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir,device = device)
 
     elif "FiLM" in model_name:
+        #print('FiLMを使用します')
         from src.training.train_FiLM import training_FiLM
-        
         model_trained = training_FiLM(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model,
                                     #optimizer = optimizer, 
                                     scalers = scalers,
@@ -1050,7 +1069,26 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                                           model_trained,reg_list,scalers,
                                                           output_dir=vis_dir,
                                                           device = device, test_ids = test_ids)
+    elif 'WGP' in model_name:
+        from src.training.train_WGP import training_MT_WGP
+        model_trained = training_MT_WGP(x_tr = X_train, x_val = X_val, y_tr = Y_train, y_val = Y_val, 
+                                        model = model, reg_list = reg_list, output_dir = vis_dir, 
+                                        model_name = model_name, loss_sum = loss_sum, device = device, 
+                                        batch_size = batch_size, 
+                                        label_tr = labels_train, label_val = labels_val,
+                                        scalers = scalers, 
+                                        train_ids = train_ids,
+                                        
+                                        )
 
+        from src.test.test_WGP import test_MT_WGP
+        predicts, true, r2_results, mse_results = test_MT_WGP(X_test,Y_test, 
+                                                          model_trained,reg_list,
+                                                          #scalers,
+                                                          output_dir=vis_dir,
+                                                          device = device, 
+                                                          y_tr = Y_train, 
+                                                          test_ids = test_ids)
     else:
         #optimizer = optim.Adam(model.parameters(), lr=0.001)
         model_trained = training_MT(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, 
