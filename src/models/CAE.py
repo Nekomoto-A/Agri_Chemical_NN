@@ -55,7 +55,7 @@ class ConvolutionalAutoencoder(nn.Module):
         in_ch = shared_layers[-1]
         
         for i, out_ch in enumerate(decoder_channels[1:] + [1]):
-            self.decoder_conv.add_module(f"deconv_{i+1}", nn.ConvTranspose1d(in_ch, out_ch, kernel_size=3, stride=2, padding=1, output_padding=1))
+            self.decoder_conv.add_module(f"deconv_{i+1}", nn.ConvTranspose1d(in_ch, out_ch, kernel_size=5, stride=2, padding=1, output_padding=1))
             if i < len(decoder_channels) - 1:
                 self.decoder_conv.add_module(f"deconv_bn_{i+1}", nn.BatchNorm1d(out_ch))
                 self.decoder_conv.add_module(f"deconv_relu_{i+1}", nn.LeakyReLU())
@@ -79,7 +79,7 @@ class ConvolutionalAutoencoder(nn.Module):
         
         reconstructed_flat = reconstructed_conv.view(x.size(0), -1)
         reconstructed_x = self.final_output_layer(reconstructed_flat)
-            
+        
         return reconstructed_x, encoded_features
 
     def get_encoder(self):

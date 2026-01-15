@@ -108,6 +108,10 @@ train_MoE.py:
   patience: 10
   tr_loss: True
   load_balancing_alpha: 10
+train_GP_NUTS.py:
+  num_samples: 400
+  warmup_steps: 500
+  num_chains: 1
 test.py:
   loss_sum: 'WeightedSUM' #'SUM' #
   num_predictive_samples: 100
@@ -130,7 +134,7 @@ fold_eval.py:
   carr_calc: False
   marginal_hist: False
   k_fold: 5
-  model_name: 'DCAE_DKL'
+  model_name: 'DCAE_NUTS'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
@@ -158,7 +162,7 @@ fold_eval.py:
   embedding: 'Onehot'
   latent_dim: 32
 main.py:
-  result_dir: 'result_DCAE_DKL'
+  result_dir: 'result_DCAE_NUTS'
   reg_list: [
             ['Available.P'],
             #['pH'],

@@ -33,6 +33,7 @@ def statsmodel_train(X,Y,scalers,reg):
                 ),
             "XGB": XGBRegressor(
                 #n_estimators=1000, 
+                #objective='reg:gamma',
                 n_job = -1
                 ),
             "LGB": lgb.LGBMRegressor(

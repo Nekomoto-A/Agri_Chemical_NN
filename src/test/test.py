@@ -784,6 +784,12 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                     reg_list = reg_list,
                                     shared_learn = False,
                                     )
+        elif 'NUTS' in model_name:
+            from src.models.MT_GP_nuts import PyroGPModel, NUTSGPRunner
+            model = PyroGPModel(pretrained_encoder, latent_dim, reg_list)
+            model.to(device)
+            runner = NUTSGPRunner(model, device)
+
         elif 'WGP' in model_name:
             from src.models.WGP import WarpedGPFineTuningModel
             model = WarpedGPFineTuningModel(pretrained_encoder=pretrained_encoder,
@@ -887,7 +893,8 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
     #     #model =MT_HBM(x = X_train, location_idx = location_idx, num_locations = num_locations,num_tasks = len(reg_list))
     #     model = MultitaskModel(task_names=reg_list, num_features = input_dim)
 
-    model.to(device)
+    if 'NUTS' not in model_name:
+        model.to(device)
 
     print('学習データ数:',len(X_train))
     if X_val is not None:
@@ -1066,6 +1073,23 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
 
         from src.test.test_GP import test_MT_DKL
         predicts, true, r2_results, mse_results = test_MT_DKL(X_test,Y_test, 
+                                                          model_trained,reg_list,scalers,
+                                                          output_dir=vis_dir,
+                                                          device = device, test_ids = test_ids)
+    elif 'NUTS' in model_name:
+        from src.training.train_GP_NUTS import training_GP_NUTS
+        model_trained = training_GP_NUTS(x_tr = X_train, x_val = X_val, y_tr = Y_train, y_val = Y_val, 
+                                        runner = runner, reg_list = reg_list, output_dir = vis_dir, 
+                                        model_name = model_name, 
+                                        #loss_sum = loss_sum, 
+                                        device = device, 
+                                        #batch_size = batch_size, 
+                                        label_tr = labels_train, label_val = labels_val,
+                                        #scalers = scalers, 
+                                        #train_ids = train_ids,
+                                        )
+        from src.test.test_GP_NUTS import test_GP_NUTS
+        predicts, true, r2_results, mse_results = test_GP_NUTS(X_test,Y_test, X_train, Y_train,
                                                           model_trained,reg_list,scalers,
                                                           output_dir=vis_dir,
                                                           device = device, test_ids = test_ids)
