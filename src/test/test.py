@@ -784,6 +784,11 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                     reg_list = reg_list,
                                     shared_learn = False,
                                     )
+        elif 'WGP_NUTS' in model_name:
+            from src.models.WGP import PyroGPModel, NUTSGPRunner
+            model = PyroGPModel(pretrained_encoder, latent_dim, reg_list)
+            runner = NUTSGPRunner(model, device)
+
         elif 'NUTS' in model_name:
             from src.models.MT_GP_nuts import PyroGPModel, NUTSGPRunner
             model = PyroGPModel(pretrained_encoder, latent_dim, reg_list)
@@ -797,6 +802,10 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                     reg_list = reg_list,
                                     shared_learn = False,
                                     )
+            model.to(device)
+            model.device = device
+            model.warping_layer.device = device
+
         else:
             if 'VAE' in model_name:
                 from src.models.VAE import FineTuningModel_vae

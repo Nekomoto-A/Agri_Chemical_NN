@@ -45,7 +45,7 @@ from sklearn.metrics import mean_absolute_error
 def test_GP_NUTS(x_te, y_te, x_tr, y_tr, runner, reg_list, scalers, output_dir, device, test_ids, n_samples_mc=100):
     x_te = x_te.to(device)
 
-    #y_tr = {k: v + 1e-6 for k, v in y_tr.items()}
+    y_tr = {k: v + 1e-6 for k, v in y_tr.items()}
 
     x_tr = x_tr.to(device)
     y_tr = {k: v.to(device) for k, v in y_tr.items()}

@@ -153,3 +153,173 @@ class WarpedGPFineTuningModel(nn.Module):
                     'z_space_mean': z_mean
                 }
         return mc_outputs
+
+import torch
+import torch.nn as nn
+import pyro
+import pyro.distributions as dist
+from pyro.nn import PyroModule, PyroParam
+import pyro.contrib.gp as gp
+from pyro.infer import MCMC, NUTS
+from pyro.infer.autoguide import init_to_median
+
+class PyroGPModel(PyroModule):
+    def __init__(self, encoder, latent_dim, reg_list):
+        super().__init__()
+        self.encoder = encoder
+        # エンコーダーの重みは固定
+        for param in self.encoder.parameters():
+            param.requires_grad_(False)
+
+        self.reg_list = reg_list
+        self.latent_dim = latent_dim 
+        
+        self.kernels = nn.ModuleList()
+        for _ in reg_list:
+            kernel = gp.kernels.Matern52(
+                input_dim=latent_dim, 
+                variance=torch.tensor(1.0), 
+                lengthscale=torch.ones(latent_dim)
+            )
+            self.kernels.append(kernel)
+
+    def warping_func(self, y, a, b, c):
+        """tanhを用いたわーピング関数: g(y)"""
+        return y + a * torch.tanh(b * (y - c))
+
+    def warping_deriv(self, y, a, b, c):
+        """わーピング関数の導関数: dg/dy (ヤコビアンの計算用)"""
+        # d/dy tanh(x) = 1 - tanh^2(x)
+        return 1 + a * b * (1 - torch.tanh(b * (y - c))**2)
+
+    def model(self, x, y_dict=None):
+        with torch.no_grad():
+            features = self.encoder(x)
+        
+        num_data = features.size(0)
+        device = features.device
+
+        for i, reg in enumerate(self.reg_list):
+            # --- ハイパーパラメータのサンプリング ---
+            ls = pyro.sample(f"{reg}_ls", dist.Gamma(torch.full((self.latent_dim,), 2.0, device=device), 1.0).to_event(1))
+            var = pyro.sample(f"{reg}_var", dist.HalfNormal(torch.tensor(1.0, device=device)))
+            
+            # --- わーピング関数のパラメータサンプリング ---
+            # a: 強度(正), b: 急峻さ(正), c: 中心
+            w_a = pyro.sample(f"{reg}_w_a", dist.HalfNormal(torch.tensor(1.0, device=device)))
+            w_b = pyro.sample(f"{reg}_w_b", dist.HalfNormal(torch.tensor(1.0, device=device)))
+            w_c = pyro.sample(f"{reg}_w_c", dist.Normal(torch.tensor(0.0, device=device), 1.0))
+
+            self.kernels[i].lengthscale = ls
+            self.kernels[i].variance = var
+
+            K = self.kernels[i](features) + torch.eye(num_data, device=device) * 1e-4
+            zero_loc = features.new_zeros(num_data)
+
+            # 潜在関数 f (わーピングされた空間での値)
+            f = pyro.sample(f"{reg}_f", dist.MultivariateNormal(zero_loc, covariance_matrix=K))
+            
+            sigma = pyro.sample(f"{reg}_sigma", dist.HalfNormal(torch.tensor(1.0, device=device)))
+
+            if y_dict is not None:
+                y = y_dict[reg]
+                # 1. 観測データをわーピング空間へ写像
+                z_obs = self.warping_func(y, w_a, w_b, w_c)
+                # 2. わーピング空間での尤度 (Gaussianとして計算)
+                pyro.sample(f"{reg}_obs_z", dist.Normal(f, sigma), obs=z_obs)
+                # 3. ヤコビアン補正: log p(y) = log p(z) + log |dz/dy|
+                log_det_jacobian = torch.log(self.warping_deriv(y, w_a, w_b, w_c)).sum()
+                pyro.factor(f"{reg}_jacobian", log_det_jacobian)
+            else:
+                pyro.sample(f"{reg}_obs_z", dist.Normal(f, sigma), obs=None)
+
+class NUTSGPRunner:
+    def __init__(self, pyro_model, device):
+        self.pyro_model = pyro_model.to(device)
+        self.device = device
+        self.mcmc = None
+
+    def run_mcmc(self, x, y_dict, num_samples=500, warmup_steps=200):
+        nuts_kernel = NUTS(self.pyro_model.model, jit_compile=True, ignore_jit_warnings=True, init_strategy=init_to_median())
+        self.mcmc = MCMC(nuts_kernel, num_samples=num_samples, warmup_steps=warmup_steps, num_chains=1)
+        self.mcmc.run(x, y_dict)
+
+    def _inverse_warping(self, z_target, a, b, c, low_bound, high_bound):
+        """
+        二分法による数値的な逆変換 g^-1(z)
+        low_bound, high_bound を動的に受け取る
+        """
+        low = torch.full_like(z_target, low_bound)
+        high = torch.full_like(z_target, high_bound)
+        
+        # 20-30回程度の反復で、浮動小数点の精度限界に近い解が得られます
+        for _ in range(25): 
+            mid = (low + high) / 2
+            # g(mid) < z_target ならば、真の y はもっと右側にある
+            mask = self.pyro_model.warping_func(mid, a, b, c) < z_target
+            low = torch.where(mask, mid, low)
+            high = torch.where(mask, high, mid)
+            
+        return (low + high) / 2
+
+    def predict(self, x_new, x_train, y_train_dict, margin=5.0):
+        if self.mcmc is None:
+            raise ValueError("MCMCを先に実行してください。")
+
+        x_new, x_train = x_new.to(self.device), x_train.to(self.device)
+        samples = self.mcmc.get_samples()
+        num_samples = len(next(iter(samples.values())))
+        
+        with torch.no_grad():
+            f_new = self.pyro_model.encoder(x_new)
+            f_train = self.pyro_model.encoder(x_train)
+
+        results = {}
+        for i, reg in enumerate(self.pyro_model.reg_list):
+            y_train_orig = y_train_dict[reg].to(self.device)
+            
+            # --- 動的な範囲の設定 ---
+            # トレーニングデータの最小・最大値からマージンを持たせる
+            y_min = y_train_orig.min().item()
+            y_max = y_train_orig.max().item()
+            y_range = y_max - y_min
+            
+            # データの範囲の数倍、あるいは標準偏差に基づくマージンを設定
+            # ここではデータの値域の50%分を上下に広げています
+            low_bound = y_min - (y_range * margin) - 1.0
+            high_bound = y_max + (y_range * margin) + 1.0
+
+            y_preds = []
+
+            for s in range(num_samples):
+                # パラメータの取得
+                var = samples[f"{reg}_var"][s].to(self.device)
+                sigma = samples[f"{reg}_sigma"][s].to(self.device)
+                w_a = samples[f"{reg}_w_a"][s].to(self.device)
+                w_b = samples[f"{reg}_w_b"][s].to(self.device)
+                w_c = samples[f"{reg}_w_c"][s].to(self.device)
+                
+                # トレーニングデータをわーピング空間に変換
+                z_train = self.pyro_model.warping_func(y_train_orig, w_a, w_b, w_c).unsqueeze(-1)
+
+                # GPの推論
+                self.pyro_model.kernels[i].variance = var
+                Kff = self.pyro_model.kernels[i](f_train) + torch.eye(f_train.size(0), device=self.device) * (sigma**2 + 1e-4)
+                Kfs = self.pyro_model.kernels[i](f_train, f_new)
+                
+                L = torch.linalg.cholesky(Kff)
+                alpha = torch.cholesky_solve(z_train, L)
+                z_mu = (Kfs.T @ alpha).squeeze(-1)
+                
+                # 動的な範囲を渡して逆変換
+                y_pred_sample = self._inverse_warping(z_mu, w_a, w_b, w_c, low_bound, high_bound)
+                y_preds.append(y_pred_sample)
+
+            stacked_y_preds = torch.stack(y_preds)
+            results[reg] = {
+                'mean': stacked_y_preds.mean(dim=0),
+                'std': stacked_y_preds.std(dim=0)
+            }
+            
+        return results
+    

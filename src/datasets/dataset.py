@@ -621,6 +621,15 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
                     y_val_pp = pp.transform(y_val[reg].values.reshape(-1, 1))
                 y_test_pp = pp.transform(y_test[reg].values.reshape(-1, 1))
                 scalers[reg] = pp  # スケーラーを保存
+            elif tr == 'MM':
+                from sklearn.preprocessing import MinMaxScaler
+                pp = MinMaxScaler()
+                pp = pp.fit(y_train_split[reg].values.reshape(-1, 1))
+                y_train_split_pp = pp.transform(y_train_split[reg].values.reshape(-1, 1))
+                if isinstance(val_size, (int, float)):
+                    y_val_pp = pp.transform(y_val[reg].values.reshape(-1, 1))
+                y_test_pp = pp.transform(y_test[reg].values.reshape(-1, 1))
+                scalers[reg] = pp  # スケーラーを保存
             elif tr == 'YJ':
                 pp = PowerTransformer()
                 pp = pp.fit(y_train_split[reg].values.reshape(-1, 1))

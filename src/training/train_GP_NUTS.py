@@ -127,7 +127,11 @@ def training_GP_NUTS(x_tr, x_val, y_tr, y_val, runner, reg_list, output_dir,
     os.makedirs(train_dir, exist_ok = True)
 
     # y が 0 以上の場合の一般的な対処法
-    #y_tr = {k: v + 1e-6 for k, v in y_tr.items()}
+    y_tr = {k: v + 1e-6 for k, v in y_tr.items()}
+    for reg in reg_list:
+        print(f"{reg} min value: {y_tr[reg].min().item()}")
+        if (y_tr[reg] <= 0).any():
+            print(f"Warning: {reg} contains zero or negative values!")
 
     x_tr = x_tr.to(device)
     y_tr = {k: v.to(device) for k, v in y_tr.items()}
@@ -188,4 +192,95 @@ def training_GP_NUTS(x_tr, x_val, y_tr, y_val, runner, reg_list, output_dir,
         print(f"学習データに対する予測値を {save_path} に保存しました。")
         plt.close() # メモリ解放のためにプロットを閉じる
     
+    return runner
+
+def training_WGP_NUTS(x_tr, x_val, y_tr, y_val, runner, reg_list, output_dir, 
+                    model_name, 
+                    device, 
+                    #batch_size, #optimizer, 
+                label_tr, label_val,
+                num_samples = config['num_samples'],
+                warmup_steps = config['warmup_steps'],
+                num_chains = config['num_chains']
+                ):
+    print("--- Starting MCMC sampling (NUTS) ---")
+    train_dir = os.path.join(output_dir, 'train')
+    os.makedirs(train_dir, exist_ok=True)
+
+    # 1. データの準備とデバイス転送
+    x_tr = x_tr.to(device)
+    y_tr = {k: v.to(device) for k, v in y_tr.items()}
+
+    # yの値に関する警告（Warping関数がtanhベースの場合、極端な値は勾配消失を招く可能性があるため）
+    for reg in reg_list:
+        y_min = y_tr[reg].min().item()
+        y_max = y_tr[reg].max().item()
+        print(f"Task [{reg}] - Min: {y_min:.4f}, Max: {y_max:.4f}")
+
+    # 2. MCMCサンプリングの実行
+    # Runner内部で jit_compile=True が設定されていることを想定
+    runner.run_mcmc(
+        x_tr, 
+        y_tr, 
+        num_samples=num_samples,
+        warmup_steps=warmup_steps
+    )
+
+    print("Sampling completed.")
+
+    # 3. MCMCの収束診断結果を保存 (r_hat 等)
+    summary_path = os.path.join(output_dir, 'mcmc_summary.txt')
+    with open(summary_path, 'w') as f:
+        # runner.mcmc.summary() の出力をキャプチャしてファイルに保存
+        import sys
+        from io import StringIO
+        old_stdout = sys.stdout
+        sys.stdout = mystdout = StringIO()
+        runner.mcmc.summary()
+        sys.stdout = old_stdout
+        f.write(mystdout.getvalue())
+    print(f"MCMC summary saved to {summary_path}")
+
+    # 4. 訓練データに対する予測（事後平均）の計算
+    # WGPの場合、内部で z = g(y) の計算が行われます
+    with torch.no_grad():
+        outputs = runner.predict(x_tr, x_tr, y_tr)
+
+    # 5. 各タスクの結果を可視化
+    for r in reg_list:
+        # 正解ラベルと予測値（事後平均）の抽出
+        # y_tr[r] が (N, 1) または (N) であることを考慮
+        true_vals = y_tr[r].cpu().flatten().numpy()
+        pred_means = outputs[r]['mean'].cpu().flatten().numpy()
+        pred_stds = outputs[r]['std'].cpu().flatten().numpy() # 必要に応じて使用
+
+        # 保存ディレクトリの作成
+        save_dir = os.path.join(train_dir, r)
+        os.makedirs(save_dir, exist_ok=True)
+        save_path = os.path.join(save_dir, f'train_fit_{r}.png')
+
+        # Scatter Plot (True vs Predicted)
+        plt.figure(figsize=(8, 8))
+        
+        # 不確実性（標準偏差）をエラーバーとして表示することも可能
+        plt.errorbar(true_vals, pred_means, yerr=2*pred_stds, fmt='o', 
+                     alpha=0.4, ecolor='gray', capsize=0, label='Prediction w/ 2σ')
+        
+        # 理想的な予測ライン (y=x)
+        min_val = min(true_vals.min(), pred_means.min())
+        max_val = max(true_vals.max(), pred_means.max())
+        plt.plot([min_val, max_val], [min_val, max_val], 'r--', lw=2, label='Ideal (y=x)')
+
+        plt.title(f'Train Data Fit: {r}\n(NUTS Samples: {num_samples})')
+        plt.xlabel('True Values')
+        plt.ylabel('Predicted (Posterior Mean)')
+        plt.legend()
+        plt.grid(True, linestyle='--', alpha=0.7)
+        plt.axis('equal')
+        plt.tight_layout()
+
+        plt.savefig(save_path)
+        plt.close()
+        print(f"Fit plot for {r} saved to {save_path}")
+
     return runner
