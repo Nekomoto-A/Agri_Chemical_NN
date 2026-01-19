@@ -148,6 +148,7 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
     #                         weight_decay = 0.01
     #                         )
 
+
     optimizer = torch.optim.Adam([
         # GPレイヤー（Variational parameters + Kernel hyperparameters）
         {'params': model.gp_layers.parameters(), 'lr': lr},

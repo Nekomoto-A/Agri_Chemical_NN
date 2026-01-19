@@ -17,7 +17,8 @@ import yaml
 yaml_path = 'config.yaml'
 script_name = os.path.basename(__file__)
 with open(yaml_path, "r", encoding="utf-8") as file:
-    config = yaml.safe_load(file)[script_name]
+    #config = yaml.safe_load(file)[script_name]
+    config = yaml.safe_load(file)['train_GP.py']
 
 class MultiTaskDataset(Dataset):
     """
@@ -141,22 +142,24 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
     val_dataset = MultiTaskDataset(x_val, label_val, y_val)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
-    initialize_gp_params_from_ae(model, x_tr, device)
-
     lr = lr[0]
     # optimizer = optim.Adam(model.parameters() , lr=lr,
     #                         weight_decay = 0.01
     #                         )
 
+    # optimizer = torch.optim.Adam([
+    #     # GPレイヤー（Variational parameters + Kernel hyperparameters）
+    #     {'params': model.gp_layers.parameters(), 'lr': lr},
+        
+    #     # 尤度関数のパラメータ（観測ノイズ Noise）
+    #     {'params': model.likelihoods.parameters(), 'lr': lr},
+        
+    #     # もしエンコーダーも微調整するなら、ここに追加（今回は不要）
+    #     # {'params': model.shared_block.parameters(), 'lr': 1e-4}, 
+    # ], lr=lr)
+
     optimizer = torch.optim.Adam([
-        # GPレイヤー（Variational parameters + Kernel hyperparameters）
-        {'params': model.gp_layers.parameters(), 'lr': lr},
-        
-        # 尤度関数のパラメータ（観測ノイズ Noise）
-        {'params': model.likelihoods.parameters(), 'lr': lr},
-        
-        # もしエンコーダーも微調整するなら、ここに追加（今回は不要）
-        # {'params': model.shared_block.parameters(), 'lr': 1e-4}, 
+        {'params': model.parameters()},
     ], lr=lr)
 
         #personal_losses = []
@@ -181,12 +184,14 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
                 param.requires_grad = True
 
 
-    for likelihood in model.likelihoods:
-        likelihood.train()
+    # for likelihood in model.likelihoods:
+    #     likelihood.train()
 
     # これが False だと Optimizer に入れても更新されません
     # print('params')
     # print(model.gp_layers[0].covar_module.base_kernel.raw_lengthscale.requires_grad)
+
+    initialize_gp_params_from_ae(model, x_tr, label_tr, device)
 
     for epoch in range(epochs):
         if visualize == True:
@@ -200,6 +205,7 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
 
         running_train_losses = {key: 0.0 for key in ['SUM'] + reg_list}
         #for x_batch, y_batch in train_loader:
+        model.train()
         for x_batch, label_batch, y_batch in train_loader:
             x_batch = x_batch.to(device)
 
@@ -210,7 +216,7 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
             model.train()
             optimizer.zero_grad()
 
-            outputs, _ = model(x_batch)
+            outputs, _ = model(x_batch, label_batch)
             train_losses = {}
 
             for reg in reg_list:
@@ -264,12 +270,12 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
             running_val_losses = {key: 0.0 for key in ['SUM'] + reg_list}
             #val_loss = 0
             with torch.no_grad():
-                for x_val_batch, label_batch, y_val_batch in val_loader:
+                for x_val_batch, label_val_batch, y_val_batch in val_loader:
 
                     x_val_batch = x_val_batch.to(device)
                     #y_val_batch = y_val_batch.to(device)
                     
-                    outputs,_ = model(x_val_batch)
+                    outputs,_ = model(x_val_batch, label_val_batch)
                     val_losses = []
                     #for j in range(len(output_dim)):
 
@@ -364,7 +370,7 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
         pred = {}
         for x_tr_batch, label_tr_batch, y_tr_batch in train_loader:
             x_tr_batch = x_tr_batch.to(device)
-            outputs,_ = model(x_tr_batch)
+            outputs,_ = model(x_tr_batch, label_tr_batch)
 
             for target in reg_list:
                 # 1. 正解ラベルの格納 (変更なし)
@@ -409,3 +415,29 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
             plt.close() # メモリ解放のためにプロットを閉じる
     
     return model
+
+def initialize_gp_params_from_ae(model, x_tr, label_emb_tr, device):
+    """
+    誘導点（Inducing Points）を、実際に入力されるデータ（特徴量+ラベル）の
+    一部を使って初期化する例
+    """
+    model.eval()
+    with torch.no_grad():
+        # 1. エンコーダーから特徴量を抽出
+        features = model.shared_block(x_tr.to(device))
+        
+        # 2. 特徴量とラベル埋め込みを結合 (これがGPの実際の入力次元になる)
+        # label_emb_tr も関数に渡す必要があります
+        combined_input = torch.cat([features, label_emb_tr.to(device)], dim=-1)
+        
+        # 3. 誘導点の数（inducing_points_num）だけデータを取り出す
+        for i, gp_layer in enumerate(model.gp_layers):
+            # 現在のGP層の誘導点の数を確認
+            num_inducing = gp_layer.variational_strategy.inducing_points.size(0)
+            
+            # データの先頭から num_inducing 分だけサンプリングしてコピー
+            # (あるいはランダムサンプリング)
+            initial_inducing_points = combined_input[:num_inducing, :]
+            
+            # エラー箇所：サイズを合わせてコピー
+            gp_layer.variational_strategy.inducing_points.copy_(initial_inducing_points)

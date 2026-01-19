@@ -127,29 +127,45 @@ def training_GP_NUTS(x_tr, x_val, y_tr, y_val, runner, reg_list, output_dir,
     os.makedirs(train_dir, exist_ok = True)
 
     # y が 0 以上の場合の一般的な対処法
-    y_tr = {k: v + 1e-6 for k, v in y_tr.items()}
+    #y_tr = {k: v + 1e-6 for k, v in y_tr.items()}
     for reg in reg_list:
         print(f"{reg} min value: {y_tr[reg].min().item()}")
         if (y_tr[reg] <= 0).any():
             print(f"Warning: {reg} contains zero or negative values!")
 
     x_tr = x_tr.to(device)
+    label_tr = label_tr.to(device)
     y_tr = {k: v.to(device) for k, v in y_tr.items()}
 
-    runner.run_mcmc(
-        x_tr, 
-        y_tr, 
-        num_samples = num_samples,    # 取得するサンプル数
-        warmup_steps = warmup_steps,    # 収束までの捨てサンプル数
-        #num_chains = num_chains
-    )
+    print(model_name)
+    if 'label' in model_name:
+        #print(label_tr.shape)
+        runner.run_mcmc(
+        x = x_tr, 
+        labels_emb = label_tr, 
+        y_dict = y_tr, 
+        num_samples=num_samples,
+        warmup_steps=warmup_steps
+        )
+    else:
+        runner.run_mcmc(
+            x_tr, 
+            y_tr, 
+            num_samples=num_samples,
+            warmup_steps=warmup_steps
+        )
 
     print("Sampling completed.")
 
     true = {}
-    pred = {}
+    #pred = {}
 
-    outputs = runner.predict(x_tr, x_tr, y_tr)
+    if 'label' in model_name:
+        outputs = runner.predict(x_tr, label_tr, x_tr, label_tr, y_tr)
+    else:
+        outputs = runner.predict(x_tr, x_tr, y_tr)
+        
+
 
     for r in reg_list:
         # 1. 正解ラベルの格納 (変更なし)
@@ -219,12 +235,24 @@ def training_WGP_NUTS(x_tr, x_val, y_tr, y_val, runner, reg_list, output_dir,
 
     # 2. MCMCサンプリングの実行
     # Runner内部で jit_compile=True が設定されていることを想定
-    runner.run_mcmc(
+    if 'label' in model_name:
+        runner.run_mcmc(
         x_tr, 
-        y_tr, 
+        label_tr, 
+        y_dict=y_tr,  
         num_samples=num_samples,
         warmup_steps=warmup_steps
-    )
+        )
+    else:
+        runner.run_mcmc(
+            x_tr, 
+            y_tr, 
+            num_samples=num_samples,
+            warmup_steps=warmup_steps
+        )
+
+    # 診断の実行
+    summary_df = runner.check_diagnostics(output_dir)
 
     print("Sampling completed.")
 
@@ -243,6 +271,7 @@ def training_WGP_NUTS(x_tr, x_val, y_tr, y_val, runner, reg_list, output_dir,
 
     # 4. 訓練データに対する予測（事後平均）の計算
     # WGPの場合、内部で z = g(y) の計算が行われます
+    
     with torch.no_grad():
         outputs = runner.predict(x_tr, x_tr, y_tr)
 

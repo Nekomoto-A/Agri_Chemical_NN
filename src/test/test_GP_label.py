@@ -42,26 +42,14 @@ import matplotlib.pyplot as plt
 import os
 from sklearn.metrics import mean_absolute_error
 
-def test_GP_NUTS(x_te, y_te, x_tr, y_tr, runner, reg_list, 
-                 label_tr, label_te,
-                 model_name, scalers, output_dir, device, test_ids, n_samples_mc=100):
+def test_MT_DKL(x_te, label_te, y_te, model, reg_list, scalers, output_dir, device, test_ids, n_samples_mc=100):
     x_te = x_te.to(device)
-    label_te =label_te.to(device)
-    #y_tr = {k: v + 1e-6 for k, v in y_tr.items()}
-
-    x_tr = x_tr.to(device)
-    label_tr = label_tr.to(device)
-    y_tr = {k: v.to(device) for k, v in y_tr.items()}
-
+    label_te = label_te.to(device)
     predicts, trues = {}, {}
     
     # 1. predictメソッドを使用して平均と標準偏差を取得
     # これにより、GPの不確実性（observed_pred.stddev）が取得されます
-    if 'label' in model_name:
-        mc_results = runner.predict(x_te, label_te, x_tr, label_tr, y_tr,)
-        # 現在の呼び出し（恐らくこうなっている）
-    else:
-        mc_results = runner.predict(x_te, x_tr, y_tr)
+    mc_results = model.predict(x_te, label_te)
     
     r2_scores, mse_scores = [], []
     
@@ -80,22 +68,26 @@ def test_GP_NUTS(x_te, y_te, x_tr, y_tr, runner, reg_list,
             if reg in scalers:
                 scaler = scalers[reg]
                 # 平均値の逆変換
-                pred_mean = scaler.inverse_transform(pred_mean_tensor.cpu().detach().numpy().reshape(-1, 1))
-                true = scaler.inverse_transform(true_tensor.cpu().detach().numpy())
+                pred_mean = scaler.inverse_transform(pred_mean_tensor.cpu().numpy().reshape(-1, 1))
+                true = scaler.inverse_transform(true_tensor.cpu().numpy())
                 
                 # 標準偏差の逆変換（標準偏差はスケーリングの倍率のみを掛ける）
                 # 例: (x - mean) / scale の場合、stdには scale を掛ける
                 if hasattr(scaler, 'scale_'):
-                    pred_std = pred_std_tensor.cpu().detach().numpy().reshape(-1, 1) * scaler.scale_
+                    pred_std = pred_std_tensor.cpu().numpy().reshape(-1, 1) * scaler.scale_
                 else:
                     # スケーラーがscale_を持っていない場合のフォールバック（簡易版）
-                    pred_std = pred_std_tensor.cpu().detach().numpy().reshape(-1, 1)
+                    pred_std = pred_std_tensor.cpu().numpy().reshape(-1, 1)
             else:
-                pred_mean = pred_mean_tensor.cpu().detach().numpy().reshape(-1, 1)
-                pred_std = pred_std_tensor.cpu().detach().numpy().reshape(-1, 1)
-                true = true_tensor.cpu().detach().numpy()
+                pred_mean = pred_mean_tensor.cpu().numpy().reshape(-1, 1)
+                pred_std = pred_std_tensor.cpu().numpy().reshape(-1, 1)
+                true = true_tensor.cpu().numpy()
 
             predicts[reg], trues[reg] = pred_mean, true
+
+            # print(pred_mean.shape)
+            # print(true.shape)
+            # print(pred_std.shape)
 
             y_true = np.array(true).flatten()
             y_pred = np.array(pred_mean).flatten()
@@ -148,3 +140,118 @@ def test_GP_NUTS(x_te, y_te, x_tr, y_tr, runner, reg_list,
             mse_scores.append(mae)
 
     return predicts, trues, r2_scores, mse_scores
+
+# def test_MT_DKL(x_te, y_te, model, reg_list, scalers, output_dir, device, test_ids, n_samples_mc=100):
+
+#     x_te = x_te.to(device)
+
+#     predicts, trues = {}, {}
+#     model.eval()
+#     with torch.no_grad():
+#         outputs, _ = model(x_te)
+
+#     r2_scores, mse_scores = [], []
+
+#     # --- 3. タスクごとに結果を処理 ---
+#     for reg in reg_list:
+#         # 回帰タスクの処理
+#         if torch.is_floating_point(y_te[reg]):
+#             true_tensor = y_te[reg]
+#             pred_tensor_for_eval = outputs[reg].mean
+#             if reg in scalers:
+#                 scaler = scalers[reg]
+#                 pred = scaler.inverse_transform(pred_tensor_for_eval.cpu().detach().numpy().reshape(-1, 1))
+#                 true = scaler.inverse_transform(true_tensor.cpu().detach().numpy())
+#             else:
+#                 # スケーラーなし
+#                 pred = pred_tensor_for_eval.cpu().detach().numpy().reshape(-1, 1)
+#                 true = true_tensor.cpu().detach().numpy()
+#             #print(f'output:{pred.shape}, true:{true.shape}')
+#             predicts[reg], trues[reg] = pred, true
+#             # --- 4. 結果のプロット（エラーバー付き） ---
+
+#             # ( ... 元のコードと同じ ... )
+
+#             result_dir = os.path.join(output_dir, reg)
+
+#             os.makedirs(result_dir, exist_ok=True)
+
+           
+
+#             plt.figure(figsize=(12, 12))
+
+
+
+#             plt.scatter(true.flatten(), pred.flatten(), color='royalblue', alpha=0.7)
+
+   
+
+#             min_val = min(np.min(true), np.min(pred))
+
+#             max_val = max(np.max(true), np.max(pred))
+
+#             plt.plot([min_val, max_val], [min_val, max_val], 'r--', label='y=x')
+
+#             plt.xlabel('True Values')
+
+#             plt.ylabel('Predicted Values')
+
+#             plt.title(f'True vs Predicted for {reg}')
+
+#             plt.legend()
+
+#             plt.grid(True)
+
+
+
+#             plt.savefig(os.path.join(result_dir, 'true_predict_with_ci.png'))
+
+#             plt.close()
+
+           
+
+#             # 誤差のヒストグラム (変更なし)
+
+#             plt.figure()
+
+#             plt.hist((true - pred).flatten(), bins=30, color='skyblue', edgecolor='black')
+
+#             plt.title("Histogram of Prediction Error")
+
+#             plt.xlabel("True - Predicted")
+
+#             plt.ylabel("Frequency")
+
+#             plt.grid(True)
+
+#             plt.savefig(os.path.join(result_dir, 'loss_hist.png'))
+
+#             plt.close()
+
+
+
+#             # 評価指標の計算 (変更なし)
+
+#             corr_matrix = np.corrcoef(true.flatten(), pred.flatten())
+
+#             r2 = corr_matrix[0, 1]
+
+#             r2_scores.append(r2)
+
+           
+
+#             try:
+
+#                 mae = normalized_medae_iqr(true, pred) # カスタム指標
+
+#             except NameError:
+
+#                 print(f"WARN: normalized_medae_iqr が定義されていません。タスク {reg} の評価に MAE (mean_absolute_error) を使用します。")
+
+#                 mae = mean_absolute_error(true, pred)
+
+#             mse_scores.append(mae)
+
+
+
+#     return predicts, trues, r2_scores, mse_scores

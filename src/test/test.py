@@ -680,6 +680,9 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                   ):
 
     output_dims = []
+
+    label_dim = labels_train.shape[1]
+
     #print(Y_train)
     for reg in reg_list:
         if not Y_val:
@@ -777,6 +780,14 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                         label_embedding_dim = labels_train.shape[1],
                                         shared_learn = False,
                                         )
+        elif 'DKL_label' in model_name:
+            from src.models.MT_GP_label import GPFineTuningModel
+            model = GPFineTuningModel(pretrained_encoder = pretrained_encoder, 
+                                 last_shared_layer_dim = latent_dim, 
+                                 label_emb_dim = label_dim, 
+                                 reg_list = reg_list, 
+                                 shared_learn = False)
+
         elif 'DKL' in model_name:
             from src.models.MT_GP import GPFineTuningModel
             model = GPFineTuningModel(pretrained_encoder=pretrained_encoder,
@@ -787,6 +798,13 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         elif 'WGP_NUTS' in model_name:
             from src.models.WGP import PyroGPModel, NUTSGPRunner
             model = PyroGPModel(pretrained_encoder, latent_dim, reg_list)
+            runner = NUTSGPRunner(model, device)
+        
+        elif 'NUTS_label' in model_name:
+            print(latent_dim)
+            print(label_dim)
+            from src.models.MT_GP_nuts_label import PyroGPModel, NUTSGPRunner
+            model = PyroGPModel(encoder = pretrained_encoder, latent_dim = latent_dim, label_dim = label_dim, reg_list = reg_list)
             runner = NUTSGPRunner(model, device)
 
         elif 'NUTS' in model_name:
@@ -1035,6 +1053,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                     #optimizer = optimizer, 
                                     scalers = scalers,
                                     train_ids = train_ids,
+                                    vis_label = labels_train_original, 
                                     reg_loss_fanction = reg_loss_fanction,
                                     output_dim=output_dims,
                                     reg_list = reg_list, output_dir = vis_dir, 
@@ -1068,6 +1087,23 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
 
         predicts, true, r2_results, mse_results = test_MT(X_test,Y_test, X_val, Y_val, 
                                                           model_trained,reg_list,scalers,output_dir=vis_dir,device = device, test_ids = test_ids)
+    elif 'DKL_label' in model_name:
+        from src.training.train_GP_label import training_MT_DKL
+        model_trained = training_MT_DKL(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, 
+                                        model = model, reg_list = reg_list, output_dir = vis_dir, 
+                                        model_name = model_name, loss_sum = loss_sum, device = device, 
+                                        batch_size = batch_size, 
+                                        label_tr = labels_train, 
+                                        label_val = labels_val,
+                                        scalers = scalers, 
+                                        train_ids = train_ids, 
+                                    )
+        from src.test.test_GP_label import test_MT_DKL
+        predicts, true, r2_results, mse_results = test_MT_DKL(X_test,labels_test, Y_test, 
+                                                                model_trained,reg_list,scalers,
+                                                                output_dir=vis_dir,
+                                                                device = device, test_ids = test_ids
+                                                                )
     
     elif 'DKL' in model_name:
         from src.training.train_GP import training_MT_DKL
@@ -1099,7 +1135,9 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                         )
         from src.test.test_GP_NUTS import test_GP_NUTS
         predicts, true, r2_results, mse_results = test_GP_NUTS(X_test,Y_test, X_train, Y_train,
-                                                          model_trained,reg_list,scalers,
+                                                          model_trained,reg_list, 
+                                                          labels_train, labels_test,
+                                                          model_name, scalers,
                                                           output_dir=vis_dir,
                                                           device = device, test_ids = test_ids)
     elif 'WGP' in model_name:
@@ -1129,6 +1167,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                     #optimizer = optimizer, 
                                     scalers = scalers,
                                     train_ids = train_ids,
+                                    vis_label = labels_train_original, 
                                     reg_loss_fanction = reg_loss_fanction,
                                     output_dim=output_dims,
                                     reg_list = reg_list, output_dir = vis_dir, 

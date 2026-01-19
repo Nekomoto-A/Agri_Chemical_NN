@@ -74,6 +74,9 @@
 
 from pyro.infer import MCMC, NUTS
 from pyro.infer.autoguide import init_to_median
+import arviz as az
+import matplotlib.pyplot as plt
+import os
 
 class NUTSGPRunner:
     def __init__(self, pyro_model, device):
@@ -178,6 +181,39 @@ class NUTSGPRunner:
             # }
             
         return results
+    def check_diagnostics(self, output_dir):
+        """
+        MCMCサンプリングの収束診断を実行
+        """
+        if self.mcmc is None:
+            raise ValueError("MCMCを実行した後に呼び出してください。")
+
+        # PyroのMCMCオブジェクトをArviZ形式に変換
+        # coords や dims を設定すると、多次元パラメータ(w_aなど)の管理が楽になります
+        data = az.from_pyro(self.mcmc)
+
+        # 1. 統計量の表示 (R-hat, ESSなど)
+        print("--- MCMC Summary Statistics ---")
+        summary = az.summary(data, round_to=3)
+        print(summary)
+
+        # 2. トレースプロットの表示
+        # 特定のパラメータ（カーネルの分散、わーピング強度など）のみを表示
+        # var_names で絞り込まないと、潜在関数fの全次元が表示されてしまうため注意
+        target_vars = [k for k in summary.index if ("_var" in k or "_ls" in k or "_w_" in k or "_sigma" in k)]
+        
+        print("\nPlotting Trace Plots...")
+        az.plot_trace(data, var_names=target_vars)
+        plt.tight_layout()
+        plt.show()
+
+        # 3. 事後分布のプロット
+        print("\nPlotting Posterior Distributions...")
+        az.plot_posterior(data, var_names=target_vars)
+        plt.save(os.path.join(output_dir, "posterior_distributions.png"))
+        #plt.show()
+
+        return summary
     # def predict(self, x_new, x_train, y_train_dict):
     #     if self.mcmc is None:
     #         raise ValueError("MCMCを先に実行してください。")

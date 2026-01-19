@@ -164,33 +164,40 @@ from pyro.infer import MCMC, NUTS
 from pyro.infer.autoguide import init_to_median
 
 class PyroGPModel(PyroModule):
-    def __init__(self, encoder, latent_dim, reg_list):
+    def __init__(self, encoder, latent_dim, reg_list, num_warping_units=2):
         super().__init__()
         self.encoder = encoder
-        # エンコーダーの重みは固定
         for param in self.encoder.parameters():
             param.requires_grad_(False)
 
         self.reg_list = reg_list
         self.latent_dim = latent_dim 
+        self.num_warping_units = num_warping_units # tanhの数
         
-        self.kernels = nn.ModuleList()
-        for _ in reg_list:
-            kernel = gp.kernels.Matern52(
-                input_dim=latent_dim, 
-                variance=torch.tensor(1.0), 
-                lengthscale=torch.ones(latent_dim)
-            )
-            self.kernels.append(kernel)
+        self.kernels = nn.ModuleList([
+            gp.kernels.Matern52(input_dim=latent_dim, variance=torch.tensor(1.0), lengthscale=torch.ones(latent_dim))
+            for _ in reg_list
+        ])
 
     def warping_func(self, y, a, b, c):
-        """tanhを用いたわーピング関数: g(y)"""
-        return y + a * torch.tanh(b * (y - c))
+        """複数のtanhの合計によるわーピング: g(y) = y + Σ a*tanh(b(y-c))"""
+        # y: (N,) or (N, 1)
+        # a, b, c: (K,)
+        if y.dim() == 1:
+            y = y.unsqueeze(-1) # (N, 1)
+        
+        # broadcastingを利用して (N, K) の行列を作り、最後にKの次元で和を取る
+        warped = y + (a * torch.tanh(b * (y - c))).sum(dim=-1, keepdim=True)
+        return warped.squeeze(-1)
 
     def warping_deriv(self, y, a, b, c):
-        """わーピング関数の導関数: dg/dy (ヤコビアンの計算用)"""
+        """導関数の合計: dg/dy = 1 + Σ a*b*(1 - tanh^2(...))"""
+        if y.dim() == 1:
+            y = y.unsqueeze(-1)
+        
         # d/dy tanh(x) = 1 - tanh^2(x)
-        return 1 + a * b * (1 - torch.tanh(b * (y - c))**2)
+        deriv = 1 + (a * b * (1 - torch.tanh(b * (y - c))**2)).sum(dim=-1, keepdim=True)
+        return deriv.squeeze(-1)
 
     def model(self, x, y_dict=None):
         with torch.no_grad():
@@ -200,38 +207,35 @@ class PyroGPModel(PyroModule):
         device = features.device
 
         for i, reg in enumerate(self.reg_list):
-            # --- ハイパーパラメータのサンプリング ---
+            # GPハイパーパラメータ
             ls = pyro.sample(f"{reg}_ls", dist.Gamma(torch.full((self.latent_dim,), 2.0, device=device), 1.0).to_event(1))
             var = pyro.sample(f"{reg}_var", dist.HalfNormal(torch.tensor(1.0, device=device)))
             
-            # --- わーピング関数のパラメータサンプリング ---
-            # a: 強度(正), b: 急峻さ(正), c: 中心
-            w_a = pyro.sample(f"{reg}_w_a", dist.HalfNormal(torch.tensor(1.0, device=device)))
-            w_b = pyro.sample(f"{reg}_w_b", dist.HalfNormal(torch.tensor(1.0, device=device)))
-            w_c = pyro.sample(f"{reg}_w_c", dist.Normal(torch.tensor(0.0, device=device), 1.0))
+            # --- 複数のわーピングパラメータをサンプリング ---
+            # (num_warping_units,) の形状でサンプリング
+            w_a = pyro.sample(f"{reg}_w_a", dist.HalfNormal(torch.full((self.num_warping_units,), 1.0, device=device)).to_event(1))
+            w_b = pyro.sample(f"{reg}_w_b", dist.HalfNormal(torch.full((self.num_warping_units,), 1.0, device=device)).to_event(1))
+            w_c = pyro.sample(f"{reg}_w_c", dist.Normal(torch.zeros(self.num_warping_units, device=device), 1.0).to_event(1))
 
             self.kernels[i].lengthscale = ls
             self.kernels[i].variance = var
 
             K = self.kernels[i](features) + torch.eye(num_data, device=device) * 1e-4
-            zero_loc = features.new_zeros(num_data)
-
-            # 潜在関数 f (わーピングされた空間での値)
-            f = pyro.sample(f"{reg}_f", dist.MultivariateNormal(zero_loc, covariance_matrix=K))
-            
+            f = pyro.sample(f"{reg}_f", dist.MultivariateNormal(torch.zeros(num_data, device=device), covariance_matrix=K))
             sigma = pyro.sample(f"{reg}_sigma", dist.HalfNormal(torch.tensor(1.0, device=device)))
 
             if y_dict is not None:
                 y = y_dict[reg]
-                # 1. 観測データをわーピング空間へ写像
                 z_obs = self.warping_func(y, w_a, w_b, w_c)
-                # 2. わーピング空間での尤度 (Gaussianとして計算)
                 pyro.sample(f"{reg}_obs_z", dist.Normal(f, sigma), obs=z_obs)
-                # 3. ヤコビアン補正: log p(y) = log p(z) + log |dz/dy|
+                
+                # ヤコビアン補正
                 log_det_jacobian = torch.log(self.warping_deriv(y, w_a, w_b, w_c)).sum()
                 pyro.factor(f"{reg}_jacobian", log_det_jacobian)
-            else:
-                pyro.sample(f"{reg}_obs_z", dist.Normal(f, sigma), obs=None)
+
+import arviz as az
+import matplotlib.pyplot as plt
+import os
 
 class NUTSGPRunner:
     def __init__(self, pyro_model, device):
@@ -322,4 +326,36 @@ class NUTSGPRunner:
             }
             
         return results
-    
+    def check_diagnostics(self, output_dir):
+        """
+        MCMCサンプリングの収束診断を実行
+        """
+        if self.mcmc is None:
+            raise ValueError("MCMCを実行した後に呼び出してください。")
+
+        # PyroのMCMCオブジェクトをArviZ形式に変換
+        # coords や dims を設定すると、多次元パラメータ(w_aなど)の管理が楽になります
+        data = az.from_pyro(self.mcmc)
+
+        # 1. 統計量の表示 (R-hat, ESSなど)
+        print("--- MCMC Summary Statistics ---")
+        summary = az.summary(data, round_to=3)
+        print(summary)
+
+        # 2. トレースプロットの表示
+        # 特定のパラメータ（カーネルの分散、わーピング強度など）のみを表示
+        # var_names で絞り込まないと、潜在関数fの全次元が表示されてしまうため注意
+        target_vars = [k for k in summary.index if ("_var" in k or "_ls" in k or "_w_" in k or "_sigma" in k)]
+        
+        print("\nPlotting Trace Plots...")
+        az.plot_trace(data, var_names=target_vars)
+        plt.tight_layout()
+        plt.show()
+
+        # 3. 事後分布のプロット
+        print("\nPlotting Posterior Distributions...")
+        az.plot_posterior(data, var_names=target_vars)
+        plt.save(os.path.join(output_dir, "posterior_distributions.png"))
+        #plt.show()
+
+        return summary

@@ -221,6 +221,7 @@ def fold_evaluate(reg_list, output_dir, device,
                   labels = config['labels'],
                   embedding = config['embedding'], 
                   latent_dim = config['latent_dim'], 
+                  embedding_size = config['embedding_size']
                   ):
     #if feature_selection_all:
     #   output_dir = os.path.join(fsdir, output_dir)
@@ -330,12 +331,31 @@ def fold_evaluate(reg_list, output_dir, device,
         ids.append(test_ids)
         
         input_dim = X_train_tensor.shape[1]
-
+        
         #test_df = pd.DataFrame(index=test_ids)
 
         if embedding == 'Onehot':
             from src.datasets.emb_fns import onehot_encode_and_split
             label_train_embedded, label_val_embedded, label_test_embedded = onehot_encode_and_split(label_train_tensor, label_val_tensor, label_test_tensor,)
+
+        elif embedding == 'Word2Vec':
+            from src.datasets.emb_fns import create_w2v_models, w2v_encode_and_split
+            emb_models = create_w2v_models(label_encoders, vector_size = embedding_size)
+            label_train_embedded, label_val_embedded, label_test_embedded = w2v_encode_and_split(label_train_tensor, 
+                                                                                                 label_val_tensor, 
+                                                                                                 label_test_tensor, 
+                                                                                                 label_encoders, 
+                                                                                                 emb_models,
+                                                                                                )
+        
+        from src.datasets.emb_fns import save_combined_data_to_csv
+        save_combined_data_to_csv(filepath = 'emb_labels.csv', 
+                                  original_labels = label_train_tensor, 
+                                  embedded_tensor = label_train_embedded, 
+                                  output_dir = fold_dir, 
+                                  target_vars_dict = Y_train_tensor, 
+                                  label_encoders = label_encoders
+                                  )
 
         if len(reg_list) > 1:
             vis_dir_main = os.path.join(fold_dir, method)

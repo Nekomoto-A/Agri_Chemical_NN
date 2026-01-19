@@ -109,8 +109,8 @@ train_MoE.py:
   tr_loss: True
   load_balancing_alpha: 10
 train_GP_NUTS.py:
-  num_samples: 400
-  warmup_steps: 500
+  num_samples: 200
+  warmup_steps: 300
   num_chains: 1
 test.py:
   loss_sum: 'WeightedSUM' #'SUM' #
@@ -134,7 +134,7 @@ fold_eval.py:
   carr_calc: False
   marginal_hist: False
   k_fold: 5
-  model_name: 'DCAE_NUTS'
+  model_name: 'DCAE_DKL_label'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
@@ -156,14 +156,16 @@ fold_eval.py:
   feature_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\taxon_data\lv6.csv' #C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\lv6.csv #
   target_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\chem_data.xlsx' #C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\chem_data.xlsx #
   data_inte: False
-  transformer: [None, None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
-  reg_loss_fanction: ['mae', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
+  transformer: ['YJ', None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
+  reg_loss_fanction: ['mse', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
   labels: ['crop'] #['experimental_purpose'] #
-  embedding: 'Onehot'
-  latent_dim: 32
+  embedding: 'Word2Vec'
+  embedding_size: 10
+  latent_dim: 20
 main.py:
-  result_dir: 'result_DCAE_NUTS'
+  result_dir: 'result_DKL_label'
   reg_list: [
+            [CEC],
             ['Available.P'],
             #['pH'],
             #['Available.P', 'crop'], #, 'pH'
@@ -175,8 +177,6 @@ main.py:
             #['NH4.N'],
             #['pH',CEC',],
             ['Exchangeable.K'],
-            
-            [CEC],
             #]
             #['pH', 'Available.P'],
             #['pH', 'Available.P', 'EC', 'NH4.N', 'NO3.N', 'Exchangeable.K'],

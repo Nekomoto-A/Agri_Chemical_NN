@@ -834,6 +834,7 @@ class MAPELoss(nn.Module):
 def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, model_name,loss_sum, device, batch_size, #optimizer, 
                 scalers, 
                 train_ids, 
+                vis_label, 
                 reg_loss_fanction,
                 label_encoders = None, #scheduler = None, 
                 epochs = config['epochs'], patience = config['patience'],early_stopping = config['early_stopping'],
@@ -1213,6 +1214,20 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
         plt.savefig(train_loss_history_dir)
         plt.close()
 
+    vis_dataset = CustomDatasetAdv(x_tr, y_tr)
+    vis_loader = DataLoader(vis_dataset, batch_size=batch_size, 
+                            shuffle=True,
+                            #sampler=sampler
+                            )
+    visualize_and_save_tsne(model, vis_loader, device, train_dir, perplexity=30, n_iter=1000)
+
+    label_dataset = CustomDatasetAdv(x_tr, vis_label)
+    label_loader = DataLoader(label_dataset, batch_size=batch_size, 
+                            shuffle=True,
+                            #sampler=sampler
+                            )
+    visualize_and_save_tsne(model, label_loader, device, train_dir, perplexity=30, n_iter=1000)
+
     with torch.no_grad():
         true = {}
         pred = {}
@@ -1294,3 +1309,98 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
             plt.close() # メモリ解放のためにプロットを閉じる
     
     return model
+
+
+import os
+import torch
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.manifold import TSNE
+
+def visualize_and_save_tsne(model, dataloader, device, output_dir, perplexity=30, n_iter=1000):
+    """
+    モデルの中間出力をt-SNEで可視化する。
+    model.reg_listに関わらず、データ(batch_targets)に含まれる全項目をプロット対象とする。
+    """
+    model.eval()
+    os.makedirs(output_dir, exist_ok=True)
+    
+    all_latent = []
+    all_targets = {} # 動的にキーを格納するための辞書
+    
+    # 1. データの収集
+    print("Extracting features and targets...")
+    with torch.no_grad():
+        for batch_x, batch_targets, _, _ in dataloader:
+            batch_x = batch_x.to(device)
+            # batch_label_emb = batch_label_emb.to(device)
+            
+            # 特徴量の抽出
+            #_, latent_features = model(batch_x, batch_label_emb)
+            _, latent_features = model(batch_x)
+            all_latent.append(latent_features.cpu().numpy())
+            
+            # batch_targetsに含まれるすべてのキーについてデータを収集
+            for key, value in batch_targets.items():
+                if key not in all_targets:
+                    all_targets[key] = []
+                all_targets[key].append(value.cpu().numpy())
+                
+    # データを結合
+    latent_array = np.concatenate(all_latent, axis=0)
+    for key in all_targets.keys():
+        all_targets[key] = np.concatenate(all_targets[key], axis=0).flatten()
+
+    # 2. t-SNEによる次元削減
+    print(f"Running t-SNE for {latent_array.shape[0]} samples...")
+    tsne = TSNE(
+        n_components=2, 
+        perplexity=perplexity, 
+        #n_iter=n_iter, 
+        random_state=42,
+        init='pca',
+        learning_rate='auto'
+    )
+    tsne_results = tsne.fit_transform(latent_array)
+
+    # 3. 収集されたすべてのターゲット（キー）ごとにプロットを作成
+    print(f"Generating plots for: {list(all_targets.keys())}")
+    for key, target_values in all_targets.items():
+        plt.figure(figsize=(12, 8))
+        
+        # 判定ロジック：ユニーク数またはデータ型で離散/連続を判断
+        unique_values = np.unique(target_values)
+        num_unique = len(unique_values)
+        is_discrete = np.issubdtype(target_values.dtype, np.integer) or num_unique <= 20
+
+        if is_discrete:
+            # 離散値：凡例を表示
+            sns.scatterplot(
+                x=tsne_results[:, 0], y=tsne_results[:, 1],
+                hue=target_values, palette="tab10", # 離散値に適したパレット
+                legend='full', alpha=0.8, edgecolor='w', linewidth=0.5
+            )
+            plt.legend(title=key, bbox_to_anchor=(1.05, 1), loc='upper left')
+        else:
+            # 連続値：カラーバーを表示
+            sc = plt.scatter(
+                tsne_results[:, 0], tsne_results[:, 1],
+                c=target_values, cmap="viridis",
+                alpha=0.8, edgecolors='w', linewidths=0.5
+            )
+            cbar = plt.colorbar(sc)
+            cbar.set_label(f'{key} value', rotation=270, labelpad=15)
+
+        plt.title(f't-SNE visualization - Variable: {key}')
+        plt.xlabel('t-SNE dimension 1')
+        plt.ylabel('t-SNE dimension 2')
+        plt.grid(True, linestyle='--', alpha=0.5)
+        
+        # 保存
+        save_path = os.path.join(output_dir, f'tsne_{key}.png')
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"Saved: {save_path}")
+
+    print("All visualizations completed successfully.")

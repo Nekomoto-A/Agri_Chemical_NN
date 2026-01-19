@@ -45,8 +45,8 @@ class GPFineTuningModel(nn.Module):
         for _ in reg_list:
             # 各タスクにGPレイヤーとガウス尤度を割り当て
             self.gp_layers.append(GPRegressionLayer(input_dim=last_shared_layer_dim))
-            #self.likelihoods.append(gpytorch.likelihoods.GaussianLikelihood())
-            self.likelihoods.append(gpytorch.likelihoods.StudentTLikelihood())
+            self.likelihoods.append(gpytorch.likelihoods.GaussianLikelihood())
+            #self.likelihoods.append(gpytorch.likelihoods.StudentTLikelihood())
 
     def forward(self, x):
         # 1. 特徴抽出
