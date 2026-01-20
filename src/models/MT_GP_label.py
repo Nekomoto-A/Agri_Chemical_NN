@@ -28,14 +28,16 @@ class GPRegressionLayer(ApproximateGP):
         # 2. 積カーネルの定義
         # 特徴量用のカーネル (0 ~ feature_dim-1 番目の次元を使用)
         self.feature_covar_module = gpytorch.kernels.ScaleKernel(
-            gpytorch.kernels.MaternKernel(nu=2.5, ard_num_dims=feature_dim, active_dims=torch.arange(feature_dim))
-        )
-
-        # ラベル埋め込み用のカーネル (feature_dim ~ 最後 までの次元を使用)
-        self.label_covar_module = gpytorch.kernels.ScaleKernel(
-            gpytorch.kernels.RBFKernel(ard_num_dims=label_dim, active_dims=torch.arange(feature_dim, total_dim))
+            gpytorch.kernels.MaternKernel(nu=2.5, ard_num_dims=feature_dim, active_dims=torch.arange(feature_dim)),
+            outputscale_prior=gpytorch.priors.LogNormalPrior(loc=2, scale=0.3)
         )
         
+        # ラベル埋め込み用のカーネル (feature_dim ~ 最後 までの次元を使用)
+        self.label_covar_module = gpytorch.kernels.ScaleKernel(
+            gpytorch.kernels.RBFKernel(ard_num_dims=label_dim, active_dims=torch.arange(feature_dim, total_dim)),
+            outputscale_prior=gpytorch.priors.LogNormalPrior(loc=2, scale=0.3)
+        )
+
         # カーネルの積
         self.covar_module = self.feature_covar_module * self.label_covar_module
 
@@ -50,15 +52,20 @@ class GPRegressionLayer(ApproximateGP):
         
         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
 
+
 # --- 2. メインのファインチューニングモデル ---
+#from gpytorch.likelihoods import HeteroscedasticMLPLikelihood
+
 class GPFineTuningModel(nn.Module):
     def __init__(self, pretrained_encoder, last_shared_layer_dim, label_emb_dim, reg_list, shared_learn=True):
         super(GPFineTuningModel, self).__init__()
         self.reg_list = reg_list
         self.shared_block = pretrained_encoder
         self.label_emb_dim = label_emb_dim
+        
+        # 結合入力の次元
+        self.total_dim = last_shared_layer_dim + label_emb_dim
 
-        # エンコーダーの重み固定/解除
         for param in self.shared_block.parameters():
             param.requires_grad = shared_learn
         
@@ -66,30 +73,37 @@ class GPFineTuningModel(nn.Module):
         self.likelihoods = nn.ModuleList()
         
         for _ in reg_list:
-            # GPレイヤーにエンコーダー出力次元とラベル埋め込み次元を渡す
-            self.gp_layers.append(GPRegressionLayer(
+            # 1. GPレイヤー
+            gp_layer = GPRegressionLayer(
                 feature_dim=last_shared_layer_dim, 
                 label_dim=label_emb_dim
-            ))
-            self.likelihoods.append(gpytorch.likelihoods.GaussianLikelihood())
+            )
+            self.gp_layers.append(gp_layer)
+            
+            # 2. 不均一分散 Likelihood の設定
+            # noise_model は入力次元を受け取り、ノイズの強さを出力するMLP
+            # 内部で log_noise を予測するため、出力次元は 1 です
+            noise_model = nn.Sequential(
+                nn.Linear(self.total_dim, 8),
+                nn.ReLU(),
+                nn.Linear(8, 1)
+            )
+            self.likelihoods.append(HeteroscedasticMLPLikelihood(noise_model=noise_model))
 
+    # forward と predict も修正が必要（後述）
     def forward(self, x, label_emb):
-        # 1. 特徴抽出
         shared_features = self.shared_block(x)
-        
-        # --- 修正ポイント ---
-        # label_emb を shared_features と同じデバイス（GPU等）に移動させる
         label_emb = label_emb.to(shared_features.device)
-        # ------------------
-        
-        # 2. 特徴量とラベル埋め込みを結合
         combined_input = torch.cat([shared_features, label_emb], dim=-1)
         
         outputs = {}
         for i, reg in enumerate(self.reg_list):
-            outputs[reg] = self.gp_layers[i](combined_input)
+            # GPからの潜在分布を取得
+            latent_dist = self.gp_layers[i](combined_input)
+            # outputs には潜在分布を格納（Loss計算時に使用）
+            outputs[reg] = latent_dist
             
-        return outputs, shared_features
+        return outputs, shared_features, combined_input # Loss計算時に入力も必要になるため返す
 
     def predict(self, x, label_emb):
         self.eval()
@@ -102,9 +116,10 @@ class GPFineTuningModel(nn.Module):
             combined_input = torch.cat([shared_features, label_emb], dim=-1)
             
             for i, reg in enumerate(self.reg_list):
-                observed_pred = self.likelihoods[i](self.gp_layers[i](combined_input))
+                # Likelihoodに潜在分布と入力を両方渡す
+                latent_dist = self.gp_layers[i](combined_input)
+                observed_pred = self.likelihoods[i](latent_dist, combined_input=combined_input)
                 
-                # ApproximateGPの場合、通常1つの多変量正規分布が返ります
                 mc_outputs[reg] = {
                     'mean': observed_pred.mean,
                     'std': observed_pred.stddev
@@ -124,3 +139,59 @@ class DeepMean(gpytorch.means.Mean):
     def forward(self, x):
         return self.mlp(x).squeeze(-1)
 
+import math
+import torch
+import torch.nn as nn
+import gpytorch
+from gpytorch.likelihoods import Likelihood
+from gpytorch.distributions import MultivariateNormal
+
+class HeteroscedasticMLPLikelihood(Likelihood):
+    def __init__(self, noise_model):
+        super().__init__()
+        self.noise_model = noise_model
+
+    def forward(self, function_samples, combined_input, **kwargs):
+        # 予測分布のサンプリング等に使用
+        log_noise = self.noise_model(combined_input).squeeze(-1)
+        return torch.distributions.Normal(function_samples, torch.exp(log_noise).sqrt())
+
+    def expected_log_prob(self, target, function_dist, combined_input, **kwargs):
+        """
+        GPyTorchのELBO計算時に呼び出されるメソッド。
+        ガウス分布の期待対数尤度を、combined_inputを用いて計算します。
+        """
+        # GPの潜在分布 q(f) の平均と分散を取得
+        mean = function_dist.mean
+        variance = function_dist.variance
+        
+        # MLPからその地点の対数ノイズ（対数分散）を予測
+        # log_noise = self.noise_model(combined_input).squeeze(-1)
+        # noise = torch.exp(log_noise) # 分散 σ^2
+        raw = self.noise_model(combined_input)
+        noise = 0.1 + 0.9 * torch.sigmoid(raw).squeeze(-1) # 0.1〜1.0 の範囲に制限
+
+
+        # ガウス対数尤度の期待値の計算式 (Analytic form):
+        # E[log p(y|f)] = -0.5 * (log(2*pi*σ^2) + (y-m)^2/σ^2 + v/σ^2)
+        res = -0.5 * (torch.log(2 * math.pi * noise) + (target - mean)**2 / noise + variance / noise)
+        return res
+
+    def __call__(self, latent_dist, combined_input, **kwargs):
+        """
+        model.predict 等で呼び出された際の挙動を定義
+        """
+        if not isinstance(latent_dist, MultivariateNormal):
+            return super().__call__(latent_dist, combined_input=combined_input, **kwargs)
+            
+        latent_mean = latent_dist.mean
+        latent_covar = latent_dist.covariance_matrix
+        
+        log_noise = self.noise_model(combined_input).squeeze(-1)
+        noise = torch.exp(log_noise)
+        #raw = self.noise_model(combined_input)
+        #noise = 0.1 + 0.9 * torch.sigmoid(raw).squeeze(-1) # 0.1〜1.0 の範囲に制限
+        
+        # 共分散行列の対角成分にノイズ（分散）を加える
+        return MultivariateNormal(latent_mean, latent_covar + torch.diag_embed(noise))
+    

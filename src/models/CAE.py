@@ -41,7 +41,7 @@ class ConvolutionalAutoencoder(nn.Module):
             nn.Linear(self.flatten_dim, latent_dim),
             nn.BatchNorm1d(latent_dim),
             nn.LeakyReLU(), 
-            #nn.Sigmoid()
+            nn.Sigmoid()
         )
 
         # --- 2. デコーダー ---

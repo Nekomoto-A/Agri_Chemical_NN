@@ -216,7 +216,7 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
             model.train()
             optimizer.zero_grad()
 
-            outputs, _ = model(x_batch, label_batch)
+            outputs, _, combined_input = model(x_batch, label_batch)
             train_losses = {}
 
             for reg in reg_list:
@@ -226,7 +226,8 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
 
                 #loss = -personal_losses[reg](output, true_tr).sum()
                 #loss = -personal_losses[reg](output, true_tr).mean()
-                loss = -personal_losses[reg](output, true_tr.squeeze(-1)).mean()
+                #loss = -personal_losses[reg](output, true_tr.squeeze(-1), combined_input=combined_input).mean()
+                loss = -personal_losses[reg](output, true_tr.squeeze(-1), combined_input=combined_input).mean()
                 train_losses[reg] = loss
   
                 running_train_losses[reg] += loss.item()
@@ -275,7 +276,7 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
                     x_val_batch = x_val_batch.to(device)
                     #y_val_batch = y_val_batch.to(device)
                     
-                    outputs,_ = model(x_val_batch, label_val_batch)
+                    outputs, _, combined_input = model(x_val_batch, label_val_batch)
                     val_losses = []
                     #for j in range(len(output_dim)):
 
@@ -284,7 +285,8 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
 
                         #loss = -personal_losses[reg](outputs[reg], true_val).sum()
                         #loss = -personal_losses[reg](outputs[reg], true_val).mean()
-                        loss = -personal_losses[reg](outputs[reg], true_val.squeeze(-1)).mean()
+                        #loss = -personal_losses[reg](outputs[reg], true_val.squeeze(-1)).mean()
+                        loss = -personal_losses[reg](outputs[reg], true_val.squeeze(-1), combined_input=combined_input).mean()
 
                         #val_loss_history.setdefault(reg, []).append(loss.item())
                         running_val_losses[reg] += loss.item()
@@ -370,7 +372,7 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
         pred = {}
         for x_tr_batch, label_tr_batch, y_tr_batch in train_loader:
             x_tr_batch = x_tr_batch.to(device)
-            outputs,_ = model(x_tr_batch, label_tr_batch)
+            outputs, _, _ = model(x_tr_batch, label_tr_batch)
 
             for target in reg_list:
                 # 1. 正解ラベルの格納 (変更なし)
@@ -390,6 +392,10 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
 
             all_labels = np.concatenate(true[r])
             all_predictions = np.concatenate(pred[r])
+
+            if r in scalers:
+                all_predictions  = scalers[r].inverse_transform(all_predictions .reshape(-1, 1))
+                all_labels = scalers[r].inverse_transform(all_labels.reshape(-1, 1))
 
             # 7. Matplotlibを使用してグラフを描画
             plt.figure(figsize=(8, 8))

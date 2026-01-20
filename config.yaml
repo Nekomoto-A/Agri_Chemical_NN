@@ -51,8 +51,8 @@ train.py:
   AdaBN: False
   FDS: 'DWMixup'
 train_GP.py:
-  epochs: 1000
-  patience: 10
+  epochs: 2000
+  patience: 20
   early_stopping: True
   visualize: False
   validation: True
@@ -156,12 +156,12 @@ fold_eval.py:
   feature_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\taxon_data\lv6.csv' #C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\lv6.csv #
   target_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\chem_data.xlsx' #C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\chem_data.xlsx #
   data_inte: False
-  transformer: ['YJ', None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
+  transformer: ['log', None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
   reg_loss_fanction: ['mse', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
   labels: ['crop'] #['experimental_purpose'] #
   embedding: 'Word2Vec'
   embedding_size: 10
-  latent_dim: 20
+  latent_dim: 32
 main.py:
   result_dir: 'result_DKL_label'
   reg_list: [
