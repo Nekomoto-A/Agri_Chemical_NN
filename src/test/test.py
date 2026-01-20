@@ -822,7 +822,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                     )
             model.to(device)
             model.device = device
-            model.warping_layer.device = device
+            model.warping_layers.device = device
 
         else:
             if 'VAE' in model_name:

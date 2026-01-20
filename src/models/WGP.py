@@ -79,7 +79,8 @@ class GPRegressionLayer(ApproximateGP):
                 ard_num_dims=input_dim,
                 lengthscale_prior=ls_prior,
                 lengthscale_constraint=ls_constraint
-            )
+            ),
+            outputscale_prior=gpytorch.priors.LogNormalPrior(loc=2, scale=0.3)
         )
 
         self.covar_module.base_kernel.lengthscale = 0.1

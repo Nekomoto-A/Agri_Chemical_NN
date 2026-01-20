@@ -39,7 +39,7 @@ class GPRegressionLayer(ApproximateGP):
         )
 
         # カーネルの積
-        self.covar_module = self.feature_covar_module * self.label_covar_module
+        self.covar_module = self.feature_covar_module + self.label_covar_module
 
     def forward(self, x):
         # x は [エンコーダー出力, ラベル埋め込み] が結合されたもの
@@ -51,7 +51,6 @@ class GPRegressionLayer(ApproximateGP):
         covar_x = self.covar_module(x)
         
         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
-
 
 # --- 2. メインのファインチューニングモデル ---
 #from gpytorch.likelihoods import HeteroscedasticMLPLikelihood
@@ -171,7 +170,6 @@ class HeteroscedasticMLPLikelihood(Likelihood):
         raw = self.noise_model(combined_input)
         noise = 0.1 + 0.9 * torch.sigmoid(raw).squeeze(-1) # 0.1〜1.0 の範囲に制限
 
-
         # ガウス対数尤度の期待値の計算式 (Analytic form):
         # E[log p(y|f)] = -0.5 * (log(2*pi*σ^2) + (y-m)^2/σ^2 + v/σ^2)
         res = -0.5 * (torch.log(2 * math.pi * noise) + (target - mean)**2 / noise + variance / noise)
@@ -193,5 +191,5 @@ class HeteroscedasticMLPLikelihood(Likelihood):
         #noise = 0.1 + 0.9 * torch.sigmoid(raw).squeeze(-1) # 0.1〜1.0 の範囲に制限
         
         # 共分散行列の対角成分にノイズ（分散）を加える
-        return MultivariateNormal(latent_mean, latent_covar + torch.diag_embed(noise))
+        return MultivariateNormal(latent_mean, latent_covar + 0.1 * torch.diag_embed(noise))
     
