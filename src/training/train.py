@@ -1235,48 +1235,10 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
             x_tr_batch = x_tr_batch.to(device)
             outputs,_ = model(x_tr_batch)
 
-            first_output_value = next(iter(outputs.values()))
-            if isinstance(first_output_value, tuple):
-                for reg, (mu, log_sigma_sq) in outputs.items():
-                    #outputs[reg] = mu
-                    true.setdefault(reg, []).append(y_tr_batch[reg].cpu().numpy())
-                    pred.setdefault(reg, []).append(mu.cpu().numpy())
-            
-            else:
-                if has_quantile_regression:
-                    try:
-                        # model.quantiles は [0.1, 0.5, 0.9] のようなリスト/テンソル
-                        # (modelがCPU/GPUどちらにあってもいいように .cpu() を挟みます)
-                        quantiles_list = model.quantiles.cpu().numpy().flatten().tolist()
-                        median_index = quantiles_list.index(0.5)
-                        print(f"INFO: 分位点回帰の中央値 (インデックス {median_index}) を予測値として格納します。")
-                    except (ValueError, AttributeError):
-                        print("WARN: 0.5 の分位点が見つかりません。最初の分位点 (インデックス 0) を予測値として使用します。")
-                        median_index = 0
-                    except Exception as e:
-                        print(f"WARN: 分位点インデックスの取得に失敗 ({e})。インデックス 0 を使用します。")
-                        median_index = 0
-                #else:
-                #    print("INFO: 単一予測を予測値として格納します。")
-                for target in reg_list:
-                    # 1. 正解ラベルの格納 (変更なし)
-                    # y_tr_batch[target] は (バッチサイズ) または (バッチサイズ, 1) を想定
-                    true.setdefault(target, []).append(y_tr_batch[target].cpu().numpy())
-                    
-                    # 2. 予測値の取得
-                    # raw_output は (バッチサイズ, num_quantiles) または (バッチサイズ, 1)
-                    raw_output = outputs[target].cpu().detach() 
-
-                    # 3. モデルタイプに応じて格納する値を変更
-                    if has_quantile_regression:
-                        # 分位点回帰の場合: 中央値(0.5)の列を抽出
-                        # (形状: [バッチサイズ, num_quantiles] -> [バッチサイズ])
-                        median_output = raw_output[:, median_index]
-                        pred.setdefault(target, []).append(median_output.numpy())
-                    else:
-                        # 単一予測の場合: そのまま格納
-                        pred.setdefault(target, []).append(raw_output.numpy())
-        
+            for target in reg_list:
+                true.setdefault(target, []).append(y_tr_batch[target].cpu().numpy())
+                pred.setdefault(target, []).append(outputs[target].cpu().numpy())
+    
         for r in reg_list:
             save_dir = os.path.join(train_dir, r)
             os.makedirs(save_dir, exist_ok = True)

@@ -111,6 +111,9 @@ def initialize_gp_params_from_ae(gp_model, train_x, device, train_y_list=None):
     print("GP parameters have been initialized based on AE latent distribution.")
     #gp_model.train()
 
+#from gpytorch.mlls import DeepApproximateMarginalLogLikelihood
+from gpytorch.mlls import VariationalELBO, DeepApproximateMLL
+
 def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir, 
                     model_name,loss_sum, device, batch_size, #optimizer, 
                 label_tr, label_val,
@@ -142,6 +145,8 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
     val_dataset = MultiTaskDataset(x_val, label_val, y_val)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
+    #initialize_gp_params_from_ae(model, x_tr, device)
+
     lr = lr[0]
     # optimizer = optim.Adam(model.parameters() , lr=lr,
     #                         weight_decay = 0.01
@@ -158,14 +163,22 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
     #     # {'params': model.shared_block.parameters(), 'lr': 1e-4}, 
     # ], lr=lr)
 
-    optimizer = torch.optim.Adam([
-        {'params': model.parameters()},
-    ], lr=lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr = lr)
 
         #personal_losses = []
     personal_losses = {}
     for i, reg in enumerate(reg_list):
-        mll = gpytorch.mlls.VariationalELBO(model.likelihoods[i], model.gp_layers[i], num_data=len(train_dataset))
+        # VariationalELBOは、GPの出力分布と実際のラベルの整合性を測ります
+        # ① まず、通常の VariationalELBO を作成
+        base_mll = VariationalELBO(
+            model.likelihoods[i], 
+            model.dgp_models[i], 
+            num_data=len(train_dataset)
+        )
+        
+        # ② それを DeepApproximateMLL でラップする
+        # これにより、内部で .mean(0) が呼ばれ、[10, 209] のような次元が正しく処理されます
+        mll = DeepApproximateMLL(base_mll)
         personal_losses[reg] = mll
 
     if 'AE' in model_name:
@@ -182,7 +195,13 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
             for param in model.parameters():
                 param.requires_grad = True
 
-    initialize_gp_params_from_ae(model, x_tr, label_tr, device)
+
+    for likelihood in model.likelihoods:
+        likelihood.train()
+
+    # これが False だと Optimizer に入れても更新されません
+    # print('params')
+    # print(model.gp_layers[0].covar_module.base_kernel.raw_lengthscale.requires_grad)
 
     for epoch in range(epochs):
         if visualize == True:
@@ -196,7 +215,6 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
 
         running_train_losses = {key: 0.0 for key in ['SUM'] + reg_list}
         #for x_batch, y_batch in train_loader:
-        model.train()
         for x_batch, label_batch, y_batch in train_loader:
             x_batch = x_batch.to(device)
 
@@ -207,18 +225,21 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
             model.train()
             optimizer.zero_grad()
 
-            outputs, _, combined_input = model(x_batch, label_batch)
+            outputs, _ = model(x_batch)
+            # shared_features = model.shared_block(x_tr)
+            # outputs = model.dgp_models[i](shared_features) # ここでDistributionが返る
             train_losses = {}
 
             for reg in reg_list:
+                # 推奨される学習ループ内の記述例
                 # ❶ 正解ラベルとモデルの出力を取得
                 true_tr = y_batch[reg].to(device)
                 output = outputs[reg] 
 
                 #loss = -personal_losses[reg](output, true_tr).sum()
                 #loss = -personal_losses[reg](output, true_tr).mean()
-                #loss = -personal_losses[reg](output, true_tr.squeeze(-1), combined_input=combined_input).mean()
-                loss = -personal_losses[reg](output, true_tr.squeeze(-1), combined_input=combined_input).mean()
+                loss = -personal_losses[reg](output, true_tr.squeeze(-1)).mean()
+                #loss = -personal_losses[reg](output, true_tr).mean()
                 train_losses[reg] = loss
   
                 running_train_losses[reg] += loss.item()
@@ -262,22 +283,19 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
             running_val_losses = {key: 0.0 for key in ['SUM'] + reg_list}
             #val_loss = 0
             with torch.no_grad():
-                for x_val_batch, label_val_batch, y_val_batch in val_loader:
-
+                for x_val_batch, label_batch, y_val_batch in val_loader:
                     x_val_batch = x_val_batch.to(device)
                     #y_val_batch = y_val_batch.to(device)
-                    
-                    outputs, _, combined_input = model(x_val_batch, label_val_batch)
+                    outputs,_ = model(x_val_batch)
                     val_losses = []
                     #for j in range(len(output_dim)):
 
                     for reg in reg_list:
                         true_val = y_val_batch[reg].to(device)
-
                         #loss = -personal_losses[reg](outputs[reg], true_val).sum()
                         #loss = -personal_losses[reg](outputs[reg], true_val).mean()
-                        #loss = -personal_losses[reg](outputs[reg], true_val.squeeze(-1)).mean()
-                        loss = -personal_losses[reg](outputs[reg], true_val.squeeze(-1), combined_input=combined_input).mean()
+                        loss = -personal_losses[reg](outputs[reg], true_val.squeeze(-1)).mean()
+                        #loss = -personal_losses[reg](output, true_val).mean()
 
                         #val_loss_history.setdefault(reg, []).append(loss.item())
                         running_val_losses[reg] += loss.item()
@@ -363,7 +381,7 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
         pred = {}
         for x_tr_batch, label_tr_batch, y_tr_batch in train_loader:
             x_tr_batch = x_tr_batch.to(device)
-            outputs, _, _ = model(x_tr_batch, label_tr_batch)
+            outputs,_ = model(x_tr_batch)
 
             for target in reg_list:
                 # 1. 正解ラベルの格納 (変更なし)
@@ -383,10 +401,6 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
 
             all_labels = np.concatenate(true[r])
             all_predictions = np.concatenate(pred[r])
-
-            if r in scalers:
-                all_predictions  = scalers[r].inverse_transform(all_predictions .reshape(-1, 1))
-                all_labels = scalers[r].inverse_transform(all_labels.reshape(-1, 1))
 
             # 7. Matplotlibを使用してグラフを描画
             plt.figure(figsize=(8, 8))
@@ -412,29 +426,3 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
             plt.close() # メモリ解放のためにプロットを閉じる
     
     return model
-
-def initialize_gp_params_from_ae(model, x_tr, label_emb_tr, device):
-    """
-    誘導点（Inducing Points）を、実際に入力されるデータ（特徴量+ラベル）の
-    一部を使って初期化する例
-    """
-    model.eval()
-    with torch.no_grad():
-        # 1. エンコーダーから特徴量を抽出
-        features = model.shared_block(x_tr.to(device))
-        
-        # 2. 特徴量とラベル埋め込みを結合 (これがGPの実際の入力次元になる)
-        # label_emb_tr も関数に渡す必要があります
-        combined_input = torch.cat([features, label_emb_tr.to(device)], dim=-1)
-        
-        # 3. 誘導点の数（inducing_points_num）だけデータを取り出す
-        for i, gp_layer in enumerate(model.gp_layers):
-            # 現在のGP層の誘導点の数を確認
-            num_inducing = gp_layer.variational_strategy.inducing_points.size(0)
-            
-            # データの先頭から num_inducing 分だけサンプリングしてコピー
-            # (あるいはランダムサンプリング)
-            initial_inducing_points = combined_input[:num_inducing, :]
-            
-            # エラー箇所：サイズを合わせてコピー
-            gp_layer.variational_strategy.inducing_points.copy_(initial_inducing_points)

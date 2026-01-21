@@ -134,7 +134,7 @@ fold_eval.py:
   carr_calc: False
   marginal_hist: False
   k_fold: 5
-  model_name: 'DCAE_WGP'
+  model_name: 'DCAE'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
@@ -148,7 +148,10 @@ fold_eval.py:
     '063_20_Naga_Onio', '064_20_Naga_Onio', '065_20_Naga_Onio', '066_20_Naga_Onio',
     '067_20_Naga_Pump', '050_20_Sait_Stra', '048_20_Sait_Yama',  '049_20_Sait_Yama', 
 
-    '214_21_Miyz_Edam', '273_22_Naga_Rice', '235_21_Miyz_Spin'
+    '214_21_Miyz_Edam', '273_22_Naga_Rice', '235_21_Miyz_Spin',
+
+    #'171_21_Miyz_Spin', '159_21_Miyz_Spin', '163_21_Miyz_Spin', '164_21_Miyz_Spin',
+    #'172_21_Miyz_Spin', '158_21_Miyz_Spin', '152_21_Miyz_Spin', '165_21_Miyz_Spin'
 
   ]
   feature_path_linux: 'data/raw/riken/taxon_data/lv6.csv' #'/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/lv6.csv' # # #
@@ -156,27 +159,27 @@ fold_eval.py:
   feature_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\taxon_data\lv6.csv' #C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\lv6.csv #
   target_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\chem_data.xlsx' #C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\chem_data.xlsx #
   data_inte: False
-  transformer: [None, None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
+  transformer: ['log', None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
   reg_loss_fanction: ['mse', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
   labels: ['crop'] #['experimental_purpose'] #
   embedding: 'Word2Vec'
   embedding_size: 10
   latent_dim: 32
 main.py:
-  result_dir: 'result_WGP'
+  result_dir: 'result_smearing'
   reg_list: [
-            [CEC],
+            #[CEC],
             ['Available.P'],
             #['pH'],
             #['Available.P', 'crop'], #, 'pH'
-            ['NO3.N'],
+            #['NO3.N'],
             #['pH', 'NO3.N',],
             #'pH'
             #['pH', 'Available.P',],
             #['pH','EC',],
             #['NH4.N'],
             #['pH',CEC',],
-            ['Exchangeable.K'],
+            #['Exchangeable.K'],
             #]
             #['pH', 'Available.P'],
             #['pH', 'Available.P', 'EC', 'NH4.N', 'NO3.N', 'Exchangeable.K'],

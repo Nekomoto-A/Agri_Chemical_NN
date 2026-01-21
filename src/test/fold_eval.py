@@ -202,6 +202,59 @@ class ContinuousStratifiedKFold:
         
         return skf.split(X, y_binned)
 
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.manifold import TSNE
+import os
+
+def save_tsne_plots(X, Y, target_columns, save_dir="tsne_results"):
+    """
+    Xのデータをt-SNEで2次元に削減し、Yの各カラムで色分けした図を保存する関数
+    """
+    # 保存用ディレクトリの作成
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+        print(f"ディレクトリ '{save_dir}' を作成しました。")
+
+    # 1. t-SNEの実行 (全てのプロットで共通の座標を使用)
+    print("t-SNE計算中... (データ量によっては時間がかかる場合があります)")
+    tsne = TSNE(n_components=2, random_state=42)
+    X_embedded = tsne.fit_transform(X)
+    
+    # 結果を一時的なDataFrameに格納
+    df_plot = pd.DataFrame(X_embedded, columns=['tsne_1', 'tsne_2'])
+    
+    # 2. 指定された各カラムについてループ
+    for col in target_columns:
+        plt.figure(figsize=(10, 7))
+        
+        # Yから対象カラムをコピー
+        df_plot[col] = Y[col].values
+        
+        # 3. 連続値かカテゴリ値かによる条件分岐
+        if pd.api.types.is_numeric_dtype(Y[col]):
+            # 連続値：散布図とカラーバー
+            scatter = plt.scatter(df_plot['tsne_1'], df_plot['tsne_2'], 
+                                  c=df_plot[col], cmap='viridis', s=20)
+            plt.colorbar(scatter, label=col)
+            plt.title(f't-SNE plot colored by {col} (Continuous)')
+        else:
+            # ラベルデータ：seabornのscatterplotで凡例を表示
+            sns.scatterplot(data=df_plot, x='tsne_1', y='tsne_2', 
+                            hue=col, palette='viridis', s=20)
+            plt.legend(title=col, bbox_to_anchor=(1.05, 1), loc='upper left')
+            plt.title(f't-SNE plot colored by {col} (Categorical)')
+
+        plt.tight_layout()
+        
+        # 4. 図の保存
+        filename = f"tsne_{col}.png"
+        filepath = os.path.join(save_dir, filename)
+        plt.savefig(filepath)
+        plt.close()
+        print(f"保存完了: {filepath}")
+
 def fold_evaluate(reg_list, output_dir, device, 
                   transformer = config['transformer'],
                   #feature_path = config['feature_path'], target_path = config['target_path'], 
@@ -265,6 +318,7 @@ def fold_evaluate(reg_list, output_dir, device,
             X,Y = data_create(feature_path, target_path, reg_list, exclude_ids)
         
         ae_dir = None
+
     
     #print(X)
     if corr_calc:
@@ -305,6 +359,9 @@ def fold_evaluate(reg_list, output_dir, device,
     ids = []
 
     scores = {}
+
+    target_columns = reg_list + labels
+    save_tsne_plots(X, Y, target_columns, save_dir = sub_dir)
 
     #for fold, (train_index, test_index) in enumerate(kf.split(X, Y['crop'])):
     for fold, (train_index, test_index) in enumerate(kf.split(X,Y[reg_list[0]])):

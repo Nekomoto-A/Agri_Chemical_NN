@@ -39,7 +39,7 @@ class GPRegressionLayer(ApproximateGP):
         )
 
         # カーネルの積
-        self.covar_module = self.feature_covar_module + self.label_covar_module
+        self.covar_module = self.feature_covar_module * self.label_covar_module
 
     def forward(self, x):
         # x は [エンコーダー出力, ラベル埋め込み] が結合されたもの
@@ -191,5 +191,5 @@ class HeteroscedasticMLPLikelihood(Likelihood):
         #noise = 0.1 + 0.9 * torch.sigmoid(raw).squeeze(-1) # 0.1〜1.0 の範囲に制限
         
         # 共分散行列の対角成分にノイズ（分散）を加える
-        return MultivariateNormal(latent_mean, latent_covar + 0.1 * torch.diag_embed(noise))
+        return MultivariateNormal(latent_mean, latent_covar + torch.diag_embed(noise))
     

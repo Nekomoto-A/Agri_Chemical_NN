@@ -42,6 +42,8 @@ def normalized_medae_iqr(y_true, y_pred):
     
     return medae / iqr
 
+from src.test.test import get_corrected_predictions 
+from src.test.test import is_log1p_transformer
 def test_FiLM(x_te, y_te, label_te,  
               model, reg_list, scalers, output_dir, device, 
               test_ids):
@@ -53,7 +55,9 @@ def test_FiLM(x_te, y_te, label_te,
     model.eval()
     with torch.no_grad():
         outputs, _ = model(x_te, label_te)
-            
+    
+    mc_results = model.predict_with_mc_dropout(x_te, n_samples=50)
+
     r2_scores, mse_scores = [], []
     
     # --- 3. タスクごとに結果を処理 ---
@@ -69,9 +73,15 @@ def test_FiLM(x_te, y_te, label_te,
 
             if reg in scalers:
                 scaler = scalers[reg]
-                # --- 通常のスケーリング解除 ---
-                pred = scaler.inverse_transform(pred_tensor_for_eval.cpu().detach().numpy())
                 true = scaler.inverse_transform(true_tensor.cpu().detach().numpy())
+                if is_log1p_transformer(scaler):
+                    mc_result = mc_results[reg]
+                    pred_tensor_for_eval = get_corrected_predictions(mc_result)
+                    pred = pred_tensor_for_eval.cpu().detach().numpy()
+                else:
+                    # --- 通常のスケーリング解除 ---
+                    pred = scaler.inverse_transform(pred_tensor_for_eval.cpu().detach().numpy())
+
             else:
                 # スケーラーなし
                 pred = pred_tensor_for_eval.cpu().detach().numpy()
