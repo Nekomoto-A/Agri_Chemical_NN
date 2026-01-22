@@ -339,6 +339,8 @@ def train_pretraining_vae(model, x_tr, x_val, device, output_dir,
     loss_path = os.path.join(output_dir, 'VAE_loss.png')
     save_loss_plot(train_loss_history, val_loss_history, loss_path)
 
+    _, _ = check_latent_stats(model, train_loader, device=device)
+
     # 最終的なt-SNE
     model.eval()
     if tsne_plot_epoch_freq > 0: # 設定によって実行有無を制御
@@ -357,8 +359,8 @@ def vae_loss_function(recon_x, x, mu, logvar, beta=1.0):
     """
     # 1. 再構成誤差 (MSE)
     # reduction='sum' なのでバッチサイズ分だけ値が大きくなる点に注意
-    #MSE = F.mse_loss(recon_x, x, reduction='sum')
-    MSE = F.mse_loss(recon_x, x, reduction='mean')
+    MSE = F.mse_loss(recon_x, x, reduction='sum')
+    #MSE = F.mse_loss(recon_x, x, reduction='mean')
 
     # 2. KLダイバージェンス
     # 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
@@ -369,6 +371,44 @@ def vae_loss_function(recon_x, x, mu, logvar, beta=1.0):
     total_loss = MSE + beta * KLD
     
     return total_loss, MSE, KLD
+
+import torch
+import numpy as np
+import matplotlib.pyplot as plt
+
+def check_latent_stats(model, data_loader, device="cpu"):
+    model.eval()
+    all_mu = []
+    all_logvar = []
+    
+    with torch.no_grad():
+        # 最初の1バッチ、または数バッチ分を取得
+        for x,_ in data_loader:
+            x = x.to(device)
+            _, mu, logvar = model(x)
+            
+            all_mu.append(mu.cpu())
+            all_logvar.append(logvar.cpu())
+            break  # 統計確認用なら1バッチでも十分なことが多い
+            
+    # Tensorに変換
+    all_mu = torch.cat(all_mu, dim=0)
+    all_logvar = torch.cat(all_logvar, dim=0)
+    all_std = torch.exp(0.5 * all_logvar) # 標準偏差 sigma
+    
+    # 統計量の計算
+    mean_mu = all_mu.mean().item()
+    mean_std = all_std.mean().item()
+    var_of_mu = all_mu.var(dim=0).mean().item() # mu自体の分散（0に近いと危険）
+
+    print("-" * 30)
+    print(f"【潜在変数の統計量】")
+    print(f"平均 (mu) の平均値: {mean_mu:.4f}  (理想: 0に近い)")
+    print(f"標準偏差 (std) の平均値: {mean_std:.4f}  (理想: 1より小さい、1に近いと情報喪失)")
+    print(f"mu の分散 (Var of mu): {var_of_mu:.4f}  (理想: 0より大きい、0に近いと崩壊)")
+    print("-" * 30)
+
+    return all_mu.numpy(), all_std.numpy()
 
 def train_pretraining_gmvae(model, x_tr, x_val, device, output_dir, 
                       y_tr = None, y_val = None, label_encoders = None,

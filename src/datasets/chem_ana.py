@@ -397,7 +397,6 @@ if __name__ == '__main__':
     if exclude_ids != None:
         mask = ~df['crop-id'].isin(exclude_ids)
         df = df[mask]
-
         
     #df['category'] = df['crop'].apply(classify_crop)
     df['a'] = 'a'

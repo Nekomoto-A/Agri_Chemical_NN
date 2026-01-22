@@ -56,7 +56,7 @@ def test_FiLM(x_te, y_te, label_te,
     with torch.no_grad():
         outputs, _ = model(x_te, label_te)
     
-    mc_results = model.predict_with_mc_dropout(x_te, n_samples=50)
+    mc_results = model.predict_with_mc_dropout(x_te,label_te, n_samples=50)
 
     r2_scores, mse_scores = [], []
     

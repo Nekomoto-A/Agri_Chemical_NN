@@ -38,7 +38,7 @@ class Autoencoder(nn.Module):
         #self.encoder.add_module("latent_batchnorm", nn.LayerNorm(latent_dim))
         #self.encoder.add_module("latent_relu", nn.ReLU())
         self.encoder.add_module("latent_relu", nn.LeakyReLU())
-        self.encoder.add_module("sigmoid", nn.Sigmoid())
+        #self.encoder.add_module("sigmoid", nn.Sigmoid())
 
         # --- 2. デコーダー ---
         self.decoder = nn.Sequential()
