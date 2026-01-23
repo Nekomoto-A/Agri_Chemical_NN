@@ -59,6 +59,7 @@ def test_MT_DKL(x_te, label_te, y_te, model, reg_list, scalers, output_dir, devi
             pred_mean_tensor = mc_results[reg]['mean']#.mean(0)
 
             pred_std_tensor = mc_results[reg]['std']#.mean(0)
+            #print(pred_std_tensor)
 
             #print(pred_std_tensor)
 

@@ -431,8 +431,8 @@ def fold_evaluate(reg_list, output_dir, device,
                 labels_test=label_test_embedded,
                 label_encoders = label_encoders,
                 labels_train_original = label_train_tensor,
-                #labels_val_original = label_val_tensor,
-                #labels_test_original = label_test_tensor,
+                labels_val_original = label_val_tensor,
+                labels_test_original = label_test_tensor,
                 ae_dir = ae_dir, 
 
                 )
@@ -464,8 +464,8 @@ def fold_evaluate(reg_list, output_dir, device,
                     labels_test=label_test_embedded,
                     label_encoders = label_encoders,
                     labels_train_original = label_train_tensor,
-                    #labels_val_original = label_val_tensor,
-                    #labels_test_original = label_test_tensor,
+                    labels_val_original = label_val_tensor,
+                    labels_test_original = label_test_tensor,
                     ae_dir = ae_dir,
                     )
                 
@@ -509,8 +509,8 @@ def fold_evaluate(reg_list, output_dir, device,
             labels_test=label_test_embedded,
             label_encoders = label_encoders,
             labels_train_original = label_train_tensor,
-            #labels_val_original = label_val_tensor,
-            #labels_test_original = label_test_tensor,
+            labels_val_original = label_val_tensor,
+            labels_test_original = label_test_tensor,
             ae_dir = ae_dir
             )
             
