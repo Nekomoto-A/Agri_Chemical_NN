@@ -42,6 +42,84 @@ import matplotlib.pyplot as plt
 import os
 from sklearn.metrics import mean_absolute_error
 
+import torch
+import numpy as np
+
+def apply_delta_method_sklearn(mean_gp, std_gp, power_transformer):
+    """
+    sklearn.PowerTransformerで変換された予測値に対し、デルタ法で補正を行います。
+    
+    Args:
+        mean_gp (torch.Tensor): GPが出力した平均 (標準化済み)
+        std_gp (torch.Tensor): GPが出力した標準偏差 (標準化済み)
+        power_transformer: フィット済みの sklearn.preprocessing.PowerTransformer
+        
+    Returns:
+        dict: 'mean': 元スケールの補正済み平均, 'std': 元スケールの推定標準偏差
+    """
+    # 1. PowerTransformerからパラメータを抽出
+    # 複数の特徴量がある場合を考慮し、最初の要素を取得 ([0])
+    lmbda = power_transformer.lambdas_[0]
+    
+    # 標準化が有効な場合、その平均とスケールを取得
+    if power_transformer.standardize:
+        m_yj = power_transformer._scaler.mean_[0]
+        s_yj = power_transformer._scaler.scale_[0]
+    else:
+        m_yj = 0.0
+        s_yj = 1.0
+
+    # 2. 標準化を解除して Yeo-Johnson スケールに戻す
+    # 線形変換なので、平均と分散は単純にスケールされる
+    mean_yj = mean_gp * s_yj + m_yj
+    std_yj = std_gp * s_yj
+    var_yj = std_yj ** 2
+
+    # 3. Yeo-Johnson逆変換の微分計算 (デルタ法)
+    pos_mask = (mean_yj >= 0)
+    neg_mask = ~pos_mask
+    
+    inv_mean = torch.zeros_like(mean_yj)
+    g_prime = torch.zeros_like(mean_yj)
+    g_double_prime = torch.zeros_like(mean_yj)
+
+    # --- Case 1: y_yj >= 0 ---
+    m_pos = mean_yj[pos_mask]
+    if abs(lmbda) < 1e-6:
+        inv_mean[pos_mask] = torch.exp(m_pos) - 1
+        g_prime[pos_mask] = torch.exp(m_pos)
+        g_double_prime[pos_mask] = torch.exp(m_pos)
+    else:
+        term = m_pos * lmbda + 1
+        inv_mean[pos_mask] = torch.pow(term, 1/lmbda) - 1
+        g_prime[pos_mask] = torch.pow(term, (1/lmbda) - 1)
+        g_double_prime[pos_mask] = (1 - lmbda) * torch.pow(term, (1/lmbda) - 2)
+
+    # --- Case 2: y_yj < 0 ---
+    m_neg = mean_yj[neg_mask]
+    l2 = 2.0 - lmbda
+    if abs(l2) < 1e-6:
+        inv_mean[neg_mask] = 1 - torch.exp(-m_neg)
+        g_prime[neg_mask] = torch.exp(-m_neg)
+        g_double_prime[neg_mask] = -torch.exp(-m_neg)
+    else:
+        term = -m_neg * l2 + 1
+        inv_mean[neg_mask] = 1 - torch.pow(term, 1/l2)
+        g_prime[neg_mask] = torch.pow(term, (1/l2) - 1)
+        g_double_prime[neg_mask] = (l2 - 1) * torch.pow(term, (1/l2) - 2)
+
+    # 4. 最終的な補正
+    corrected_mean = inv_mean + 0.5 * g_double_prime * var_yj
+    corrected_var = (g_prime ** 2) * var_yj
+    corrected_std = torch.sqrt(torch.clamp(corrected_var, min=1e-9))
+
+    return {
+        'mean': corrected_mean,
+        'std': corrected_std
+    }
+
+from sklearn.preprocessing import PowerTransformer
+
 def test_MT_DKL(x_te, label_te, y_te, model, reg_list, scalers, output_dir, device, test_ids, n_samples_mc=100):
     x_te = x_te.to(device)
     label_te = label_te.to(device)
@@ -69,16 +147,18 @@ def test_MT_DKL(x_te, label_te, y_te, model, reg_list, scalers, output_dir, devi
             if reg in scalers:
                 scaler = scalers[reg]
                 # 平均値の逆変換
-                pred_mean = scaler.inverse_transform(pred_mean_tensor.cpu().numpy().reshape(-1, 1))
-                true = scaler.inverse_transform(true_tensor.cpu().numpy())
-                
-                # 標準偏差の逆変換（標準偏差はスケーリングの倍率のみを掛ける）
-                # 例: (x - mean) / scale の場合、stdには scale を掛ける
-                if hasattr(scaler, 'scale_'):
-                    pred_std = pred_std_tensor.cpu().numpy().reshape(-1, 1) * scaler.scale_
+                if isinstance(scaler, PowerTransformer):
+                    print('yeo-jonson変換のためデルタ法による補正を行います')
+                    pred_mean_tensor = pred_mean_tensor.cpu() #.numpy().reshape(-1, 1)
+                    pred_std_tensor = pred_std_tensor.cpu() #.numpy().reshape(-1, 1)
+                    pred_smaering = apply_delta_method_sklearn(pred_mean_tensor, pred_std_tensor, scaler)#['mean']
+                    pred_mean = pred_smaering['mean'].numpy().reshape(-1, 1)
+                    pred_std = pred_smaering['std'].numpy().reshape(-1, 1)
                 else:
-                    # スケーラーがscale_を持っていない場合のフォールバック（簡易版）
-                    pred_std = pred_std_tensor.cpu().numpy().reshape(-1, 1)
+                    pred_mean = scaler.inverse_transform(pred_mean_tensor.cpu().numpy().reshape(-1, 1))
+                    pred_std = scaler.inverse_transform(pred_std_tensor.cpu().numpy().reshape(-1, 1))
+
+                true = scaler.inverse_transform(true_tensor.cpu().numpy())
             else:
                 pred_mean = pred_mean_tensor.cpu().numpy().reshape(-1, 1)
                 pred_std = pred_std_tensor.cpu().numpy().reshape(-1, 1)
@@ -101,7 +181,7 @@ def test_MT_DKL(x_te, label_te, y_te, model, reg_list, scalers, output_dir, devi
             plt.figure(figsize=(10, 10))
 
             # エラーバー付き散布図
-            # yerr=pred_std.flatten() で各点の不確かさを表示
+            #y_err=pred_std.flatten()
             plt.errorbar(
                 y_true, #.flatten(), 
                 y_pred, #.flatten(), 
@@ -114,6 +194,7 @@ def test_MT_DKL(x_te, label_te, y_te, model, reg_list, scalers, output_dir, devi
                 alpha=0.6, 
                 label='Predictions with ±1σ'
             )
+            #plt.scatter(true.flatten(), pred_mean.flatten(), color='royalblue', alpha=0.7)
     
             min_val = min(np.min(true), np.min(pred_mean))
             max_val = max(np.max(true), np.max(pred_mean))

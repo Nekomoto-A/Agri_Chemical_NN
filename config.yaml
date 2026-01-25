@@ -9,7 +9,7 @@ dataset.py:
   feature_transformer: 'CLR'
   softlabel: True
   data_vis: 'visualize'
-  data_augumentation: None #'smoter' #'smoter' #'smoter' #'gaussian_copula'
+  data_augumentation: None #'smoter' #None #'smoter' #'smoter' #'smoter' #'gaussian_copula'
   num_augumentation: 200
   num_epochs: 30
   batch_size: 32
@@ -51,7 +51,7 @@ train.py:
   AdaBN: False
   FDS: 'DWMixup'
 train_GP.py:
-  epochs: 2000
+  epochs: 10000
   patience: 20
   early_stopping: True
   visualize: False
@@ -125,8 +125,8 @@ fold_eval.py:
   feature_selection_dir: 'result_DRA_NN'
   carr_calc: False
   marginal_hist: False
-  k_fold: 5
-  model_name: 'CAE_DKL_label'
+  k_fold: 10
+  model_name: 'DCAE_DKL_label'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
@@ -155,16 +155,18 @@ fold_eval.py:
   reg_loss_fanction: ['mse', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
   labels: ['crop'] #['experimental_purpose'] #
   embedding: 'Word2Vec'
-  embedding_size: 10
-  latent_dim: 32
+  embedding_size: 3
+  latent_dim: 64
 main.py:
-  result_dir: 'result_GP'
+  result_dir: 'result_DKL_cons'
   reg_list: [
             [CEC],
             ['Available.P'],
             ['pH'],
             #['Available.P', 'crop'], #, 'pH'
             ['NO3.N'],
+            ['EC'], 
+            ['Exchangeable.K'],
             #['pH', 'NO3.N',],
             #'pH'
             #['pH', 'Available.P',],

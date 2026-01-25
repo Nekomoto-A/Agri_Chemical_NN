@@ -206,6 +206,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.manifold import TSNE
+from umap.umap_ import UMAP
+import numpy as np
 import os
 
 def save_tsne_plots(X, Y, target_columns, save_dir="tsne_results"):
@@ -219,8 +221,10 @@ def save_tsne_plots(X, Y, target_columns, save_dir="tsne_results"):
 
     # 1. t-SNEの実行 (全てのプロットで共通の座標を使用)
     print("t-SNE計算中... (データ量によっては時間がかかる場合があります)")
-    tsne = TSNE(n_components=2, random_state=42)
-    X_embedded = tsne.fit_transform(X)
+    #reducer = TSNE(n_components=2, random_state=42)
+    reducer = UMAP(n_components=2, random_state=42)
+    #X_embedded = tsne.fit_transform(X)
+    X_embedded = reducer.fit_transform(X)
     
     # 結果を一時的なDataFrameに格納
     df_plot = pd.DataFrame(X_embedded, columns=['tsne_1', 'tsne_2'])
@@ -360,7 +364,12 @@ def fold_evaluate(reg_list, output_dir, device,
 
     scores = {}
 
-    target_columns = reg_list + labels
+    if labels != None:
+        target_columns = reg_list + labels
+    else:
+        target_columns = reg_list
+    #target_columns = reg_list + (labels if labels is not None else [])
+
     save_tsne_plots(X, Y, target_columns, save_dir = sub_dir)
 
     #for fold, (train_index, test_index) in enumerate(kf.split(X, Y['crop'])):
@@ -405,14 +414,15 @@ def fold_evaluate(reg_list, output_dir, device,
                                                                                                  emb_models,
                                                                                                 )
         
-        from src.datasets.emb_fns import save_combined_data_to_csv
-        save_combined_data_to_csv(filepath = 'emb_labels.csv', 
-                                  original_labels = label_train_tensor, 
-                                  embedded_tensor = label_train_embedded, 
-                                  output_dir = fold_dir, 
-                                  target_vars_dict = Y_train_tensor, 
-                                  label_encoders = label_encoders
-                                  )
+        if labels != []:
+            from src.datasets.emb_fns import save_combined_data_to_csv
+            save_combined_data_to_csv(filepath = 'emb_labels.csv', 
+                                    original_labels = label_train_tensor, 
+                                    embedded_tensor = label_train_embedded, 
+                                    output_dir = fold_dir, 
+                                    target_vars_dict = Y_train_tensor, 
+                                    label_encoders = label_encoders
+                                    )
 
         if len(reg_list) > 1:
             vis_dir_main = os.path.join(fold_dir, method)

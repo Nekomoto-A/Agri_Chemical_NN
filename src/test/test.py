@@ -448,12 +448,14 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
 
     # 2. ユニークなラベルを抽出
     # sorted=True (デフォルト) にすると、値が昇順に並びます
-    unique_labels = torch.unique(labels_train_original['crop'], sorted=True)
-    number_of_classes = unique_labels.numel()
+    if 'crop' in labels_train_original:
+        unique_labels = torch.unique(labels_train_original['crop'], sorted=True)
+        number_of_classes = unique_labels.numel()
 
     output_dims = []
-
-    label_dim = labels_train.shape[1]
+    #    print(labels_train)
+    if labels_train != {}:
+        label_dim = labels_train.shape[1]
 
     #print(Y_train)
     for reg in reg_list:
@@ -630,19 +632,21 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         model.to(device)
 
         from src.training.training_foundation import evaluate_and_save_errors
-        evaluate_and_save_errors(model = ae_model, data_tensor = X_train, indices = train_ids, 
-                             device = device, out_dir = vis_dir, filename_prefix = 'finetuning_train')
+        if len(X_train) == len(train_ids):
+            evaluate_and_save_errors(model = ae_model, data_tensor = X_train, indices = train_ids, 
+                                device = device, out_dir = vis_dir, filename_prefix = 'finetuning_train')
         
         save_tsne_and_csv(encoder = pretrained_encoder, 
                         features = X_train, targets_dict = Y_train, 
                         output_dir = vis_dir,
                         )
-        save_tsne_with_labels(encoder = pretrained_encoder, 
-                              features = X_train, 
-                              targets_dict = labels_train_original, 
-                              label_encoders_dict = label_encoders, 
-                              output_dir = vis_dir, 
-                              )
+        if labels_train_original != {}:
+            save_tsne_with_labels(encoder = pretrained_encoder, 
+                                features = X_train, 
+                                targets_dict = labels_train_original, 
+                                label_encoders_dict = label_encoders, 
+                                output_dir = vis_dir, 
+                                )
 
     # elif model_name == 'MoE':
     #     from src.models.MoE import MoEModel
