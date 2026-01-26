@@ -341,7 +341,7 @@ from src.models.MT_CNN_soft import MTCNN_SPS
 from src.models.MT_CNN_SA import MTCNNModel_SA
 from src.models.MT_CNN_Di import MTCNNModel_Di
 from src.models.MT_BNN_MG import MTBNNModel_MG
-from src.models.HBM import MultitaskModel
+#from src.models.HBM import MultitaskModel
 
 import numpy as np
 import os
@@ -446,9 +446,16 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                   adapte = config['Adapte']
                   ):
 
-    output_dims = []
+    # 2. ユニークなラベルを抽出
+    # sorted=True (デフォルト) にすると、値が昇順に並びます
+    if 'crop' in labels_train_original:
+        unique_labels = torch.unique(labels_train_original['crop'], sorted=True)
+        number_of_classes = unique_labels.numel()
 
-    label_dim = labels_train.shape[1]
+    output_dims = []
+    #    print(labels_train)
+    if labels_train != {}:
+        label_dim = labels_train.shape[1]
 
     #print(Y_train)
     for reg in reg_list:
@@ -468,8 +475,9 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
             output_dims.append(len(torch.unique(all)))
     #output_dims = np.ones(len(reg_list), dtype="int16")
 
-    # if model_name == 'CNN':
-    #     model = MTCNNModel(input_dim = input_dim,output_dims = output_dims,reg_list=reg_list)
+    if model_name == 'CNN':
+        model = MTCNNModel(input_dim = input_dim,output_dims = output_dims,reg_list=reg_list)
+        model.to(device)
     # #elif model_name == 'NN':
     # #    model = MTNNModel(input_dim = input_dim,output_dims = output_dims, hidden_layers=[128, 64, 64])
     # elif model_name == 'CNN_catph':
@@ -488,8 +496,14 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
     #     model = BNNMTModel(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
     # elif model_name == 'BNN_MG':
     #     model = MTBNNModel_MG(input_dim = input_dim,output_dims = output_dims,reg_list = reg_list)
-    
-    if 'AE' in model_name:
+    elif model_name == 'HBM':
+        from src.models.HBM import HierarchicalMultiTaskModel
+        model = HierarchicalMultiTaskModel(n_dims = input_dim, 
+                                           n_labels = number_of_classes, 
+                                           task_names =reg_list, 
+                                           device = device)
+
+    elif 'AE' in model_name:
         if 'GMVAE' in model_name:
             from src.models.GMVAE import GMVAE
             ae_model = GMVAE(input_dim=input_dim, latent_dim=latent_dim).to(device)
@@ -614,21 +628,25 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                         reg_list = reg_list,
                                         shared_learn = False,
                                         )
+            
+        model.to(device)
 
         from src.training.training_foundation import evaluate_and_save_errors
-        evaluate_and_save_errors(model = ae_model, data_tensor = X_train, indices = train_ids, 
-                             device = device, out_dir = vis_dir, filename_prefix = 'finetuning_train')
+        if len(X_train) == len(train_ids):
+            evaluate_and_save_errors(model = ae_model, data_tensor = X_train, indices = train_ids, 
+                                device = device, out_dir = vis_dir, filename_prefix = 'finetuning_train')
         
         save_tsne_and_csv(encoder = pretrained_encoder, 
                         features = X_train, targets_dict = Y_train, 
                         output_dir = vis_dir,
                         )
-        save_tsne_with_labels(encoder = pretrained_encoder, 
-                              features = X_train, 
-                              targets_dict = labels_train_original, 
-                              label_encoders_dict = label_encoders, 
-                              output_dir = vis_dir, 
-                              )
+        if labels_train_original != {}:
+            save_tsne_with_labels(encoder = pretrained_encoder, 
+                                features = X_train, 
+                                targets_dict = labels_train_original, 
+                                label_encoders_dict = label_encoders, 
+                                output_dir = vis_dir, 
+                                )
 
     # elif model_name == 'MoE':
     #     from src.models.MoE import MoEModel
@@ -693,8 +711,8 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
     #     #model =MT_HBM(x = X_train, location_idx = location_idx, num_locations = num_locations,num_tasks = len(reg_list))
     #     model = MultitaskModel(task_names=reg_list, num_features = input_dim)
 
-    if 'NUTS' not in model_name:
-        model.to(device)
+    # if ('NUTS' not in model_name) or ('HBM' not in model_name):
+    #     model.to(device)
 
     print('学習データ数:',len(X_train))
     if X_val is not None:
@@ -718,6 +736,28 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         from src.test.test_BNN import test_BNN_MT
         predicts, true, r2_results, mse_results = test_BNN_MT(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir)
 
+    elif model_name == 'HBM':
+        from src.training.train_HBM import training_HBM
+        model_trained, guide_trained = training_HBM(x_tr = X_train, y_tr = Y_train, 
+                                                    label_tr = labels_train_original['crop'],#output_dim, 
+                                                    reg_list = reg_list, #output_dir, model_name, likelihood, #optimizer, 
+                                                    device = device, 
+                                                    model = model,
+                                                    scalers = scalers,
+                                                    #train_ids = train_ids, 
+                                                    output_dir = vis_dir,
+                                                    )
+        
+        from src.test.test_HBM import test_HBM
+        predicts, true, r2_results, mse_results = test_HBM(x_te = X_test, y_te = Y_test, label_te = labels_test_original['crop'], 
+                                                           #x_val, y_val, label_val, 
+                                                            model = model_trained, guide = guide_trained, 
+                                                            reg_list = reg_list, scalers = scalers, 
+                                                            output_dir = vis_dir, device = device, 
+                                                            test_ids = test_ids#, n_samples_mc=100
+                                                            )
+        # print(predicts)
+        # print(true)
     # elif 'GP' in model_name:
     #     model_trained,likelihood_trained  = training_MT_GP(x_tr = X_train, y_tr = y_train, model = model,likelihood = likelihood, 
     #                                                reg_list = reg_list
@@ -820,6 +860,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
     #     predicts, true, r2_results, mse_results = test_MT_gate(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir,device = device)
 
     elif "FiLM" in model_name:
+        print('FiLMによるFTを使用します')
         #print('FiLMを使用します')
         from src.training.train_FiLM import training_FiLM
         model_trained = training_FiLM(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, model = model,
@@ -842,6 +883,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                                           model_trained,reg_list,scalers,output_dir=vis_dir,device = device, test_ids = test_ids)
 
     elif 'FDS' in model_name:
+        print('FDSを使用します')
         from src.training.train_FDS import training_MT_FDS
         model_trained = training_MT_FDS(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, 
                                     model = model, 
@@ -861,6 +903,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         predicts, true, r2_results, mse_results = test_MT(X_test,Y_test, X_val, Y_val, 
                                                           model_trained,reg_list,scalers,output_dir=vis_dir,device = device, test_ids = test_ids)
     elif 'DKL_label' in model_name:
+        print('labelありのDKLを使用します')
         from src.training.train_GP_label import training_MT_DKL
         model_trained = training_MT_DKL(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, 
                                         model = model, reg_list = reg_list, output_dir = vis_dir, 
@@ -879,6 +922,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                                                 )
     
     elif 'DKL' in model_name:
+        print('DKLを使用します')
         from src.training.train_GP import training_MT_DKL
         model_trained = training_MT_DKL(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, 
                                         model = model, reg_list = reg_list, output_dir = vis_dir, 
@@ -895,6 +939,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                                           output_dir=vis_dir,
                                                           device = device, test_ids = test_ids)
     elif 'NUTS' in model_name:
+        print('NUTSによるDKLを使用します')
         from src.training.train_GP_NUTS import training_GP_NUTS
         model_trained = training_GP_NUTS(x_tr = X_train, x_val = X_val, y_tr = Y_train, y_val = Y_val, 
                                         runner = runner, reg_list = reg_list, output_dir = vis_dir, 
@@ -914,6 +959,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                                           output_dir=vis_dir,
                                                           device = device, test_ids = test_ids)
     elif 'WGP' in model_name:
+        print('WGPを使用します')
         from src.training.train_WGP import training_MT_WGP
         model_trained = training_MT_WGP(x_tr = X_train, x_val = X_val, y_tr = Y_train, y_val = Y_val, 
                                         model = model, reg_list = reg_list, output_dir = vis_dir, 
@@ -934,6 +980,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                                           y_tr = Y_train, 
                                                           test_ids = test_ids)
     elif 'DGP' in model_name:
+        print('DGPを使用します')
         from src.training.train_DGP import training_MT_DKL
         model_trained = training_MT_DKL(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, 
                                         model = model, reg_list = reg_list, output_dir = vis_dir, 
@@ -950,6 +997,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                                           output_dir=vis_dir,
                                                           device = device, test_ids = test_ids)
     else:
+        print('通常のFTを使用します')
         #optimizer = optim.Adam(model.parameters(), lr=0.001)
         model_trained = training_MT(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, 
                                     model = model, 

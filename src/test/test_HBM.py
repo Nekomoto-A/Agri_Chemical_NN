@@ -1,111 +1,148 @@
 import torch
-import pyro
-import pyro.distributions as dist
-from pyro.infer import MCMC, NUTS, Predictive
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader
+from sklearn.metrics import accuracy_score, r2_score, mean_squared_error, f1_score, mean_absolute_error, mean_absolute_percentage_error, median_absolute_error
 import matplotlib.pyplot as plt
-import seaborn as sns
+from src.experiments.visualize import visualize_tsne
+import shap
 import pandas as pd
-import warnings
-from sklearn.metrics import r2_score, mean_absolute_error
-
 import numpy as np
-
+import mpld3
 import yaml
 import os
-yaml_path = 'config.yaml'
-script_name = os.path.basename(__file__)
-with open(yaml_path, "r", encoding="utf-8") as file:
-    config = yaml.safe_load(file)[script_name]
 
+def normalized_medae_iqr(y_true, y_pred):
+    """
+    中央絶対誤差（MedAE）を四分位範囲（IQR）で正規化した、
+    非常に頑健な評価指標を計算します。
 
-def test_MT_HBM(x_te, y_te, loc_idx_test, model, reg_list, scalers, output_dir, method_bm, trained_model,
-                num_samples_for_vi_pred = config['num_samples_for_vi_pred']
-                ):
-    # --- 予測分布の生成 ---
-    if method_bm == 'mcmc':
-        # MCMCの場合: 事後サンプルを使って予測分布を生成
-        # MCMCオブジェクトから事後サンプルを取得
-        posterior_samples = trained_model.get_samples()
-        predictive = Predictive(model, posterior_samples=posterior_samples, return_sites=("obs",))
-        #samples = predictive(x_te)
-    elif method_bm == 'vi':
-        # VIで学習したガイドから事後サンプルを生成
-        predictive = Predictive(model, guide=trained_model, num_samples=num_samples_for_vi_pred)
+    Args:
+        y_true (array-like): 実際の観測値。
+        y_pred (array-like): モデルによる予測値。
 
-    # 予測を実行
-    test_predictions = predictive(x = x_te)
+    Returns:
+        float: 正規化されたMedAEの値。
+    """
+    y_true = np.asarray(y_true)
+    y_pred = np.asarray(y_pred)
 
-    # 予測の平均値を計算
-    pred_mean = test_predictions['obs'].mean(axis=0).squeeze(0).cpu().numpy()
-    print(pred_mean.shape)
-    # 出力ごとの予測と実際のデータをリストに格納
-    r2_scores = []
-    mae_scores = []
+    # 1. 中央絶対誤差（MedAE）の計算
+    #medae = median_absolute_error(y_true, y_pred)
+    medae = mean_absolute_error(y_true, y_pred)
 
-    predicts = {}
-    trues = {}
-    for i,reg in enumerate(reg_list):
-        if reg in scalers:
-            if len(reg_list) > 1:
-                output = scalers[reg].inverse_transform(pred_mean[:,i].reshape(-1, 1))
+    # 2. 四分位範囲（IQR）の計算
+    q1 = np.percentile(y_true, 25)
+    q3 = np.percentile(y_true, 75)
+    iqr = q3 - q1
+
+    # 3. 正規化（ゼロ除算を回避）
+    if iqr == 0:
+        return np.inf if medae > 0 else 0.0
+    
+    return medae / iqr
+
+def test_HBM(x_te, y_te, label_te, 
+             #x_val, y_val, label_val, 
+             model, guide, reg_list, scalers, output_dir, device, 
+             test_ids, n_samples_mc=100):
+    #x_te = x_te.to(device)
+
+    predicts, trues = {}, {}
+
+    #model.eval()
+    # with torch.no_grad():
+    #     outputs, _ = model(x_te)
+    outputs = model.get_predictions(guide, x_te, label_te)
+
+    r2_scores, mse_scores = [], []
+    
+    # --- 3. タスクごとに結果を処理 ---
+    for reg in reg_list:
+        # 分類タスクの処理 (省略)
+        if '_rank' in reg or not torch.is_floating_point(y_te[reg]):
+            pass # ...
+
+        # 回帰タスクの処理
+        elif torch.is_floating_point(y_te[reg]):
+            true_tensor = y_te[reg]
+            pred_tensor_for_eval = outputs[reg]['mean']
+            if reg in scalers:
+                scaler = scalers[reg]
+                true = scaler.inverse_transform(true_tensor.cpu().detach().numpy().reshape(-1,1))
+                pred = scaler.inverse_transform(pred_tensor_for_eval.cpu().detach().numpy().reshape(-1,1))
             else:
-                output = scalers[reg].inverse_transform(pred_mean.reshape(-1, 1))
+                # スケーラーなし
+                pred = pred_tensor_for_eval.cpu().detach().numpy().reshape(-1,1)
+                true = true_tensor.cpu().detach().numpy().reshape(-1,1)
+
+            # --- 3-3. (★) MC Dropout 結果のCSV保存 ---
+            # ( ... 元のコードと同じ ... )
+            # test_ids を numpy 配列に変換
+            ids_flat = np.asarray(test_ids).flatten()
+            true_flat = true.flatten()
+            pred_flat = pred.flatten()
             
-            true = scalers[reg].inverse_transform(y_te[reg].cpu().numpy().reshape(-1, 1))
-        else:
-            if len(reg_list) > 1:
-                output = pred_mean[:,i].reshape(-1, 1)
+            predicts[reg], trues[reg] = pred, true
+            #print(pred.shape)
+            
+            # --- 4. 結果のプロット（エラーバー付き） ---
+            # ( ... 元のコードと同じ ... )
+            result_dir = os.path.join(output_dir, reg)
+            os.makedirs(result_dir, exist_ok=True)
+            
+            plt.figure(figsize=(12, 12))
+            
+            plt.scatter(true.flatten(), pred.flatten(), color='royalblue', alpha=0.7)
+            
+            # IDのアノテーション
+            if len(ids_flat) == len(true_flat):
+                # (★注意) データが多いと重なるため、件数が多い場合はコメントアウトを推奨
+                # print(f"INFO: タスク {reg} のプロットに {len(ids_flat)} 件のアノテーションを追加します。")
+                if len(ids_flat) <= 200: # 例: 200件以下ならアノテーション
+                    for i in range(len(ids_flat)):
+                        plt.annotate(
+                            ids_flat[i], (true_flat[i], pred_flat[i]),
+                            textcoords="offset points", xytext=(0, 5),
+                            ha='center', fontsize=6, alpha=0.5
+                        )
+                else:
+                    print(f"INFO: タスク {reg} のデータ件数 ({len(ids_flat)}) が多いため、アノテーションをスキップします。")
             else:
-                output = pred_mean.reshape(-1, 1)
-            true = y_te[reg].cpu().numpy().reshape(-1, 1)
+                 print(f"WARN: タスク {reg} の test_ids (len {len(ids_flat)}) と予測 (len {len(true_flat)}) の長さが異なります。アノテーションをスキップします。")
 
-        predicts[reg] = output
-        trues[reg] = true
+            min_val = min(np.min(true), np.min(pred))
+            max_val = max(np.max(true), np.max(pred))
+            plt.plot([min_val, max_val], [min_val, max_val], 'r--', label='y=x')
+            plt.xlabel('True Values')
+            plt.ylabel('Predicted Values')
+            plt.title(f'True vs Predicted for {reg}')
+            plt.legend()
+            plt.grid(True)
 
-        result_dir = os.path.join(output_dir, reg)
-        os.makedirs(result_dir,exist_ok=True)
+            plt.savefig(os.path.join(result_dir, 'true_predict_with_ci.png'))
+            plt.close()
+            
+            # 誤差のヒストグラム (変更なし)
+            plt.figure()
+            plt.hist((true - pred).flatten(), bins=30, color='skyblue', edgecolor='black')
+            plt.title("Histogram of Prediction Error")
+            plt.xlabel("True - Predicted")
+            plt.ylabel("Frequency")
+            plt.grid(True)
+            plt.savefig(os.path.join(result_dir, 'loss_hist.png'))
+            plt.close()
 
-        #print(true.shape)
-        #print(output.shape)
+            # 評価指標の計算 (変更なし)
+            corr_matrix = np.corrcoef(true.flatten(), pred.flatten())
+            r2 = corr_matrix[0, 1]
+            r2_scores.append(r2)
+            
+            try:
+                mae = normalized_medae_iqr(true, pred) # カスタム指標
+            except NameError:
+                print(f"WARN: normalized_medae_iqr が定義されていません。タスク {reg} の評価に MAE (mean_absolute_error) を使用します。")
+                mae = mean_absolute_error(true, pred)
+            mse_scores.append(mae)
 
-        TP_dir = os.path.join(result_dir, 'true_predict.png')
-        plt.figure()
-        plt.scatter(true,output)
-        plt.xlabel('true_data')
-        plt.ylabel('predicted_data')
-        plt.tight_layout()
-        plt.savefig(TP_dir)
-        plt.close()
-
-        hist_dir = os.path.join(result_dir, 'mae_hist.png')
-        plt.figure()
-        plt.hist(true-output, bins=30, color='skyblue', edgecolor='black')  # bins=階級数
-        plt.title("Histogram of Normally Distributed Data")
-        plt.xlabel("MAE")
-        plt.ylabel("Frequency")
-        plt.grid(True)
-        plt.tight_layout()
-        #plt.show()
-        plt.savefig(hist_dir)
-        plt.close()
-
-        #print(output)
-        #print(true)
-
-        #print(output.flatten())
-        #print(true.flatten())
-        #print(true.shape)
-        #print(output.shape)
-        corr_matrix = np.corrcoef(true.flatten(),output.flatten())
-        #print(corr_matrix)
-
-        # 相関係数（xとyの間の値）は [0, 1] または [1, 0] の位置
-        r2 = corr_matrix[0, 1]
-        #print(r2)
-        r2_scores.append(r2)
-        #mse = mean_squared_error(true,output)
-        mae = mean_absolute_error(true,output)
-        #print(mse)
-        mae_scores.append(mae)
-
-    return predicts, trues, r2_scores, mae_scores
+    return predicts, trues, r2_scores, mse_scores

@@ -1221,12 +1221,13 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                             )
     visualize_and_save_tsne(model, vis_loader, device, train_dir, perplexity=30, n_iter=1000)
 
-    label_dataset = CustomDatasetAdv(x_tr, vis_label)
-    label_loader = DataLoader(label_dataset, batch_size=batch_size, 
-                            shuffle=True,
-                            #sampler=sampler
-                            )
-    visualize_and_save_tsne(model, label_loader, device, train_dir, perplexity=30, n_iter=1000)
+    if vis_label != {}:
+        label_dataset = CustomDatasetAdv(x_tr, vis_label)
+        label_loader = DataLoader(label_dataset, batch_size=batch_size, 
+                                shuffle=True,
+                                #sampler=sampler
+                                )
+        visualize_and_save_tsne(model, label_loader, device, train_dir, perplexity=30, n_iter=1000)
 
     with torch.no_grad():
         true = {}
