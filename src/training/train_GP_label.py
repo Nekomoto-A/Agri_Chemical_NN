@@ -133,6 +133,9 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
     val_loss_history = {}
     last_epoch = 1
 
+    # y_tr = {k: v + 1e-6 for k, v in y_tr.items()}
+    # y_val = {k: v + 1e-6 for k, v in y_val.items()}
+
     train_dataset = MultiTaskDataset(x_tr, label_tr, y_tr)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, 
                             shuffle=True,
@@ -213,7 +216,10 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
             for reg in reg_list:
                 # ❶ 正解ラベルとモデルの出力を取得
                 true_tr = y_batch[reg].to(device)
-                output = outputs[reg] 
+                output = outputs[reg]
+
+                #print(output.mean.mean().item())
+                #print(f"Lengthscale: {model.gp_layers[0].feature_kernel.lengthscale.item()}")
 
                 #loss = -personal_losses[reg](output, true_tr).sum()
                 #loss = -personal_losses[reg](output, true_tr).mean()

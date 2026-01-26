@@ -235,51 +235,6 @@ class HeteroscedasticMLPLikelihood(Likelihood):
 #         covar_x = self.covar_module(x)
 #         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
 
-import torch
-import gpytorch
-
-class GPLayer(gpytorch.models.ApproximateGP):
-    def __init__(self, feature_dim, label_dim, inducing_points_num=32, is_noise_gp=False):
-        total_dim = feature_dim + label_dim
-        inducing_points = torch.randn(inducing_points_num, total_dim)
-        
-        variational_distribution = gpytorch.variational.CholeskyVariationalDistribution(inducing_points.size(0))
-        variational_strategy = gpytorch.variational.VariationalStrategy(
-            self, inducing_points, variational_distribution, learn_inducing_locations=True
-        )
-        super(GPLayer, self).__init__(variational_strategy)
-        
-        if is_noise_gp:
-            self.mean_module = gpytorch.means.ConstantMean()
-        else:
-            # 前回のコードにあったDeepMeanを使用
-            self.mean_module = DeepMean(input_dim=total_dim)
-
-        # --- カーネルの書き換え ---
-        # 1. 特徴量部分（0番目〜feature_dim-1番目の次元）に適用するRBFカーネル
-        self.feature_kernel = gpytorch.kernels.RBFKernel(
-            active_dims=torch.arange(0, feature_dim),
-            ard_num_dims=feature_dim
-        )
-        
-        # 2. ラベル埋め込み部分（feature_dim番目〜最後までの次元）に適用する定数カーネル
-        # ConstantKernelは入力値自体は直接計算に使わず、学習可能な定数cを返します。
-        # active_dimsを指定することで、入力の特定の次元に対応させます。
-        self.label_constant_kernel = gpytorch.kernels.ConstantKernel(
-            active_dims=torch.arange(feature_dim, total_dim)
-        )
-
-        # 3. これらを組み合わせる（ScaleKernelで全体をスケーリング）
-        # ここでは積 (feature * label) を採用していますが、
-        # ラベルによって振幅が変わるような効果が得られます。
-        self.covar_module = gpytorch.kernels.ScaleKernel(
-            self.feature_kernel * self.label_constant_kernel
-        )
-
-    def forward(self, x):
-        mean_x = self.mean_module(x)
-        covar_x = self.covar_module(x)
-        return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
 
 # --- 2. ノイズGPを利用する新しいLikelihood ---
 class HeteroscedasticGPLikelihood(Likelihood):
@@ -326,7 +281,103 @@ class HeteroscedasticGPLikelihood(Likelihood):
         
         return MultivariateNormal(latent_mean, latent_covar + torch.diag_embed(noise_var))
 
+import torch
+import gpytorch
+from gpytorch.likelihoods import Likelihood
+from torch.distributions import Gamma as PyTorchGamma
+import torch.nn.functional as F
+
+# PyTorchのGamma分布を継承し、余計な引数(combined_input等)を無視するようにラップ
+class RobustGamma(PyTorchGamma):
+    def log_prob(self, value, **kwargs):
+        # GPyTorchから渡される可能性のある余計な引数を無視して、本来のlog_probのみを実行
+        return super().log_prob(value)
+
+class CustomGammaLikelihood(Likelihood):
+    def __init__(self, batch_shape=torch.Size([])):
+        super().__init__()
+        self.register_parameter(
+            name="raw_shape", 
+            parameter=torch.nn.Parameter(torch.zeros(*batch_shape, 1))
+        )
+        self.register_constraint("raw_shape", gpytorch.constraints.Positive())
+
+    @property
+    def shape(self):
+        return self.raw_shape_constraint.transform(self.raw_shape)
+
+    @shape.setter
+    def shape(self, value):
+        self.initialize(raw_shape=self.raw_shape_constraint.inverse_transform(value))
+
+    def forward(self, function_samples, *args, **kwargs):
+        """
+        **kwargsを追加して、combined_inputなどが渡されてもエラーにならないようにします。
+        """
+        #mu = torch.exp(function_samples)
+        mu = F.softplus(function_samples) + 1e-6
+        gamma_shape = self.shape
+        gamma_scale = mu / gamma_shape
+        
+        # 標準のPyTorchGammaではなく、修正したRobustGammaを返します
+        return RobustGamma(concentration=gamma_shape, rate=1.0 / gamma_scale)
+
+    def marginal(self, function_dist, *args, **kwargs):
+        sample_shape = torch.Size([1000])
+        samples = function_dist.rsample(sample_shape)
+        # ここでも**kwargsを渡せるようにします
+        return self.forward(samples, **kwargs)
+    
+import torch
+import gpytorch
+
+class GPLayer(gpytorch.models.ApproximateGP):
+    def __init__(self, feature_dim, label_dim, inducing_points_num=32, is_noise_gp=False):
+        total_dim = feature_dim + label_dim
+        inducing_points = torch.randn(inducing_points_num, total_dim)
+        
+        variational_distribution = gpytorch.variational.CholeskyVariationalDistribution(inducing_points.size(0))
+        variational_strategy = gpytorch.variational.VariationalStrategy(
+            self, inducing_points, variational_distribution, learn_inducing_locations=True
+        )
+        super(GPLayer, self).__init__(variational_strategy)
+        
+        if is_noise_gp:
+            self.mean_module = gpytorch.means.ConstantMean()
+        else:
+            self.mean_module = DeepMean(input_dim=total_dim)
+
+        # --- カーネルの書き換え ---
+        # 1. 特徴量部分（0番目〜feature_dim-1番目の次元）に適用するRBFカーネル
+        self.feature_kernel = gpytorch.kernels.MaternKernel(
+            active_dims=torch.arange(0, feature_dim),
+            #ard_num_dims=feature_dim,
+            nu=1.5
+        )
+        
+        # 2. ラベル埋め込み部分（feature_dim番目〜最後までの次元）に適用する定数カーネル
+        # ConstantKernelは入力値自体は直接計算に使わず、学習可能な定数cを返します。
+        # active_dimsを指定することで、入力の特定の次元に対応させます。
+        self.label_constant_kernel = gpytorch.kernels.ConstantKernel(
+            active_dims=torch.arange(feature_dim, total_dim)
+        )
+
+        # 3. これらを組み合わせる（ScaleKernelで全体をスケーリング）
+        # ここでは積 (feature * label) を採用していますが、
+        # ラベルによって振幅が変わるような効果が得られます。
+        self.covar_module = gpytorch.kernels.ScaleKernel(
+            #self.feature_kernel * self.label_constant_kernel
+            self.feature_kernel * self.label_constant_kernel
+        )
+
+    def forward(self, x):
+        mean_x = self.mean_module(x)
+        covar_x = self.covar_module(x)
+        return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
+
 from gpytorch.likelihoods import GaussianLikelihood
+from gpytorch.likelihoods import StudentTLikelihood
+#from gpytorch.likelihoods import GammaLikelihood
 
 # --- 3. メインモデルの修正 ---
 class GPFineTuningModel(nn.Module):
@@ -343,7 +394,6 @@ class GPFineTuningModel(nn.Module):
         self.noise_gps = nn.ModuleList() # ノイズ用GPを追加
         self.likelihoods = nn.ModuleList()
         
-        
         for _ in reg_list:
             # メインのGP
             gp_layer = GPLayer(feature_dim=last_shared_layer_dim, label_dim=label_emb_dim)
@@ -356,7 +406,10 @@ class GPFineTuningModel(nn.Module):
             
             # # GPを組み込んだLikelihood
             # self.likelihoods.append(HeteroscedasticGPLikelihood(noise_gp=noise_gp))
-            self.likelihoods.append(GaussianLikelihood())
+            #self.likelihoods.append(GaussianLikelihood())
+            self.likelihoods.append(StudentTLikelihood())
+            #self.likelihoods.append(GammaLikelihood())
+            #self.likelihoods.append(CustomGammaLikelihood())
 
     def forward(self, x, label_emb):
         shared_features = self.shared_block(x)
@@ -384,9 +437,17 @@ class GPFineTuningModel(nn.Module):
                 # Likelihood内でノイズGPが計算される
                 observed_pred = self.likelihoods[i](latent_dist, combined_input=combined_input)
                 
+                pred_mean = observed_pred.mean
+                pred_std = observed_pred.stddev
+
+                if pred_mean.dim() > 1:
+                    pred_mean = pred_mean.mean(dim=0)
+                if pred_std.dim() > 1:
+                    pred_std = pred_std.mean(dim=0)
+
                 mc_outputs[reg] = {
-                    'mean': observed_pred.mean,
-                    'std': observed_pred.stddev
+                    'mean': pred_mean,
+                    'std': pred_std
                 }
         return mc_outputs
     

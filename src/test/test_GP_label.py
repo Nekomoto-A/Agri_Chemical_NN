@@ -128,6 +128,8 @@ def test_MT_DKL(x_te, label_te, y_te, model, reg_list, scalers, output_dir, devi
     # 1. predictメソッドを使用して平均と標準偏差を取得
     # これにより、GPの不確実性（observed_pred.stddev）が取得されます
     mc_results = model.predict(x_te, label_te)
+
+    #y_te = {k: v + 1e-6 for k, v in y_te.items()}
     
     r2_scores, mse_scores = [], []
     
@@ -195,6 +197,23 @@ def test_MT_DKL(x_te, label_te, y_te, model, reg_list, scalers, output_dir, devi
                 label='Predictions with ±1σ'
             )
             #plt.scatter(true.flatten(), pred_mean.flatten(), color='royalblue', alpha=0.7)
+            
+            ids_flat = np.asarray(test_ids).flatten()
+
+            if len(ids_flat) == len(y_true):
+                # (★注意) データが多いと重なるため、件数が多い場合はコメントアウトを推奨
+                # print(f"INFO: タスク {reg} のプロットに {len(ids_flat)} 件のアノテーションを追加します。")
+                if len(ids_flat) <= 200: # 例: 200件以下ならアノテーション
+                    for i in range(len(ids_flat)):
+                        plt.annotate(
+                            ids_flat[i], (y_true[i], y_pred[i]),
+                            textcoords="offset points", xytext=(0, 5),
+                            ha='center', fontsize=6, alpha=0.5
+                        )
+                else:
+                    print(f"INFO: タスク {reg} のデータ件数 ({len(ids_flat)}) が多いため、アノテーションをスキップします。")
+            else:
+                 print(f"WARN: タスク {reg} の test_ids (len {len(ids_flat)}) と予測 (len {len(y_true)}) の長さが異なります。アノテーションをスキップします。")
     
             min_val = min(np.min(true), np.min(pred_mean))
             max_val = max(np.max(true), np.max(pred_mean))
@@ -208,6 +227,8 @@ def test_MT_DKL(x_te, label_te, y_te, model, reg_list, scalers, output_dir, devi
 
             plt.savefig(os.path.join(result_dir, 'true_predict_with_uncertainty.png'))
             plt.close()
+
+
             
             # --- 4. 評価指標の計算 ---
             corr_matrix = np.corrcoef(true.flatten(), pred_mean.flatten())
