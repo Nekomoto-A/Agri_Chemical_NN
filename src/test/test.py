@@ -316,11 +316,13 @@ def test_MT(x_te, y_te, x_val, y_val, model, reg_list, scalers, output_dir, devi
 
             # 評価指標の計算 (変更なし)
             corr_matrix = np.corrcoef(true.flatten(), pred.flatten())
-            r2 = corr_matrix[0, 1]
+            #r2 = corr_matrix[0, 1]
+            r2 = median_absolute_error(true, pred)
             r2_scores.append(r2)
             
             try:
-                mae = normalized_medae_iqr(true, pred) # カスタム指標
+                #mae = normalized_medae_iqr(true, pred) # カスタム指標
+                mae = mean_absolute_error(true, pred) # カスタム指標
             except NameError:
                 print(f"WARN: normalized_medae_iqr が定義されていません。タスク {reg} の評価に MAE (mean_absolute_error) を使用します。")
                 mae = mean_absolute_error(true, pred)
@@ -427,6 +429,12 @@ def calculate_initial_scales(targets, labels_onehot, method='max', fallback_valu
         initial_scales[i] = val
 
     return initial_scales
+
+# def evaluate_indexes(trues, predictions, reg, result_index, evals):
+#     for eval in evals:
+#         if eval == 'MSE':
+            
+
 
 def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predictions, trues, 
                   input_dim, method, index, reg_list, csv_dir, vis_dir, model_name, train_ids, test_ids, features,
@@ -567,7 +575,8 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                  last_shared_layer_dim = latent_dim, 
                                  label_emb_dim = label_dim, 
                                  reg_list = reg_list, 
-                                 shared_learn = False)
+                                 shared_learn = False
+                                 )
 
         elif 'DKL' in model_name:
             from src.models.MT_GP import GPFineTuningModel
@@ -576,6 +585,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                     reg_list = reg_list,
                                     shared_learn = False,
                                     )
+            
         elif 'WGP_NUTS' in model_name:
             from src.models.WGP import PyroGPModel, NUTSGPRunner
             model = PyroGPModel(pretrained_encoder, latent_dim, reg_list)

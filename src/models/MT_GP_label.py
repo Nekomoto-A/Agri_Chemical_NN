@@ -358,7 +358,11 @@ class GPLayer(gpytorch.models.ApproximateGP):
         # 2. ラベル埋め込み部分（feature_dim番目〜最後までの次元）に適用する定数カーネル
         # ConstantKernelは入力値自体は直接計算に使わず、学習可能な定数cを返します。
         # active_dimsを指定することで、入力の特定の次元に対応させます。
-        self.label_constant_kernel = gpytorch.kernels.ConstantKernel(
+        # self.label_constant_kernel = gpytorch.kernels.ConstantKernel(
+        #     active_dims=torch.arange(feature_dim, total_dim)
+        # )
+
+        self.label_constant_kernel = gpytorch.kernels.LinearKernel(
             active_dims=torch.arange(feature_dim, total_dim)
         )
 
@@ -366,8 +370,8 @@ class GPLayer(gpytorch.models.ApproximateGP):
         # ここでは積 (feature * label) を採用していますが、
         # ラベルによって振幅が変わるような効果が得られます。
         self.covar_module = gpytorch.kernels.ScaleKernel(
-            #self.feature_kernel * self.label_constant_kernel
             self.feature_kernel * self.label_constant_kernel
+            #self.feature_kernel + self.label_constant_kernel
         )
 
     def forward(self, x):
@@ -396,7 +400,7 @@ class GPFineTuningModel(nn.Module):
         
         for _ in reg_list:
             # メインのGP
-            gp_layer = GPLayer(feature_dim=last_shared_layer_dim, label_dim=label_emb_dim)
+            gp_layer = GPLayer(feature_dim=last_shared_layer_dim, label_dim=label_emb_dim, is_noise_gp = False)
             self.gp_layers.append(gp_layer)
             # # GPFineTuningModel 内のループ部分（参考）
             
@@ -406,8 +410,8 @@ class GPFineTuningModel(nn.Module):
             
             # # GPを組み込んだLikelihood
             # self.likelihoods.append(HeteroscedasticGPLikelihood(noise_gp=noise_gp))
-            #self.likelihoods.append(GaussianLikelihood())
-            self.likelihoods.append(StudentTLikelihood())
+            self.likelihoods.append(GaussianLikelihood())
+            #self.likelihoods.append(StudentTLikelihood())
             #self.likelihoods.append(GammaLikelihood())
             #self.likelihoods.append(CustomGammaLikelihood())
 

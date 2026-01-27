@@ -228,16 +228,16 @@ def test_MT_DKL(x_te, label_te, y_te, model, reg_list, scalers, output_dir, devi
             plt.savefig(os.path.join(result_dir, 'true_predict_with_uncertainty.png'))
             plt.close()
 
-
-            
             # --- 4. 評価指標の計算 ---
             corr_matrix = np.corrcoef(true.flatten(), pred_mean.flatten())
-            r2 = corr_matrix[0, 1] if not np.isnan(corr_matrix[0, 1]) else 0
+            #r2 = corr_matrix[0, 1] if not np.isnan(corr_matrix[0, 1]) else 0
+            r2 = median_absolute_error(true, pred_mean)
             r2_scores.append(r2)
             
             # カスタム指標の呼び出し、定義されていなければMAE
             try:
-                mae = normalized_medae_iqr(true, pred_mean)
+                #mae = normalized_medae_iqr(true, pred_mean)
+                mae = mean_absolute_error(true, pred_mean)
             except NameError:
                 mae = mean_absolute_error(true, pred_mean)
             mse_scores.append(mae)

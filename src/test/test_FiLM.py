@@ -143,11 +143,13 @@ def test_FiLM(x_te, y_te, label_te,
 
             # 評価指標の計算 (変更なし)
             corr_matrix = np.corrcoef(true.flatten(), pred.flatten())
-            r2 = corr_matrix[0, 1]
+            #r2 = corr_matrix[0, 1]
+            r2 = median_absolute_error(true, pred)
             r2_scores.append(r2)
             
             try:
-                mae = normalized_medae_iqr(true, pred) # カスタム指標
+                #mae = normalized_medae_iqr(true, pred) # カスタム指標
+                mae = mean_absolute_error(true, pred)
             except NameError:
                 print(f"WARN: normalized_medae_iqr が定義されていません。タスク {reg} の評価に MAE (mean_absolute_error) を使用します。")
                 mae = mean_absolute_error(true, pred)

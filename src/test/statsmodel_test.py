@@ -1,4 +1,4 @@
-from sklearn.metrics import r2_score,mean_squared_error,accuracy_score, f1_score, mean_absolute_error
+from sklearn.metrics import r2_score,mean_squared_error,accuracy_score, f1_score, median_absolute_error,mean_absolute_error
 from src.training.statsmodel_train import statsmodel_train
 from src.test.test import write_result
 import numpy as np
@@ -158,10 +158,11 @@ def statsmodel_test(X, Y, models, scalers, reg, result_dir,index, feature_names)
             #r2 = r2_score(true,output)
             corr_matrix = np.corrcoef(Y_pp.ravel(),pred.ravel())
             # 相関係数（xとyの間の値）は [0, 1] または [1, 0] の位置
-            r2 = corr_matrix[0, 1]
+            #r2 = corr_matrix[0, 1]
+            r2 = median_absolute_error(Y_pp, pred)
             #mse = mean_squared_error(pred,Y_pp)
-            #mse = mean_absolute_error(pred,Y_pp)
-            mse = normalized_medae_iqr(pred, Y_pp)
+            mse = mean_absolute_error(Y_pp, pred)
+            #mse = normalized_medae_iqr(pred, Y_pp)
             print(f'{name}：')
             print(f'決定係数：{r2}')
             print(f'MAE：{mse}')

@@ -141,7 +141,7 @@ fold_eval.py:
     '067_20_Naga_Pump', '050_20_Sait_Stra', '048_20_Sait_Yama',  '049_20_Sait_Yama', 
 
     '214_21_Miyz_Edam', '273_22_Naga_Rice', '235_21_Miyz_Spin',
-    '164_21_Miyz_Spin', 
+    #'164_21_Miyz_Spin', 
 
     #'171_21_Miyz_Spin', '159_21_Miyz_Spin', '163_21_Miyz_Spin', '164_21_Miyz_Spin',
     #'172_21_Miyz_Spin', '158_21_Miyz_Spin', '152_21_Miyz_Spin', '165_21_Miyz_Spin'
@@ -153,21 +153,24 @@ fold_eval.py:
   target_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\chem_data.xlsx' #C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\chem_data.xlsx #
   data_inte: False
   transformer: ['YJ', None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
-  reg_loss_fanction: ['mse', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
+  reg_loss_fanction: ['mae', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
+  eval: ['MAE', 'MedAE']
   labels: ['crop'] #['experimental_purpose'] #
   embedding: 'Word2Vec'
   embedding_size: 8
   latent_dim: 32
 main.py:
-  result_dir: 'result_DKL_t'
+  result_dir: 'result_DKL_eval'
   reg_list: [
-            [CEC],
+            
             ['Available.P'],
             ['pH'],
             #['Available.P', 'crop'], #, 'pH'
             ['NO3.N'],
             ['EC'], 
+            ['Humus'],
             ['Exchangeable.K'],
+            [CEC],
             #['pH', 'NO3.N',],
             #'pH'
             #['pH', 'Available.P',],

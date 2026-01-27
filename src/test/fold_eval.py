@@ -278,7 +278,8 @@ def fold_evaluate(reg_list, output_dir, device,
                   labels = config['labels'],
                   embedding = config['embedding'], 
                   latent_dim = config['latent_dim'], 
-                  embedding_size = config['embedding_size']
+                  embedding_size = config['embedding_size'], 
+                  eval = config['eval']
                   ):
     #if feature_selection_all:
     #   output_dir = os.path.join(fsdir, output_dir)
