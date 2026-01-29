@@ -352,7 +352,11 @@ class GPLayer(gpytorch.models.ApproximateGP):
         self.feature_kernel = gpytorch.kernels.MaternKernel(
             active_dims=torch.arange(0, feature_dim),
             #ard_num_dims=feature_dim,
-            nu=1.5
+            nu=2.5
+        )
+
+        self.feature_kernel2 = gpytorch.kernels.LinearKernel(
+            active_dims=torch.arange(feature_dim, total_dim)
         )
         
         # 2. ラベル埋め込み部分（feature_dim番目〜最後までの次元）に適用する定数カーネル
@@ -362,16 +366,22 @@ class GPLayer(gpytorch.models.ApproximateGP):
         #     active_dims=torch.arange(feature_dim, total_dim)
         # )
 
-        self.label_constant_kernel = gpytorch.kernels.LinearKernel(
-            active_dims=torch.arange(feature_dim, total_dim)
+        # self.label_constant_kernel = gpytorch.kernels.LinearKernel(
+        #     active_dims=torch.arange(feature_dim, total_dim)
+        # )
+        
+        self.label_constant_kernel = gpytorch.kernels.RBFKernel(
+            active_dims=torch.arange(label_dim, total_dim)
         )
 
         # 3. これらを組み合わせる（ScaleKernelで全体をスケーリング）
         # ここでは積 (feature * label) を採用していますが、
         # ラベルによって振幅が変わるような効果が得られます。
         self.covar_module = gpytorch.kernels.ScaleKernel(
-            self.feature_kernel * self.label_constant_kernel
-            #self.feature_kernel + self.label_constant_kernel
+            #self.feature_kernel * self.label_constant_kernel
+            self.feature_kernel + self.label_constant_kernel
+            #(self.feature_kernel + self.feature_kernel2) * self.label_constant_kernel
+            #self.feature_kernel2 * self.label_constant_kernel
         )
 
     def forward(self, x):

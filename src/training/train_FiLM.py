@@ -658,6 +658,8 @@ class MAPELoss(nn.Module):
         # 平均を返す
         return torch.mean(relative_error)
 
+
+
 def training_FiLM(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, model_name,loss_sum, device, batch_size, #optimizer, 
                 label_tr, label_val,
                 scalers, 

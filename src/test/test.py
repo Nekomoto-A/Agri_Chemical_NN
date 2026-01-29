@@ -620,7 +620,14 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                     last_shared_layer_dim = latent_dim,
                                     reg_list = reg_list
                                     )
-
+        elif 'MGP_label' in model_name:
+            from src.models.MGP_label import MGPFineTuningModel
+            model = MGPFineTuningModel(pretrained_encoder = pretrained_encoder, 
+                                 last_shared_layer_dim = latent_dim, 
+                                 label_emb_dim = label_dim, 
+                                 reg_list = reg_list, 
+                                 shared_learn = False
+                                 )
         else:
             if 'VAE' in model_name:
                 from src.models.VAE import FineTuningModel_vae
@@ -1006,6 +1013,24 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                                           model_trained,reg_list,scalers,
                                                           output_dir=vis_dir,
                                                           device = device, test_ids = test_ids)
+    elif 'MGP_label' in model_name:
+        print('labelありのMGPを使用します')
+        from src.training.train_MGP_label import training_MT_DKL
+        model_trained = training_MT_DKL(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, 
+                                        model = model, reg_list = reg_list, output_dir = vis_dir, 
+                                        model_name = model_name, loss_sum = loss_sum, device = device, 
+                                        batch_size = batch_size, 
+                                        label_tr = labels_train, 
+                                        label_val = labels_val,
+                                        scalers = scalers, 
+                                        train_ids = train_ids, 
+                                    )
+        from src.test.test_MGP_label import test_MT_DKL
+        predicts, true, r2_results, mse_results = test_MT_DKL(X_test,labels_test, Y_test, 
+                                                                model_trained,reg_list,scalers,
+                                                                output_dir=vis_dir,
+                                                                device = device, test_ids = test_ids
+                                                                )
     else:
         print('通常のFTを使用します')
         #optimizer = optim.Adam(model.parameters(), lr=0.001)

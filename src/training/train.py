@@ -809,7 +809,8 @@ class LDSMSELoss(nn.Module):
             Tensor: 重み付けされた損失の平均
         """
         # 通常の二乗誤差: (y_pred - y_true)^2
-        loss = (prediction - target) ** 2
+        #loss = (prediction - target) ** 2
+        loss = torch.abs(prediction - target)
         
         # 重みを適用: weight * (y_pred - y_true)^2
         # 注意: weightsはバッチサイズと同じ形状である必要があります
