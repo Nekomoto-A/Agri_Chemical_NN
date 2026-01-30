@@ -1093,6 +1093,7 @@ def train_and_evaluate_model_with_id(train_df, test_df, target_col, feature_cols
     IDによるアノテーション付き散布図を作成する関数
     """
     # 0. 保存先ディレクトリの作成
+    output_dir = os.path.join(output_dir, 'stats_labels')
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
