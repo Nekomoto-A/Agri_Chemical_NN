@@ -465,6 +465,12 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
     if labels_train != {}:
         label_dim = labels_train.shape[1]
 
+    target_means_dict = {}
+    for i, reg in enumerate(reg_list):
+        # 学習データの各タスクの平均を計算
+        m = Y_train[reg].mean().item()
+        target_means_dict[reg] = m
+
     #print(Y_train)
     for reg in reg_list:
         if not Y_val:
@@ -575,6 +581,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                  last_shared_layer_dim = latent_dim, 
                                  label_emb_dim = label_dim, 
                                  reg_list = reg_list, 
+                                 target_means = target_means_dict,
                                  shared_learn = False
                                  )
 

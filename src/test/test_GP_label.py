@@ -129,7 +129,7 @@ def test_MT_DKL(x_te, label_te, y_te, model, reg_list, scalers, output_dir, devi
     # これにより、GPの不確実性（observed_pred.stddev）が取得されます
     mc_results = model.predict(x_te, label_te)
 
-    #y_te = {k: v + 1e-6 for k, v in y_te.items()}
+    y_te = {k: v + 1e-6 for k, v in y_te.items()}
     
     r2_scores, mse_scores = [], []
     

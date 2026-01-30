@@ -323,7 +323,8 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
                           source_reg_list = config['reg_list2'],
                           source_exclude_ids = config['exclude_ids2'],
                           combat = config['combat'],
-                          fold = None
+                          fold = None, 
+                          stats_features = config['stats_features']
                           ):
     
     if isinstance(val_size, (int, float)):
@@ -333,7 +334,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
         y_train_split = y_train
     #print(x_train_split)
     #print(y_train_split)
-    
+
     if data_inte:
         os_name = platform.system()
         if os_name == 'Linux':
@@ -544,6 +545,15 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
     #Y_train_tensor, Y_val_tensor, Y_test_tensor = [], [], []
     Y_train_tensor, Y_val_tensor, Y_test_tensor = {}, {}, {}
     label_train_tensor, label_val_tensor, label_test_tensor = {}, {}, {}
+
+    _ = train_and_evaluate_model_with_id(
+        train_df=y_train_split,
+        test_df=y_test,
+        target_col=reg_list,
+        feature_cols=stats_features,
+        id_col = 'crop-id',
+        output_dir=fold
+    )
 
     for reg,tr in zip(reg_list,transformer):
         if '_rank' in reg:
@@ -1070,4 +1080,79 @@ def visualize_tsne_with_categorical_labels(X, Y_series, save_dir, filename="tsne
     plt.close()
 
     print(f"プロットが正常に保存されました: {save_path}")
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import os
+from sklearn.preprocessing import LabelEncoder
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error, median_absolute_error, r2_score
 
+def train_and_evaluate_model_with_id(train_df, test_df, target_col, feature_cols, id_col, output_dir):
+    """
+    IDによるアノテーション付き散布図を作成する関数
+    """
+    # 0. 保存先ディレクトリの作成
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    # 1. 特徴量、ターゲット、およびIDの抽出
+    X_train = train_df[feature_cols].copy()
+    y_train = train_df[target_col]
+    X_test = test_df[feature_cols].copy()
+    y_test = test_df[target_col]
+    test_ids = test_df[id_col].values  # アノテーション用のIDリスト
+
+    # 2. ラベルデータの自動判別と変換
+    label_cols = X_train.select_dtypes(include=['object', 'category']).columns.tolist()
+    if label_cols:
+        for col in label_cols:
+            le = LabelEncoder()
+            X_train[col] = le.fit_transform(X_train[col].astype(str))
+            X_test[col] = le.transform(X_test[col].astype(str))
+
+    # 3. モデル構築と予測
+    model = RandomForestRegressor(n_estimators=100, random_state=42)
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+
+    # 4. データの平坦化（前回のValueError対策）
+    y_test_flat = y_test.values.flatten() if hasattr(y_test, 'values') else y_test.flatten()
+    y_pred_flat = y_pred.flatten()
+
+    # 5. 指標計算とCSV保存
+    metrics = {
+        'MAE': mean_absolute_error(y_test_flat, y_pred_flat),
+        'MedAE': median_absolute_error(y_test_flat, y_pred_flat),
+        'R2_Score': r2_score(y_test_flat, y_pred_flat)
+    }
+    pd.DataFrame(list(metrics.items()), columns=['Metric', 'Value']).to_csv(
+        os.path.join(output_dir, 'evaluation_metrics.csv'), index=False
+    )
+
+    # 6. アノテーション付き散布図の作成
+    plt.figure(figsize=(12, 10)) # IDが見やすいよう少し大きめに設定
+    sns.scatterplot(x=y_test_flat, y=y_pred_flat, alpha=0.6)
+    
+    # 各点にIDをアノテーション
+    for i, txt in enumerate(test_ids):
+        plt.annotate(txt, (y_test_flat[i], y_pred_flat[i]), 
+                     fontsize=8, 
+                     xytext=(5, 5), 
+                     textcoords='offset points',
+                     alpha=0.7)
+
+    # y=xのライン
+    lims = [min(y_test_flat.min(), y_pred_flat.min()), 
+            max(y_test_flat.max(), y_pred_flat.max())]
+    plt.plot(lims, lims, 'r--', alpha=0.75, zorder=0)
+    
+    plt.xlabel('Actual Values')
+    plt.ylabel('Predicted Values')
+    plt.title(f'Actual vs Predicted (Annotated by {id_col})')
+    
+    plt.savefig(os.path.join(output_dir, 'prediction_scatter_annotated.png'))
+    plt.close()
+
+    print(f"処理完了！IDアノテーション付きグラフを保存しました。")
+    return model

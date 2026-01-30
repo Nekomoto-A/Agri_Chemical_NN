@@ -133,8 +133,8 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
     val_loss_history = {}
     last_epoch = 1
 
-    # y_tr = {k: v + 1e-6 for k, v in y_tr.items()}
-    # y_val = {k: v + 1e-6 for k, v in y_val.items()}
+    y_tr = {k: v + 1e-6 for k, v in y_tr.items()}
+    y_val = {k: v + 1e-6 for k, v in y_val.items()}
 
     train_dataset = MultiTaskDataset(x_tr, label_tr, y_tr)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, 
@@ -250,6 +250,10 @@ def training_MT_DKL(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir,
             #     l1_norm += param.abs().sum()
 
             learning_loss.backward()
+
+            # 勾配クリッピングを追加：勾配が大きすぎる場合に抑制する
+            #torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
+
             optimizer.step()
 
         for reg in reg_list:

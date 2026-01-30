@@ -4,7 +4,7 @@ MT_CNN_Attention.py:
   shared_layers: [(64,3,1,1)]
 dataset.py:
   non_outlier: None
-  val_size: 0.3
+  val_size: 0.2
   level: 7
   feature_transformer: 'CLR'
   softlabel: True
@@ -26,6 +26,7 @@ dataset.py:
   reg_list2: ['experimental_purpose'] #['pH_dry_soil'] #[] #['pH_dry_soil'] #[] #
   exclude_ids2: []
   combat: False
+  stats_features: ['crop', 'pref',  'lati', 'long']
 train.py:
   early_stopping: True
   patience: 10
@@ -51,13 +52,13 @@ train.py:
   AdaBN: False
   FDS: 'DWMixup'
 train_GP.py:
-  epochs: 10000
+  epochs: 5000
   patience: 20
   early_stopping: True
   visualize: False
   validation: True
   least_epoch: 0
-  learning_rate: [0.1]
+  learning_rate: [0.01]
   weights: [0.1, 0.9, 1.0, 1.0, 1.0, 1.0]
   vis_step: 5
   tr_loss: False
@@ -126,7 +127,7 @@ fold_eval.py:
   carr_calc: False
   marginal_hist: False
   k_fold: 5
-  model_name: 'DCAE_DKL_label'
+  model_name: 'DCAE_FiLM'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
@@ -153,20 +154,20 @@ fold_eval.py:
   target_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\chem_data.xlsx' #C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\chem_data.xlsx #
   data_inte: False
   transformer: [None, None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
-  reg_loss_fanction: ['mae', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
+  reg_loss_fanction: ['hloss', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
   eval: [None,  'MedAE']
   labels: ['crop'] #['experimental_purpose'] #
   embedding: 'Word2Vec'
   embedding_size: 8
   latent_dim: 32
 main.py:
-  result_dir: 'result_kernel3'
+  result_dir: 'result_film_huber'
   reg_list: [
             ['Available.P'],
             ['pH'],
             #['Available.P', 'crop'], #, 'pH'
             ['NO3.N'],
-            ['EC'], 
+            #['EC'], 
             ['Humus'],
             ['Exchangeable.K'],
             [CEC],

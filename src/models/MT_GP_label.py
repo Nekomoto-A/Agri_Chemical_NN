@@ -281,6 +281,63 @@ class HeteroscedasticGPLikelihood(Likelihood):
         
         return MultivariateNormal(latent_mean, latent_covar + torch.diag_embed(noise_var))
 
+class HeteroscedasticStudentTLikelihood(gpytorch.likelihoods.Likelihood):
+    def __init__(self, noise_gp, deg_free_init=20.0):
+        super().__init__()
+        self.noise_gp = noise_gp
+        self.register_parameter(
+            name="raw_deg_free", 
+            parameter=torch.nn.Parameter(torch.tensor([deg_free_init]))
+        )
+        self.register_constraint("raw_deg_free", gpytorch.constraints.GreaterThan(2.0))
+
+    @property
+    def deg_free(self):
+        return self.raw_deg_free_constraint.transform(self.raw_deg_free)
+
+    def forward(self, function_samples, *args, **kwargs):
+        # expected_log_prob 内で明示的に呼び出すため、
+        # ここでは kwargs からではなく args 等から直接取る形でも良いですが、
+        # 安全のために kwargs もチェックします。
+        combined_input = kwargs.get("combined_input")
+        
+        noise_dist = self.noise_gp(combined_input)
+        scale = torch.exp(noise_dist.mean)
+        
+        # function_samples は [num_samples, batch_size] の形状
+        # scale を [1, batch_size] にしてブロードキャスト可能にする
+        if scale.dim() < function_samples.dim():
+            scale = scale.unsqueeze(0)
+
+        return torch.distributions.StudentT(
+            df=self.deg_free,
+            loc=function_samples,
+            scale=scale
+        )
+
+    def expected_log_prob(self, target, input_dist, *args, **kwargs):
+        # 1. 引数から combined_input を取り出す（kwargsから消去）
+        combined_input = kwargs.pop("combined_input", None)
+        if combined_input is None:
+            raise RuntimeError("Heteroscedastic Student-t requires combined_input")
+
+        # 2. 潜在分布 (GPの出力) からサンプルを生成
+        # Variational ELBO の計算に必要なモンテカルロサンプリング
+        num_samples = gpytorch.settings.num_likelihood_samples.value()
+        samples = input_dist.rsample(torch.Size([num_samples]))
+
+        # 3. 自分の forward を呼んで StudentT 分布オブジェクトを取得
+        # ここでだけ combined_input を使い、分布オブジェクトを作る
+        res_dist = self.forward(samples, combined_input=combined_input)
+
+        # 4. log_prob を計算
+        # ここで target (正解ラベル) に対する対数尤度を求める
+        # kwargs にはもう combined_input は入っていないので安全
+        log_prob = res_dist.log_prob(target)
+
+        # 5. サンプル方向（dim=0）で平均をとって返す
+        return log_prob.mean(dim=0)
+
 import torch
 import gpytorch
 from gpytorch.likelihoods import Likelihood
@@ -314,8 +371,8 @@ class CustomGammaLikelihood(Likelihood):
         """
         **kwargsを追加して、combined_inputなどが渡されてもエラーにならないようにします。
         """
-        #mu = torch.exp(function_samples)
-        mu = F.softplus(function_samples) + 1e-6
+        mu = torch.exp(function_samples)
+        #mu = F.softplus(function_samples) + 1e-6
         gamma_shape = self.shape
         gamma_scale = mu / gamma_shape
         
@@ -329,10 +386,64 @@ class CustomGammaLikelihood(Likelihood):
         return self.forward(samples, **kwargs)
     
 import torch
+import torch.nn as nn
+import gpytorch
+import math
+from gpytorch.likelihoods import Likelihood
+from gpytorch.distributions import MultivariateNormal
+from torch.distributions import Gamma
+
+class HeteroscedasticGammaLikelihood(Likelihood):
+    def __init__(self, noise_gp):
+        super().__init__()
+        self.noise_gp = noise_gp
+
+    def _get_params(self, f_samples, g_samples):
+        # Softplusで正の値を保証し、1e-4で0への張り付きを防止
+        # mu = torch.nn.functional.softplus(f_samples).clamp(min=1e-4)
+        # sigma_sq = torch.nn.functional.softplus(g_samples).clamp(min=1e-4)
+        mu = torch.nn.functional.softplus(f_samples).clamp(min=1e-2, max=1e6)
+        sigma_sq = torch.nn.functional.softplus(g_samples).clamp(min=1e-2, max=1e6)
+        
+        # ガンマ分布のパラメータ(alpha: 形状, beta: 逆尺度)に変換
+        alpha = (mu ** 2) / sigma_sq
+        beta = mu / sigma_sq
+        return alpha, beta
+
+    def forward(self, function_samples, combined_input, **kwargs):
+        noise_dist = self.noise_gp(combined_input)
+        # 予測時はノイズGPの平均(mean)を使用
+        alpha, beta = self._get_params(function_samples, noise_dist.mean)
+        return Gamma(concentration=alpha, rate=beta)
+
+    def expected_log_prob(self, target, function_dist, combined_input, **kwargs):
+        # メインGPとノイズGPから再パラメータ化サンプルを取得
+        num_samples = 16 
+        f_samples = function_dist.rsample(torch.Size([num_samples]))
+        
+        noise_dist = self.noise_gp(combined_input)
+        g_samples = noise_dist.rsample(torch.Size([num_samples]))
+
+        alpha, beta = self._get_params(f_samples, g_samples)
+        
+        # ターゲットをサンプル数に合わせて拡張
+        # target: (batch), log_prob: (num_samples, batch)
+        dist = Gamma(concentration=alpha, rate=beta)
+        return dist.log_prob(target).mean(dim=0)
+
+    def __call__(self, latent_dist, combined_input, **kwargs):
+        if not isinstance(latent_dist, MultivariateNormal):
+            return super().__call__(latent_dist, combined_input=combined_input, **kwargs)
+        
+        noise_dist = self.noise_gp(combined_input)
+        alpha, beta = self._get_params(latent_dist.mean, noise_dist.mean)
+        return Gamma(concentration=alpha, rate=beta)
+    
+import torch
 import gpytorch
 
 class GPLayer(gpytorch.models.ApproximateGP):
-    def __init__(self, feature_dim, label_dim, inducing_points_num=32, is_noise_gp=False):
+    def __init__(self, feature_dim, label_dim, target_mean, inducing_points_num=32, is_noise_gp=False):
         total_dim = feature_dim + label_dim
         inducing_points = torch.randn(inducing_points_num, total_dim)
         
@@ -351,14 +462,18 @@ class GPLayer(gpytorch.models.ApproximateGP):
         # 1. 特徴量部分（0番目〜feature_dim-1番目の次元）に適用するRBFカーネル
         self.feature_kernel = gpytorch.kernels.MaternKernel(
             active_dims=torch.arange(0, feature_dim),
-            #ard_num_dims=feature_dim,
-            nu=2.5
+            ard_num_dims=feature_dim,
+            nu=1.5, 
+            # 長さスケールが大きくなりすぎないように上限を設ける例
+            #lengthscale_constraint=gpytorch.constraints.Interval(0.01, 0.5)
         )
 
         self.feature_kernel2 = gpytorch.kernels.LinearKernel(
             active_dims=torch.arange(feature_dim, total_dim)
         )
         
+        self.feature_kernel.initialize(lengthscale=0.1)
+
         # 2. ラベル埋め込み部分（feature_dim番目〜最後までの次元）に適用する定数カーネル
         # ConstantKernelは入力値自体は直接計算に使わず、学習可能な定数cを返します。
         # active_dimsを指定することで、入力の特定の次元に対応させます。
@@ -378,10 +493,14 @@ class GPLayer(gpytorch.models.ApproximateGP):
         # ここでは積 (feature * label) を採用していますが、
         # ラベルによって振幅が変わるような効果が得られます。
         self.covar_module = gpytorch.kernels.ScaleKernel(
-            #self.feature_kernel * self.label_constant_kernel
-            self.feature_kernel + self.label_constant_kernel
-            #(self.feature_kernel + self.feature_kernel2) * self.label_constant_kernel
-            #self.feature_kernel2 * self.label_constant_kernel
+            #self.feature_kernel
+            self.feature_kernel * self.label_constant_kernel, 
+            #self.feature_kernel + self.label_constant_kernel, 
+            #(self.feature_kernel + self.feature_kernel2) * self.label_constant_kernel, 
+            #self.feature_kernel2 * self.label_constant_kernel, 
+
+            #outputscale_constraint=gpytorch.constraints.GreaterThan(1e-4)
+
         )
 
     def forward(self, x):
@@ -395,7 +514,7 @@ from gpytorch.likelihoods import StudentTLikelihood
 
 # --- 3. メインモデルの修正 ---
 class GPFineTuningModel(nn.Module):
-    def __init__(self, pretrained_encoder, last_shared_layer_dim, label_emb_dim, reg_list, shared_learn=True):
+    def __init__(self, pretrained_encoder, last_shared_layer_dim, label_emb_dim, reg_list, target_means=None, shared_learn=False):
         super(GPFineTuningModel, self).__init__()
         self.reg_list = reg_list
         self.shared_block = pretrained_encoder
@@ -404,26 +523,41 @@ class GPFineTuningModel(nn.Module):
         for param in self.shared_block.parameters():
             param.requires_grad = shared_learn
         
+        # ターゲットごとの平均値設定 (なければ 1.0)
+        if target_means is None:
+            target_means = {reg: 1.0 for reg in reg_list}
+
         self.gp_layers = nn.ModuleList()
         self.noise_gps = nn.ModuleList() # ノイズ用GPを追加
         self.likelihoods = nn.ModuleList()
         
-        for _ in reg_list:
+        for reg in reg_list:
+            t_mean = target_means.get(reg, 1.0)
+            # ターゲットごとの初期平均を取得
             # メインのGP
-            gp_layer = GPLayer(feature_dim=last_shared_layer_dim, label_dim=label_emb_dim, is_noise_gp = False)
+            gp_layer = GPLayer(feature_dim=last_shared_layer_dim, label_dim=label_emb_dim,target_mean=t_mean, is_noise_gp = True)
+            #gp_layer = GPLayer(feature_dim=last_shared_layer_dim, label_dim=label_emb_dim, is_noise_gp = True)
             self.gp_layers.append(gp_layer)
-            # # GPFineTuningModel 内のループ部分（参考）
-            
+
             # # ノイズ推定用のGP
-            # noise_gp = GPLayer(feature_dim=last_shared_layer_dim, label_dim=label_emb_dim, is_noise_gp=True)
-            # self.noise_gps.append(noise_gp)
+            noise_gp = GPLayer(feature_dim=last_shared_layer_dim, label_dim=label_emb_dim, target_mean=t_mean, is_noise_gp=False)
+            self.noise_gps.append(noise_gp)
             
             # # GPを組み込んだLikelihood
-            # self.likelihoods.append(HeteroscedasticGPLikelihood(noise_gp=noise_gp))
-            self.likelihoods.append(GaussianLikelihood())
+            #self.likelihoods.append(HeteroscedasticGPLikelihood(noise_gp=noise_gp))
+            #self.likelihoods.append(HeteroscedasticGammaLikelihood(noise_gp=noise_gp))
+            #self.likelihoods.append(GaussianLikelihood())
             #self.likelihoods.append(StudentTLikelihood())
             #self.likelihoods.append(GammaLikelihood())
             #self.likelihoods.append(CustomGammaLikelihood())
+            self.likelihoods.append(
+                StudentTLikelihood(
+                    deg_free_prior=gpytorch.priors.GammaPrior(2.0, 0.01), # 裾の長さを許容する事前分布
+                    deg_free_constraint=gpytorch.constraints.GreaterThan(2.0) # 数学的安定性のための下限
+                )
+            )
+            # 組み合わせたLikelihood
+            #self.likelihoods.append(HeteroscedasticStudentTLikelihood(noise_gp=noise_gp))
 
     def forward(self, x, label_emb):
         shared_features = self.shared_block(x)
