@@ -546,7 +546,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
     Y_train_tensor, Y_val_tensor, Y_test_tensor = {}, {}, {}
     label_train_tensor, label_val_tensor, label_test_tensor = {}, {}, {}
 
-    _ = train_and_evaluate_model_with_id(
+    _ = full_analysis_pipeline(
         train_df=y_train_split,
         test_df=y_test,
         target_col=reg_list,
@@ -554,6 +554,17 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
         id_col = 'crop-id',
         output_dir=fold
     )
+
+    _ = features_label_analysis_pipeline(
+                features_train = x_train_split, 
+                features_test = x_test, 
+                train_df=y_train_split,
+                test_df=y_test,
+                target_col=reg_list,
+                feature_cols=stats_features,
+                id_col = 'crop-id',
+                output_dir=fold
+                )
 
     for reg,tr in zip(reg_list,transformer):
         if '_rank' in reg:
@@ -1080,80 +1091,349 @@ def visualize_tsne_with_categorical_labels(X, Y_series, save_dir, filename="tsne
     plt.close()
 
     print(f"プロットが正常に保存されました: {save_path}")
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
+import shap
+import umap
+import numpy as np
 from sklearn.preprocessing import LabelEncoder
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, median_absolute_error, r2_score
+from sklearn.decomposition import PCA
 
-def train_and_evaluate_model_with_id(train_df, test_df, target_col, feature_cols, id_col, output_dir):
+def full_analysis_pipeline(train_df, test_df, target_col, feature_cols, id_col, output_dir):
     """
-    IDによるアノテーション付き散布図を作成する関数
+    データの学習、予測、評価、IDアノテーション付きプロット、
+    およびSHAPによる解析結果をすべて保存する統合関数
     """
-    # 0. 保存先ディレクトリの作成
-    output_dir = os.path.join(output_dir, 'stats_labels')
+    output_dir = os.path.join(output_dir, 'shap_labels')
+    # 0. ディレクトリ準備
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-
-    # 1. 特徴量、ターゲット、およびIDの抽出
+    
+    # if 'soiltype' in feature_cols:
+    #     train_df['soiltype'] = train_df['SoilTypeID'].str[0:1]
+    #     test_df['soiltype'] = test_df['SoilTypeID'].str[0:1]
+        
+    # 1. データ抽出と前処理
     X_train = train_df[feature_cols].copy()
     y_train = train_df[target_col]
     X_test = test_df[feature_cols].copy()
     y_test = test_df[target_col]
-    test_ids = test_df[id_col].values  # アノテーション用のIDリスト
+    test_ids = test_df[id_col].values
 
-    # 2. ラベルデータの自動判別と変換
+    # ラベルデータの自動判別とLabelEncoding
     label_cols = X_train.select_dtypes(include=['object', 'category']).columns.tolist()
-    if label_cols:
-        for col in label_cols:
-            le = LabelEncoder()
-            X_train[col] = le.fit_transform(X_train[col].astype(str))
-            X_test[col] = le.transform(X_test[col].astype(str))
+    for col in label_cols:
+        le = LabelEncoder()
+        X_train[col] = le.fit_transform(X_train[col].astype(str))
+        X_test[col] = le.transform(X_test[col].astype(str))
 
-    # 3. モデル構築と予測
+    # 2. モデル学習
+    # モデルはXGBoost等に変更可能ですが、ここでは汎用的なRandomForestを使用します
     model = RandomForestRegressor(n_estimators=100, random_state=42)
     model.fit(X_train, y_train)
-    y_pred = model.predict(X_test)
 
-    # 4. データの平坦化（前回のValueError対策）
+    # 3. 予測とデータの平坦化 (1次元化)
+    y_pred = model.predict(X_test)
     y_test_flat = y_test.values.flatten() if hasattr(y_test, 'values') else y_test.flatten()
     y_pred_flat = y_pred.flatten()
 
-    # 5. 指標計算とCSV保存
+    # 4. 評価指標の計算とCSV保存
     metrics = {
         'MAE': mean_absolute_error(y_test_flat, y_pred_flat),
         'MedAE': median_absolute_error(y_test_flat, y_pred_flat),
         'R2_Score': r2_score(y_test_flat, y_pred_flat)
     }
-    pd.DataFrame(list(metrics.items()), columns=['Metric', 'Value']).to_csv(
-        os.path.join(output_dir, 'evaluation_metrics.csv'), index=False
-    )
+    metrics_df = pd.DataFrame(list(metrics.items()), columns=['Metric', 'Value'])
+    metrics_df.to_csv(os.path.join(output_dir, 'evaluation_metrics.csv'), index=False)
 
-    # 6. アノテーション付き散布図の作成
-    plt.figure(figsize=(12, 10)) # IDが見やすいよう少し大きめに設定
+    # 5. IDアノテーション付き散布図の作成
+    plt.figure(figsize=(12, 10))
     sns.scatterplot(x=y_test_flat, y=y_pred_flat, alpha=0.6)
     
-    # 各点にIDをアノテーション
+    # 各点にIDを付与
     for i, txt in enumerate(test_ids):
         plt.annotate(txt, (y_test_flat[i], y_pred_flat[i]), 
-                     fontsize=8, 
-                     xytext=(5, 5), 
-                     textcoords='offset points',
-                     alpha=0.7)
+                     fontsize=8, xytext=(5, 5), textcoords='offset points', alpha=0.7)
 
-    # y=xのライン
-    lims = [min(y_test_flat.min(), y_pred_flat.min()), 
-            max(y_test_flat.max(), y_pred_flat.max())]
-    plt.plot(lims, lims, 'r--', alpha=0.75, zorder=0)
-    
+    # y=x (理想線) の描画
+    lims = [min(y_test_flat.min(), y_pred_flat.min()), max(y_test_flat.max(), y_pred_flat.max())]
+    plt.plot(lims, lims, 'r--', alpha=0.7, zorder=0)
     plt.xlabel('Actual Values')
     plt.ylabel('Predicted Values')
-    plt.title(f'Actual vs Predicted (Annotated by {id_col})')
-    
+    plt.title(f'Actual vs Predicted (ID: {id_col})')
     plt.savefig(os.path.join(output_dir, 'prediction_scatter_annotated.png'))
     plt.close()
 
-    print(f"処理完了！IDアノテーション付きグラフを保存しました。")
+    # 6. SHAPによる解析
+    print("SHAP解析を実行中...")
+    explainer = shap.TreeExplainer(model)
+    shap_values = explainer(X_test)
+
+    # Beeswarm Plot
+    plt.figure()
+    shap.plots.beeswarm(shap_values, show=False)
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'shap_beeswarm.png'))
+    plt.close()
+
+    # Waterfall Plot (テストデータの先頭1件)
+    plt.figure()
+    shap.plots.waterfall(shap_values[0], show=False)
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'shap_waterfall_sample0.png'))
+    plt.close()
+
+    # Dependence Plot (最も重要な変数)
+    # 特徴量の重要度合計から一番効いている変数を見つける
+    top_feature_idx = np.abs(shap_values.values).mean(0).argmax()
+    top_feature_name = X_test.columns[top_feature_idx]
+    
+    plt.figure()
+    # 相互作用を色で表現する散布図
+    shap.plots.scatter(shap_values[:, top_feature_name], color=shap_values, show=False)
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, f'shap_dependence_{top_feature_name}.png'))
+    plt.close()
+
+    # 7. UMAPによる次元削減プロット（学習・テスト両方を表示）
+    print("UMAP次元削減（学習・テスト統合）を実行中...")
+    
+    # --- 1. UMAP用にデータを結合し、NaN行を特定して削除 ---
+    X_combined = pd.concat([X_train, X_test], axis=0)
+    
+    # NaNが含まれる行のインデックスを特定
+    nan_mask = X_combined.isna().any(axis=1)
+    if nan_mask.any():
+        print(f"警告: {nan_mask.sum()} 件のデータにNaNが含まれていたため、プロットから除外します。")
+    
+    # NaNのないデータのみを抽出
+    X_clean = X_combined.dropna()
+    
+    # 目的変数も同様にNaNのない行だけを抽出
+    y_train_flat = y_train.values.flatten() if hasattr(y_train, 'values') else np.array(y_train).flatten()
+    y_combined = np.concatenate([y_train_flat, y_test_flat])
+    y_clean = y_combined[~nan_mask.values]
+    
+    # IDリストも同様にフィルタリング（テストデータ部分のみ）
+    # X_combinedの後半部分がテストデータなので、そこからマスクを適用
+    test_nan_mask = nan_mask.iloc[len(X_train):].values
+    clean_test_ids = test_ids[~test_nan_mask]
+
+    # --- 2. UMAP実行 ---
+    #reducer = umap.UMAP(random_state=42)
+    reducer = PCA(n_components=2, random_state=42)
+    embedding_combined = reducer.fit_transform(X_clean)
+    
+    # フィルタリング後の学習データの数
+    n_train_clean = len(X_train) - nan_mask.iloc[:len(X_train)].sum()
+    
+    embedding_train = embedding_combined[:n_train_clean]
+    embedding_test = embedding_combined[n_train_clean:]
+    y_train_clean = y_clean[:n_train_clean]
+    y_test_clean = y_clean[n_train_clean:]
+
+    # --- 3. プロット作成 ---
+    plt.figure(figsize=(12, 9))
+    
+    # 学習データのプロット
+    scatter_train = plt.scatter(embedding_train[:, 0], embedding_train[:, 1], 
+                                c=y_train_clean, cmap='viridis', s=40, marker='o', 
+                                alpha=0.4, label='Train Data')
+    
+    # テストデータのプロット
+    scatter_test = plt.scatter(embedding_test[:, 0], embedding_test[:, 1], 
+                               c=y_test_clean, cmap='viridis', s=60, marker='x', 
+                               alpha=0.9, label='Test Data')
+    
+    cbar = plt.colorbar(scatter_test)
+    cbar.set_label(f'Target Value ({target_col})')
+    
+    # フィルタリング後のIDを付与
+    # for i, txt in enumerate(clean_test_ids):
+    #     plt.annotate(txt, (embedding_test[i, 0], embedding_test[i, 1]), 
+    #                  fontsize=8, fontweight='bold', alpha=0.8)
+
+    plt.title(f'UMAP (NaN samples removed): Train(○) vs Test(×)')
+    plt.xlabel('UMAP dimension 1')
+    plt.ylabel('UMAP dimension 2')
+    plt.legend()
+    plt.tight_layout()
+    
+    plt.savefig(os.path.join(output_dir, 'umap_train_test_comparison.png'))
+    plt.close()
+
+    print(f"すべての工程が完了しました。出力先: {output_dir}")
+    return model
+
+def features_label_analysis_pipeline(features_train, features_test, train_df, test_df, target_col, feature_cols, id_col, output_dir):
+    """
+    データの学習、予測、評価、IDアノテーション付きプロット、
+    およびSHAPによる解析結果をすべて保存する統合関数
+    """
+    output_dir = os.path.join(output_dir, 'shap_feature_labels')
+    # 0. ディレクトリ準備
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    
+    # if 'soiltype' in feature_cols:
+    #     train_df['soiltype'] = train_df['SoilTypeID'].str[0:1]
+    #     test_df['soiltype'] = test_df['SoilTypeID'].str[0:1]
+        
+    # 1. データ抽出と前処理
+    label_train = train_df[feature_cols].copy()
+    X_train = pd.concat([label_train, features_train], axis=1)
+    y_train = train_df[target_col]
+    label_test = test_df[feature_cols].copy()
+    X_test = pd.concat([label_test, features_test], axis=1)
+    y_test = test_df[target_col]
+    test_ids = test_df[id_col].values
+
+    # ラベルデータの自動判別とLabelEncoding
+    label_cols = X_train.select_dtypes(include=['object', 'category']).columns.tolist()
+    for col in label_cols:
+        le = LabelEncoder()
+        X_train[col] = le.fit_transform(X_train[col].astype(str))
+        X_test[col] = le.transform(X_test[col].astype(str))
+
+    # 2. モデル学習
+    # モデルはXGBoost等に変更可能ですが、ここでは汎用的なRandomForestを使用します
+    model = RandomForestRegressor(n_estimators=100, random_state=42)
+    model.fit(X_train, y_train)
+
+    # 3. 予測とデータの平坦化 (1次元化)
+    y_pred = model.predict(X_test)
+    y_test_flat = y_test.values.flatten() if hasattr(y_test, 'values') else y_test.flatten()
+    y_pred_flat = y_pred.flatten()
+
+    # 4. 評価指標の計算とCSV保存
+    metrics = {
+        'MAE': mean_absolute_error(y_test_flat, y_pred_flat),
+        'MedAE': median_absolute_error(y_test_flat, y_pred_flat),
+        'R2_Score': r2_score(y_test_flat, y_pred_flat)
+    }
+    metrics_df = pd.DataFrame(list(metrics.items()), columns=['Metric', 'Value'])
+    metrics_df.to_csv(os.path.join(output_dir, 'evaluation_metrics.csv'), index=False)
+
+    # 5. IDアノテーション付き散布図の作成
+    plt.figure(figsize=(12, 10))
+    sns.scatterplot(x=y_test_flat, y=y_pred_flat, alpha=0.6)
+    
+    # 各点にIDを付与
+    for i, txt in enumerate(test_ids):
+        plt.annotate(txt, (y_test_flat[i], y_pred_flat[i]), 
+                     fontsize=8, xytext=(5, 5), textcoords='offset points', alpha=0.7)
+
+    # y=x (理想線) の描画
+    lims = [min(y_test_flat.min(), y_pred_flat.min()), max(y_test_flat.max(), y_pred_flat.max())]
+    plt.plot(lims, lims, 'r--', alpha=0.7, zorder=0)
+    plt.xlabel('Actual Values')
+    plt.ylabel('Predicted Values')
+    plt.title(f'Actual vs Predicted (ID: {id_col})')
+    plt.savefig(os.path.join(output_dir, 'prediction_scatter_annotated.png'))
+    plt.close()
+
+    # 6. SHAPによる解析
+    print("SHAP解析を実行中...")
+    explainer = shap.TreeExplainer(model)
+    shap_values = explainer(X_test)
+
+    # Beeswarm Plot
+    plt.figure()
+    shap.plots.beeswarm(shap_values, show=False)
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'shap_beeswarm.png'))
+    plt.close()
+
+    # Waterfall Plot (テストデータの先頭1件)
+    plt.figure()
+    shap.plots.waterfall(shap_values[0], show=False)
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'shap_waterfall_sample0.png'))
+    plt.close()
+
+    # Dependence Plot (最も重要な変数)
+    # 特徴量の重要度合計から一番効いている変数を見つける
+    top_feature_idx = np.abs(shap_values.values).mean(0).argmax()
+    top_feature_name = X_test.columns[top_feature_idx]
+    
+    plt.figure()
+    # 相互作用を色で表現する散布図
+    shap.plots.scatter(shap_values[:, top_feature_name], color=shap_values, show=False)
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, f'shap_dependence_{top_feature_name}.png'))
+    plt.close()
+
+    # 7. UMAPによる次元削減プロット（学習・テスト両方を表示）
+    print("UMAP次元削減（学習・テスト統合）を実行中...")
+    
+    # --- 1. UMAP用にデータを結合し、NaN行を特定して削除 ---
+    X_combined = pd.concat([X_train, X_test], axis=0)
+    
+    # NaNが含まれる行のインデックスを特定
+    nan_mask = X_combined.isna().any(axis=1)
+    if nan_mask.any():
+        print(f"警告: {nan_mask.sum()} 件のデータにNaNが含まれていたため、プロットから除外します。")
+    
+    # NaNのないデータのみを抽出
+    X_clean = X_combined.dropna()
+    
+    # 目的変数も同様にNaNのない行だけを抽出
+    y_train_flat = y_train.values.flatten() if hasattr(y_train, 'values') else np.array(y_train).flatten()
+    y_combined = np.concatenate([y_train_flat, y_test_flat])
+    y_clean = y_combined[~nan_mask.values]
+    
+    # IDリストも同様にフィルタリング（テストデータ部分のみ）
+    # X_combinedの後半部分がテストデータなので、そこからマスクを適用
+    test_nan_mask = nan_mask.iloc[len(X_train):].values
+    clean_test_ids = test_ids[~test_nan_mask]
+
+    # --- 2. UMAP実行 ---
+    #reducer = umap.UMAP(random_state=42)
+    reducer = PCA(n_components=2, random_state=42)
+    embedding_combined = reducer.fit_transform(X_clean)
+    
+    # フィルタリング後の学習データの数
+    n_train_clean = len(X_train) - nan_mask.iloc[:len(X_train)].sum()
+    
+    embedding_train = embedding_combined[:n_train_clean]
+    embedding_test = embedding_combined[n_train_clean:]
+    y_train_clean = y_clean[:n_train_clean]
+    y_test_clean = y_clean[n_train_clean:]
+
+    # --- 3. プロット作成 ---
+    plt.figure(figsize=(12, 9))
+    
+    # 学習データのプロット
+    scatter_train = plt.scatter(embedding_train[:, 0], embedding_train[:, 1], 
+                                c=y_train_clean, cmap='viridis', s=40, marker='o', 
+                                alpha=0.4, label='Train Data')
+    
+    # テストデータのプロット
+    scatter_test = plt.scatter(embedding_test[:, 0], embedding_test[:, 1], 
+                               c=y_test_clean, cmap='viridis', s=60, marker='x', 
+                               alpha=0.9, label='Test Data')
+    
+    cbar = plt.colorbar(scatter_test)
+    cbar.set_label(f'Target Value ({target_col})')
+    
+    # フィルタリング後のIDを付与
+    # for i, txt in enumerate(clean_test_ids):
+    #     plt.annotate(txt, (embedding_test[i, 0], embedding_test[i, 1]), 
+    #                  fontsize=8, fontweight='bold', alpha=0.8)
+
+    plt.title(f'UMAP (NaN samples removed): Train(○) vs Test(×)')
+    plt.xlabel('UMAP dimension 1')
+    plt.ylabel('UMAP dimension 2')
+    plt.legend()
+    plt.tight_layout()
+    
+    plt.savefig(os.path.join(output_dir, 'umap_train_test_comparison.png'))
+    plt.close()
+
+    print(f"すべての工程が完了しました。出力先: {output_dir}")
     return model
