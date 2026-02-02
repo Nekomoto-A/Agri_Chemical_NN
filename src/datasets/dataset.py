@@ -259,6 +259,7 @@ class data_create:
         
         yield asv_feature
         yield chem_data
+        yield label_encoders
 
         #if self.label_list != None:
         #    label_data = chem_data[self.label_list]

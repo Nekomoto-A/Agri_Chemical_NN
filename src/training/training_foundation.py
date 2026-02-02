@@ -29,7 +29,7 @@ def pretrain_foundation(model_name, device, out_dir, latent_dim,
         feature_path = config['asv_path_windows']
         target_path = config['chem_path_windows']
 
-    X,Y = data_create(feature_path, target_path, reg_list, exclude_ids)
+    X,Y,_ = data_create(feature_path, target_path, reg_list, exclude_ids)
 
     features_list = X.columns.to_list()
 

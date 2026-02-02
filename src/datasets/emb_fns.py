@@ -212,3 +212,37 @@ def w2v_encode_and_split(train_labels, val_labels, test_labels, label_encoders, 
         return out_train[single_key], out_val[single_key], out_test[single_key]
     else:
         return out_train, out_val, out_test
+    
+
+
+def concat_encode_and_split(train_labels, val_labels, test_labels,):
+    """
+    数値を元のラベルに戻し、Word2Vecで埋め込み（Embedding）を行って分割する関数。
+
+    Args:
+        train_labels (dict): 学習用ラベル {'label_name': tensor, ...}
+        val_labels (dict): 検証用ラベル
+        test_labels (dict): テスト用ラベル
+        label_encoders (dict): 各ラベル用の学習済み LabelEncoder {'label_name': encoder, ...}
+        w2v_models (dict): 各ラベル用の学習済み Word2Vecモデル {'label_name': model, ...}
+
+    Returns:
+        tuple: (train_out, val_out, test_out)
+    """
+    
+    # out_train = {}
+    # out_val = {}
+    # out_test = {}
+    train_list = list(train_labels.values())
+    train_list_2d = [t.unsqueeze(-1) for t in train_list]
+    out_train = torch.cat(train_list_2d, dim=1)
+    
+    val_list = list(val_labels.values())
+    val_list_2d = [t.unsqueeze(-1) for t in val_list]
+    out_val = torch.cat(val_list_2d, dim=1)
+    
+    test_list = list(test_labels.values())
+    test_list_2d = [t.unsqueeze(-1) for t in test_list]
+    out_test = torch.cat(test_list_2d, dim=1)
+    
+    return out_train, out_val, out_test

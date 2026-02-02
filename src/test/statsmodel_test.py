@@ -108,7 +108,9 @@ def normalized_medae_iqr(y_true, y_pred):
     
     return medae / iqr
 
-def statsmodel_test(X, Y, models, scalers, reg, result_dir,index, feature_names):
+from sklearn.metrics import confusion_matrix, classification_report
+
+def statsmodel_test(X, Y, models, scalers, reg, result_dir,index, feature_names, reg_encoders):
     X = X.numpy()
     X_df = pd.DataFrame(X, columns=feature_names)
     #X_df.columns = X_df.columns.astype(str)
@@ -118,6 +120,15 @@ def statsmodel_test(X, Y, models, scalers, reg, result_dir,index, feature_names)
     #print(X.shape)
     scores = {}
     for name, model in models.items():
+        re_dir = os.path.dirname(result_dir)
+        #print(index[0])
+        stats_dir = os.path.join(re_dir, index[0])
+        os.makedirs(stats_dir,exist_ok=True)
+        model_dir = os.path.join(stats_dir, name)
+        os.makedirs(model_dir,exist_ok=True)
+        reg_dir = os.path.join(model_dir, reg)
+        os.makedirs(reg_dir,exist_ok=True)
+
         if np.issubdtype(Y.dtype, np.floating):
             #print(f'test:{reg}:{Y.dtype}')
             # 特徴量の重要度を取得
@@ -131,14 +142,6 @@ def statsmodel_test(X, Y, models, scalers, reg, result_dir,index, feature_names)
                 pred = model.predict(X).reshape(-1, 1)
                 #pred = model.predict(X_top_features).reshape(-1, 1)
             
-            re_dir = os.path.dirname(result_dir)
-            print(index[0])
-            stats_dir = os.path.join(re_dir, index[0])
-            os.makedirs(stats_dir,exist_ok=True)
-            model_dir = os.path.join(stats_dir, name)
-            os.makedirs(model_dir,exist_ok=True)
-            reg_dir = os.path.join(model_dir, reg)
-            os.makedirs(reg_dir,exist_ok=True)
             met_dir = os.path.join(reg_dir, f'{name}_result.png')
 
             plt.figure()
@@ -177,15 +180,33 @@ def statsmodel_test(X, Y, models, scalers, reg, result_dir,index, feature_names)
             r2 = accuracy_score(Y_pp,pred)
             mse = f1_score(Y_pp,pred, average='macro')
 
+            trues = reg_encoders[reg].inverse_transform(Y_pp)
+            preds = reg_encoders[reg].inverse_transform(pred)
+
+            # 3. 混合行列の計算
+            classes = reg_encoders[reg].classes_ # 元のラベル名のリスト
+            cm = confusion_matrix(trues, preds)
+            
+            # 4. DataFrameに変換（見やすくするために行・列にラベル名を付与）
+            cm_df = pd.DataFrame(
+                cm, 
+                index=[f"True:{c}" for c in classes], 
+                columns=[f"Pred:{c}" for c in classes]
+            )
+            cm_path = os.path.join(reg_dir, f"{reg}_confusion_matrix.csv")
+            cm_df.to_csv(cm_path)
+
         write_result(r2, mse, columns_list = [reg], csv_dir = result_dir, method = name, ind = index)
 
         scores.setdefault('R', {}).setdefault(name, {}).setdefault(reg, []).append(r2)
         scores.setdefault('MAE', {}).setdefault(name, {}).setdefault(reg, []).append(mse)
     return scores
 
-def stats_models_result(X_train, Y_train, X_test, Y_test, scalers, reg, result_dir,index, feature_names):
+def stats_models_result(X_train, Y_train, X_test, Y_test, scalers, reg, result_dir,index, feature_names, reg_encoders):
     #print(Y_train)
     models = statsmodel_train(X = X_train,Y = Y_train,scalers = scalers,reg = reg)
     scores = statsmodel_test(X = X_test, Y = Y_test, models = models, 
-                             scalers = scalers, reg = reg, result_dir = result_dir, index = index, feature_names = feature_names)
+                             scalers = scalers, reg = reg, result_dir = result_dir, index = index, feature_names = feature_names,
+                             reg_encoders=reg_encoders, 
+                             )
     return scores

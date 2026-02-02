@@ -220,7 +220,11 @@ def get_corrected_predictions(mc_output):
         
     return corrected_result
 
-def test_MT(x_te, y_te, x_val, y_val, model, reg_list, scalers, output_dir, device, test_ids, n_samples_mc=100):
+from sklearn.metrics import confusion_matrix, classification_report
+
+def test_MT(x_te, y_te, x_val, y_val, model, reg_list, scalers, output_dir, device, test_ids, 
+            label_encoders = None, 
+            n_samples_mc=100):
     x_te = x_te.to(device)
     predicts, trues = {}, {}
 
@@ -236,7 +240,33 @@ def test_MT(x_te, y_te, x_val, y_val, model, reg_list, scalers, output_dir, devi
     for reg in reg_list:
         # 分類タスクの処理 (省略)
         if '_rank' in reg or not torch.is_floating_point(y_te[reg]):
-            pass # ...
+            true_tensor = y_te[reg]
+            pred_tensor_for_eval = outputs[reg]
+
+            pred_original = pred_tensor_for_eval.cpu().detach().numpy()
+            pred = np.argmax(pred_original, axis=1)
+
+            true = true_tensor.cpu().detach().numpy()
+
+            predicts[reg], trues[reg] = pred, true
+            r2 = accuracy_score(true, pred)
+            r2_scores.append(r2)
+            
+            mae = f1_score(true, pred, average='macro') # カスタム指標
+            mse_scores.append(mae)
+
+            # 3. 混合行列の計算
+            classes = label_encoders[reg].classes_ # 元のラベル名のリスト
+            cm = confusion_matrix(true, pred)
+            
+            # 4. DataFrameに変換（見やすくするために行・列にラベル名を付与）
+            cm_df = pd.DataFrame(
+                cm, 
+                index=[f"True:{c}" for c in classes], 
+                columns=[f"Pred:{c}" for c in classes]
+            )
+            cm_path = os.path.join(output_dir, f"{reg}_confusion_matrix.csv")
+            cm_df.to_csv(cm_path)
 
         # 回帰タスクの処理
         elif torch.is_floating_point(y_te[reg]):
@@ -441,6 +471,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                   device, 
                   reg_loss_fanction, 
                   latent_dim, 
+                  reg_encoders, 
                   labels_train = None, 
                   labels_val = None, 
                   labels_test = None, 
@@ -468,8 +499,9 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
     target_means_dict = {}
     for i, reg in enumerate(reg_list):
         # 学習データの各タスクの平均を計算
-        m = Y_train[reg].mean().item()
-        target_means_dict[reg] = m
+        if torch.is_floating_point(Y_train[reg]):
+            m = Y_train[reg].mean().item()
+            target_means_dict[reg] = m
 
     #print(Y_train)
     for reg in reg_list:
@@ -573,6 +605,16 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                         output_dims = output_dims,
                                         reg_list = reg_list,
                                         label_embedding_dim = labels_train.shape[1],
+                                        shared_learn = False,
+                                        )
+        elif 'mm' in model_name:
+            from src.models.FT_label import MultiModalFineTuningModel
+            model = MultiModalFineTuningModel(pretrained_encoder=pretrained_encoder,
+                                        last_shared_layer_dim = latent_dim,
+                                        tabular_input_dim = labels_train.shape[1],
+                                        output_dims = output_dims,
+                                        reg_list = reg_list,
+                                        task_specific_layers = [16], 
                                         shared_learn = False,
                                         )
         elif 'DKL_label' in model_name:
@@ -883,7 +925,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
     #     from src.test.test_gate import test_MT_gate
     #     predicts, true, r2_results, mse_results = test_MT_gate(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir,device = device)
 
-    elif "FiLM" in model_name:
+    elif ("FiLM" in model_name) or ("mm" in model_name):
         print('FiLMによるFTを使用します')
         #print('FiLMを使用します')
         from src.training.train_FiLM import training_FiLM
@@ -904,7 +946,10 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         
         from src.test.test_FiLM import test_FiLM
         predicts, true, r2_results, mse_results = test_FiLM(X_test,Y_test, labels_test,
-                                                          model_trained,reg_list,scalers,output_dir=vis_dir,device = device, test_ids = test_ids)
+                                                          model_trained,reg_list,scalers,output_dir=vis_dir,
+                                                          device = device, test_ids = test_ids,
+                                                          label_encoders = reg_encoders, 
+                                                          )
 
     elif 'FDS' in model_name:
         print('FDSを使用します')
@@ -1058,7 +1103,10 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                     )
         
         predicts, true, r2_results, mse_results = test_MT(X_test,Y_test, X_val, Y_val, 
-                                                          model_trained,reg_list,scalers,output_dir=vis_dir,device = device, test_ids = test_ids)
+                                                          model_trained,reg_list,scalers,output_dir=vis_dir,
+                                                          device = device, test_ids = test_ids,
+                                                          label_encoders = reg_encoders,
+                                                          )
         
         if save_feature:
             from src.experiments.shared_deature_save import save_features
@@ -1121,29 +1169,30 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         plt.close(fig)
 
     else:
-        #out_csv = os.path.join(vis_dir, f'loss_{reg_list[0]}.csv')        
-        loss = np.abs(predicts[reg_list[0]]-true[reg_list[0]])
-        axes.bar(
-            x_positions, loss.ravel(), 
-            #color=colors[i], label=titles[i]
-            )
-        axes.set_ylabel(f'{reg_list[0]}_MAE') # 各グラフのy軸ラベル
-        axes.legend() # 各グラフの凡例を表示
-        axes.grid(axis='y', linestyle='--', alpha=0.7) # y軸のグリッド線
-        # 4. 【変更点】ティックの位置とラベルを明示的に設定
-        # 3. 共通のx軸の設定（一番下のグラフに対してのみ行う）
-        plt.xticks(x_positions, test_ids, rotation=90)
-        plt.xlabel('Categories')
+        if np.issubdtype(true[reg_list[0]].dtype, np.floating):
+            #out_csv = os.path.join(vis_dir, f'loss_{reg_list[0]}.csv')        
+            loss = np.abs(predicts[reg_list[0]]-true[reg_list[0]])
+            axes.bar(
+                x_positions, loss.ravel(), 
+                #color=colors[i], label=titles[i]
+                )
+            axes.set_ylabel(f'{reg_list[0]}_MAE') # 各グラフのy軸ラベル
+            axes.legend() # 各グラフの凡例を表示
+            axes.grid(axis='y', linestyle='--', alpha=0.7) # y軸のグリッド線
+            # 4. 【変更点】ティックの位置とラベルを明示的に設定
+            # 3. 共通のx軸の設定（一番下のグラフに対してのみ行う）
+            plt.xticks(x_positions, test_ids, rotation=90)
+            plt.xlabel('Categories')
 
-        # 4. レイアウトの自動調整
-        plt.tight_layout() # 全体タイトルと重ならないように調整
+            # 4. レイアウトの自動調整
+            plt.tight_layout() # 全体タイトルと重ならないように調整
 
-        mpld3.save_html(fig, out)
-        # メモリを解放するためにプロットを閉じます（多くのグラフを作成する場合に有効です）
-        plt.close(fig)
+            mpld3.save_html(fig, out)
+            # メモリを解放するためにプロットを閉じます（多くのグラフを作成する場合に有効です）
+            plt.close(fig)
 
-        #test_df[reg] = loss.ravel()
-        #test_df.to_csv(out_csv)
+            #test_df[reg] = loss.ravel()
+            #test_df.to_csv(out_csv)
 
 
     # plt.figure(figsize=(18, 14))

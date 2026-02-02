@@ -32,11 +32,11 @@ train.py:
   patience: 20
   least_epoch: 0
   visualize: False
-  epochs: 1000
+  epochs: 3000
   vis_step: 5
   validation: True
   lambda: 0.1
-  learning_rate: [0.001]
+  learning_rate: [0.01]
   weights: [0.1, 0.9, 1.0, 1.0, 1.0, 1.0]
   SUM_train_lim: 10
   personal_train_lim: 1
@@ -127,7 +127,7 @@ fold_eval.py:
   carr_calc: False
   marginal_hist: False
   k_fold: 5
-  model_name: 'DCAE_FiLM'
+  model_name: 'DCAE'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
@@ -154,32 +154,28 @@ fold_eval.py:
   target_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\chem_data.xlsx' #C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\chem_data.xlsx #
   data_inte: False
   transformer: [None, None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
-  reg_loss_fanction: ['mse', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
+  reg_loss_fanction: ['mae', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
   eval: [None,  'MedAE']
-  labels: ['pref'] #['experimental_purpose'] #
-  embedding: 'Word2Vec'
+  labels: ['pref'] #['crop', 'pref', 'lati', 'long'] #['experimental_purpose'] #
+  embedding: 'Word2Vec' #"concat" #
   embedding_size: 8
   latent_dim: 32
 main.py:
-  result_dir: 'result_DCAE_FiLM_mse'
+  result_dir: 'result_latent64'
   reg_list: [
+            ['pref'], 
+            ['crop'],  
+            ['Tmea_Apr_me'],
+            ['Tmea_May_me'],
+            ['Tmea_Jun_me'],
+            ['Tmea_Jul_me'],
+            ['Tmea_Aug_me'],
             ['Available.P'],
             ['pH'],
-            #['Available.P', 'crop'], #, 'pH'
             ['NO3.N'],
-            ['EC'], 
+            ['EC'],
             ['Humus'],
             ['Exchangeable.K'],
-            [CEC],
-            #['pH', 'NO3.N',],
-            #'pH'
-            #['pH', 'Available.P',],
-            #['pH','EC',],
-            #['NH4.N'],
-            #['pH',CEC',],
-            #]
-            #['pH', 'Available.P'],
-            #['pH', 'Available.P', 'EC', 'NH4.N', 'NO3.N', 'Exchangeable.K'],
-            #['pH_dry_soil'], ['available_P'], ['EC_electric_conductivity'], ['Total_C'], ['Total_N'],
-            #['pH_dry_soil', 'available_P', 'EC_electric_conductivity', 'Total_C', 'Total_N']
+            ['CEC'],
+            # ['pH_dry_soil', 'available_P', 'EC_electric_conductivity', 'Total_C', 'Total_N']
   ]

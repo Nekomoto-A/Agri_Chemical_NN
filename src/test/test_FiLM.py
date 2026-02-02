@@ -44,9 +44,14 @@ def normalized_medae_iqr(y_true, y_pred):
 
 from src.test.test import get_corrected_predictions 
 from src.test.test import is_log1p_transformer
+
+from sklearn.metrics import confusion_matrix, classification_report
+
 def test_FiLM(x_te, y_te, label_te,  
               model, reg_list, scalers, output_dir, device, 
-              test_ids):
+              test_ids,
+              label_encoders = None
+              ):
     x_te = x_te.to(device)
     label_te = label_te.to(device)
     predicts, trues = {}, {}
@@ -64,7 +69,34 @@ def test_FiLM(x_te, y_te, label_te,
     for reg in reg_list:
         # 分類タスクの処理 (省略)
         if '_rank' in reg or not torch.is_floating_point(y_te[reg]):
-            pass # ...
+            true_tensor = y_te[reg]
+            pred_tensor_for_eval = outputs[reg]
+
+            pred = pred_tensor_for_eval.cpu().detach().numpy()
+            true = true_tensor.cpu().detach().numpy()
+
+            predicts[reg], trues[reg] = pred, true
+            r2 = accuracy_score(true, pred)
+            r2_scores.append(r2)
+            
+            mae = f1_score(true, pred, average='macro') # カスタム指標
+            mse_scores.append(mae)
+
+            # true_labels = label_encoder.inverse_transform(true)
+            # pred_labels = label_encoder.inverse_transform(pred)
+            
+            # 3. 混合行列の計算
+            classes = label_encoders[reg].classes_ # 元のラベル名のリスト
+            cm = confusion_matrix(true, pred)
+            
+            # 4. DataFrameに変換（見やすくするために行・列にラベル名を付与）
+            cm_df = pd.DataFrame(
+                cm, 
+                index=[f"True:{c}" for c in classes], 
+                columns=[f"Pred:{c}" for c in classes]
+            )
+            cm_path = os.path.join(output_dir, f"{reg}_confusion_matrix.csv")
+            cm_df.to_csv(cm_path)
 
         # 回帰タスクの処理
         elif torch.is_floating_point(y_te[reg]):

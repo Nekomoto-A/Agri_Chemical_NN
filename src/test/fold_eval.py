@@ -313,14 +313,14 @@ def fold_evaluate(reg_list, output_dir, device,
         features_list, ae_dir = pretrain_foundation(model_name = model_name, device = device, out_dir = sub_dir, latent_dim = latent_dim)
 
         if data_inte:
-            X,Y = data_create(feature_path, target_path, reg_list, exclude_ids, feature_transformer='NON_TR',features_list=features_list)
+            X,Y,reg_encoders = data_create(feature_path, target_path, reg_list, exclude_ids, feature_transformer='NON_TR',features_list=features_list)
         else:
-            X,Y = data_create(feature_path, target_path, reg_list, exclude_ids,features_list=features_list)
+            X,Y,reg_encoders = data_create(feature_path, target_path, reg_list, exclude_ids,features_list=features_list)
     else:
         if data_inte:
-            X,Y = data_create(feature_path, target_path, reg_list, exclude_ids, feature_transformer='NON_TR',)
+            X,Y,reg_encoders = data_create(feature_path, target_path, reg_list, exclude_ids, feature_transformer='NON_TR',)
         else:
-            X,Y = data_create(feature_path, target_path, reg_list, exclude_ids)
+            X,Y,reg_encoders = data_create(feature_path, target_path, reg_list, exclude_ids)
         
         ae_dir = None
 
@@ -414,7 +414,13 @@ def fold_evaluate(reg_list, output_dir, device,
                                                                                                  label_encoders, 
                                                                                                  emb_models,
                                                                                                 )
-        
+        elif embedding == 'concat':
+            from src.datasets.emb_fns import concat_encode_and_split
+            label_train_embedded, label_val_embedded, label_test_embedded = concat_encode_and_split(label_train_tensor, 
+                                                                                                 label_val_tensor, 
+                                                                                                 label_test_tensor, 
+                                                                                                )
+
         if labels != []:
             from src.datasets.emb_fns import save_combined_data_to_csv
             save_combined_data_to_csv(filepath = 'emb_labels.csv', 
@@ -435,6 +441,7 @@ def fold_evaluate(reg_list, output_dir, device,
                 scalers, predictions, trues, input_dim, method, index , reg_list, csv_dir,
                 vis_dir = vis_dir_main, model_name = model_name, train_ids = train_ids, test_ids = test_ids, features= features,
                 device = device,
+                reg_encoders = reg_encoders,
                 reg_loss_fanction = loss_fanctions,
                 latent_dim = latent_dim, 
                 labels_train=label_train_embedded,
@@ -467,6 +474,7 @@ def fold_evaluate(reg_list, output_dir, device,
                     vis_dir = vis_dir_comp, 
                     model_name = model_name, train_ids = train_ids, test_ids = test_ids, features = features,
                     device = device,
+                    reg_encoders = reg_encoders,
                     reg_loss_fanction = loss_fanctions,
                     latent_dim = latent_dim, 
                     loss_sum = comp_method,
@@ -515,6 +523,7 @@ def fold_evaluate(reg_list, output_dir, device,
             device = device,
             reg_loss_fanction = loss_fanction, 
             latent_dim = latent_dim, 
+            reg_encoders = reg_encoders,
             labels_train=label_train_embedded,
             labels_val=label_val_embedded,
             labels_test=label_test_embedded,
@@ -534,7 +543,9 @@ def fold_evaluate(reg_list, output_dir, device,
 
             stats_scores = stats_models_result(X_train = X_train_tensor, Y_train = Y_train_single, 
                                         X_test = X_test_tensor, Y_test = Y_test_single, scalers = scalers, reg = r, 
-                                        result_dir = csv_dir, index = index, feature_names = features)
+                                        result_dir = csv_dir, index = index, feature_names = features,
+                                        reg_encoders = reg_encoders,
+                                        )
             
             for metrics, dict in stats_scores.items():
                 for method_name, regs in dict.items():
@@ -547,80 +558,85 @@ def fold_evaluate(reg_list, output_dir, device,
     for method, regs in predictions.items():
         #print(method)
         for reg, values in regs.items():
-            #print(values.shape)
-            final_hist_dir = os.path.join(sub_dir, 'final_hist')
-            os.makedirs(final_hist_dir, exist_ok=True)
-            all_hist_dir = os.path.join(final_hist_dir, 'all')
-            os.makedirs(all_hist_dir, exist_ok=True)
-
-            all_hist_path = os.path.join(all_hist_dir, f'hist_{reg}_{method}.png')
-            #print(values)
             target = np.concatenate(trues[method][reg])
             out = np.concatenate(values)
 
-            bins = np.linspace(0, np.max(target), 30)
+            if np.issubdtype(target.dtype, np.floating):
+                #print(values.shape)
+                final_hist_dir = os.path.join(sub_dir, 'final_hist')
+                os.makedirs(final_hist_dir, exist_ok=True)
+                all_hist_dir = os.path.join(final_hist_dir, 'all')
+                os.makedirs(all_hist_dir, exist_ok=True)
 
-            loss = np.abs(target-out)
+                all_hist_path = os.path.join(all_hist_dir, f'hist_{reg}_{method}.png')
+                #print(values)
 
-            test_df[f'{reg}_{method}'] = loss
-            test_df[f'True_{reg}_{method}'] = target
-            test_df[f'Pred_{reg}_{method}'] = out
+                bins = np.linspace(0, np.max(target), 30)
 
-            plt.hist(out, bins=bins, alpha=0.5, label = 'Predicted',density=True)
-            plt.hist(target, bins=bins, alpha=0.5, label = 'True',density=True)
+                loss = np.abs(target-out)
+                test_df[f'{reg}_{method}'] = loss
 
-            #plt.title('Histogram of Data')
-            plt.xlabel('Value')
-            plt.ylabel('Frequency')
-            #plt.grid(True)
-            plt.legend()
-            plt.savefig(all_hist_path)
-            plt.close()
+                plt.hist(out, bins=bins, alpha=0.5, label = 'Predicted',density=True)
+                plt.hist(target, bins=bins, alpha=0.5, label = 'True',density=True)
 
-            if reg == 'pH':
-                # 条件リスト
-                threshold1 = 5.5
-                threshold2 = 6.5
-            else:
-                thresholds = np.quantile(target, [1/3, 2/3])
-                threshold1, threshold2 = thresholds
-
-            conditions = [
-                target < threshold1,
-                (target >= threshold1) & (target < threshold2),
-                target >= threshold2
-            ]
-
-            # 各条件に対応する値のリスト
-            choices = [0, 1, 2]
-            result = np.select(conditions, choices)
-            
-            for choice in choices:
-                split_hist_dir = os.path.join(final_hist_dir, 'predict_hist')
-                os.makedirs(split_hist_dir, exist_ok=True)
-                split_hist_path = os.path.join(split_hist_dir, f'split_hist_{reg}_{method}_{choice}.png')
-                
-                target_split = target[result == choice] # 閾値1未満
-                output_spilit = out[result == choice]
-
-                plt.figure(figsize=(10, 6))
-                # 各カテゴリのヒストグラムを重ねて描画（alphaで透明度を指定）
-                # binsを共通にすることで、各棒の範囲が揃う
-                all_data_bins = np.arange(min(target_split), max(target_split), (max(target_split)-min(target_split)) / 10)
-                plt.hist(target_split, bins=all_data_bins, alpha=0.7, label=f'True')
-                plt.hist(output_spilit, bins=all_data_bins, alpha=0.7, label=f'Output')
-
-                # グラフの装飾
-                plt.title('Histogram by Category', fontsize=16)
-                plt.xlabel('Value', fontsize=12)
-                plt.ylabel('Frequency', fontsize=12)
+                #plt.title('Histogram of Data')
+                plt.xlabel('Value')
+                plt.ylabel('Frequency')
+                #plt.grid(True)
                 plt.legend()
-                plt.tight_layout()
-
-                # 画像として保存
-                plt.savefig(split_hist_path)
+                plt.savefig(all_hist_path)
                 plt.close()
 
+                if reg == 'pH':
+                    # 条件リスト
+                    threshold1 = 5.5
+                    threshold2 = 6.5
+                else:
+                    thresholds = np.quantile(target, [1/3, 2/3])
+                    threshold1, threshold2 = thresholds
+
+                conditions = [
+                    target < threshold1,
+                    (target >= threshold1) & (target < threshold2),
+                    target >= threshold2
+                ]
+
+                # 各条件に対応する値のリスト
+                choices = [0, 1, 2]
+                result = np.select(conditions, choices)
+                
+                for choice in choices:
+                    split_hist_dir = os.path.join(final_hist_dir, 'predict_hist')
+                    os.makedirs(split_hist_dir, exist_ok=True)
+                    split_hist_path = os.path.join(split_hist_dir, f'split_hist_{reg}_{method}_{choice}.png')
+                    
+                    target_split = target[result == choice] # 閾値1未満
+                    output_spilit = out[result == choice]
+
+                    plt.figure(figsize=(10, 6))
+                    # 各カテゴリのヒストグラムを重ねて描画（alphaで透明度を指定）
+                    # binsを共通にすることで、各棒の範囲が揃う
+                    all_data_bins = np.arange(min(target_split), max(target_split), (max(target_split)-min(target_split)) / 10)
+                    plt.hist(target_split, bins=all_data_bins, alpha=0.7, label=f'True')
+                    plt.hist(output_spilit, bins=all_data_bins, alpha=0.7, label=f'Output')
+
+                    # グラフの装飾
+                    plt.title('Histogram by Category', fontsize=16)
+                    plt.xlabel('Value', fontsize=12)
+                    plt.ylabel('Frequency', fontsize=12)
+                    plt.legend()
+                    plt.tight_layout()
+
+                    # 画像として保存
+                    plt.savefig(split_hist_path)
+                    plt.close()
+            else:
+                target = reg_encoders[reg].inverse_transform(target)
+                out = reg_encoders[reg].inverse_transform(out)
+
+    test_df[f'True_{reg}_{method}'] = target
+    test_df[f'Pred_{reg}_{method}'] = out
+    
     loss_dir = os.path.join(sub_dir, 'loss.csv')
     test_df = test_df.sort_index(axis=1, ascending=True)
     test_df.to_csv(loss_dir)
