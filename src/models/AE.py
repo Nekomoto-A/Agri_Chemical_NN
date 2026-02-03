@@ -71,7 +71,7 @@ class Autoencoder(nn.Module):
         return self.encoder
 
 class FineTuningModel(nn.Module):
-    def __init__(self, pretrained_encoder, last_shared_layer_dim, output_dims, reg_list, task_specific_layers=[64], shared_learn = True):
+    def __init__(self, pretrained_encoder, last_shared_layer_dim, output_dims, reg_list, task_specific_layers=[32], shared_learn = True):
         super(FineTuningModel, self).__init__()
         self.reg_list = reg_list
         self.shared_block = pretrained_encoder
@@ -252,8 +252,9 @@ class FineTuningModelWithFiLM(nn.Module):
             raw_output = head_layers[-1](current_features)
             
             # ラベル情報を基に出力をスケーリング
-            warped_output = scaler(raw_output, label_emb)
-            outputs[reg] = warped_output
+            # warped_output = scaler(raw_output, label_emb)
+            # outputs[reg] = warped_output
+            outputs[reg] = raw_output
             
         # latent_features も一緒に返すように変更
         #return outputs, modulated_features, latent_features

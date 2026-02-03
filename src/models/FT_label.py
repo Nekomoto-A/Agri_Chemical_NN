@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 class MultiModalFineTuningModel(nn.Module):
-    def __init__(self, pretrained_encoder, last_shared_layer_dim, tabular_input_dim, output_dims, reg_list, task_specific_layers=[64], shared_learn=True):
+    def __init__(self, pretrained_encoder, last_shared_layer_dim, tabular_input_dim, output_dims, reg_list, task_specific_layers=[32], shared_learn=True):
         super(MultiModalFineTuningModel, self).__init__()
         self.reg_list = reg_list
         self.shared_block = pretrained_encoder

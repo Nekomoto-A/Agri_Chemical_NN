@@ -127,7 +127,7 @@ fold_eval.py:
   carr_calc: False
   marginal_hist: False
   k_fold: 5
-  model_name: 'DCAE'
+  model_name: 'DCAE_FiLM'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
@@ -156,20 +156,20 @@ fold_eval.py:
   transformer: [None, None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
   reg_loss_fanction: ['mae', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
   eval: [None,  'MedAE']
-  labels: ['pref'] #['crop', 'pref', 'lati', 'long'] #['experimental_purpose'] #
-  embedding: 'Word2Vec' #"concat" #
+  labels: ['crop'] #['crop', 'pref', 'lati', 'long'] #['experimental_purpose'] #
+  embedding: 'Onehot' #'Word2Vec' #"concat" #
   embedding_size: 8
   latent_dim: 32
 main.py:
-  result_dir: 'result_latent64'
+  result_dir: 'result_DCAE_FiLM_onehot'
   reg_list: [
-            ['pref'], 
-            ['crop'],  
-            ['Tmea_Apr_me'],
-            ['Tmea_May_me'],
-            ['Tmea_Jun_me'],
-            ['Tmea_Jul_me'],
-            ['Tmea_Aug_me'],
+            # ['pref'], 
+            # ['crop'],  
+            # ['Tmea_Apr_me'],
+            # ['Tmea_May_me'],
+            # ['Tmea_Jun_me'],
+            # ['Tmea_Jul_me'],
+            # ['Tmea_Aug_me'],
             ['Available.P'],
             ['pH'],
             ['NO3.N'],

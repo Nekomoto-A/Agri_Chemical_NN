@@ -1095,7 +1095,7 @@ def training_FiLM(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir,
         for r in reg_list:
             save_dir = os.path.join(train_dir, r)
             os.makedirs(save_dir, exist_ok = True)
-            save_path = os.path.join(save_dir, f'train_{r}.png')
+            save_path = os.path.join(save_dir, f'FiLM_train_{r}.png')
 
             all_labels = np.concatenate(true[r])
             all_predictions = np.concatenate(pred[r])
@@ -1211,7 +1211,7 @@ def visualize_and_save_tsne(model, dataloader, device, output_dir, perplexity=30
         plt.grid(True, linestyle='--', alpha=0.5)
         
         # 保存
-        save_path = os.path.join(output_dir, f'tsne_{key}.png')
+        save_path = os.path.join(output_dir, f'FiLM_tsne_{key}.png')
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         plt.close()
         print(f"Saved: {save_path}")

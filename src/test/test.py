@@ -605,6 +605,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                         output_dims = output_dims,
                                         reg_list = reg_list,
                                         label_embedding_dim = labels_train.shape[1],
+                                        task_specific_layers = [16], 
                                         shared_learn = False,
                                         )
         elif 'mm' in model_name:
@@ -614,7 +615,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                         tabular_input_dim = labels_train.shape[1],
                                         output_dims = output_dims,
                                         reg_list = reg_list,
-                                        task_specific_layers = [16], 
+                                        #task_specific_layers = [32], 
                                         shared_learn = False,
                                         )
         elif 'DKL_label' in model_name:
@@ -660,7 +661,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                     reg_list = reg_list,
                                     shared_learn = False,
                                     )
-            model.to(device)
+            #model.to(device)
             model.device = device
             model.warping_layers.device = device
         elif 'DGP' in model_name:
@@ -683,7 +684,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                 model = FineTuningModel_vae(pretrained_encoder=pretrained_encoder,
                                         latent_dim = latent_dim,
                                         output_dims = output_dims,
-                                        reg_list = reg_list,
+                                        reg_list = reg_list, 
                                         shared_learn = False,
                                         )
             else:

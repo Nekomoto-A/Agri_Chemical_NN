@@ -1052,8 +1052,8 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                         loss = personal_losses[reg](mean_preds, std_preds, valid_labels)
                         train_losses[reg] = loss
                     else:
-                        #valid_preds = output[mask]
-                        valid_preds = output
+                        valid_preds = output[mask]
+                        #valid_preds = output
                         # ❺ 欠損値が除外されたデータのみで損失を計算
                         loss = personal_losses[reg](valid_preds, valid_labels)
                         train_losses[reg] = loss
@@ -1367,7 +1367,7 @@ def visualize_and_save_tsne(model, dataloader, device, output_dir, perplexity=30
         plt.grid(True, linestyle='--', alpha=0.5)
         
         # 保存
-        save_path = os.path.join(output_dir, f'tsne_{key}.png')
+        save_path = os.path.join(output_dir, f'middle_tsne_{key}.png')
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         plt.close()
         print(f"Saved: {save_path}")
