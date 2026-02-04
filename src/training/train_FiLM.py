@@ -803,7 +803,9 @@ def training_FiLM(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir,
     #val_dataset = CustomDataset(x_val, y_val)
     #val_dataset = CustomDatasetAdv(x_val, y_val)
     val_dataset = MultiTaskDataset(x_val, label_val, y_val)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, 
+                            shuffle=True
+                            )
         
     # modelが 'quantiles' 属性を持っていれば、分位点回帰モデルと判定
     has_quantile_regression = hasattr(model, 'quantiles')

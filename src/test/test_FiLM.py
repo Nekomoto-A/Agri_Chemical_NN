@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from sklearn.metrics import accuracy_score, r2_score, mean_squared_error, f1_score, mean_absolute_error, mean_absolute_percentage_error, median_absolute_error
+from sklearn.metrics import root_mean_squared_error, accuracy_score, r2_score, mean_squared_error, f1_score, mean_absolute_error, mean_absolute_percentage_error, median_absolute_error
 import matplotlib.pyplot as plt
 from src.experiments.visualize import visualize_tsne
 import shap
@@ -181,7 +181,8 @@ def test_FiLM(x_te, y_te, label_te,
             
             try:
                 #mae = normalized_medae_iqr(true, pred) # カスタム指標
-                mae = mean_absolute_error(true, pred)
+                #mae = mean_absolute_error(true, pred)
+                mae = root_mean_squared_error(true, pred)
             except NameError:
                 print(f"WARN: normalized_medae_iqr が定義されていません。タスク {reg} の評価に MAE (mean_absolute_error) を使用します。")
                 mae = mean_absolute_error(true, pred)

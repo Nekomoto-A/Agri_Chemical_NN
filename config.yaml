@@ -154,28 +154,44 @@ fold_eval.py:
   target_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\chem_data.xlsx' #C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\chem_data.xlsx #
   data_inte: False
   transformer: [None, None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
-  reg_loss_fanction: ['mae', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
+  reg_loss_fanction: ['hloss', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
   eval: [None,  'MedAE']
   labels: ['crop'] #['crop', 'pref', 'lati', 'long'] #['experimental_purpose'] #
-  embedding: 'Onehot' #'Word2Vec' #"concat" #
+  embedding: 'Word2Vec' #'Onehot' #'Word2Vec' #"concat" #
   embedding_size: 8
   latent_dim: 32
 main.py:
-  result_dir: 'result_DCAE_FiLM_onehot'
+  result_dir: 'result_DCAE_all_wheather_crop'
   reg_list: [
             # ['pref'], 
-            # ['crop'],  
-            # ['Tmea_Apr_me'],
-            # ['Tmea_May_me'],
-            # ['Tmea_Jun_me'],
-            # ['Tmea_Jul_me'],
-            # ['Tmea_Aug_me'],
-            ['Available.P'],
-            ['pH'],
-            ['NO3.N'],
-            ['EC'],
-            ['Humus'],
-            ['Exchangeable.K'],
-            ['CEC'],
+            # ['crop'], 
+            ['APCP_Mar_me'],
+            ['APCP_Feb_me'],
+            ['APCP_Jan_me'],
+
+            ['Tmea_Apr_me'],
+            ['Tmea_May_me'],
+            ['Tmea_Jun_me'],
+            ['Tmea_Jul_me'],
+            ['Tmea_Aug_me'],
+
+            ['APCP_Aug_me'],
+            ['APCP_Jul_me'],
+            ['APCP_Jun_me'],
+            ['APCP_May_me'],
+            ['APCP_Apr_me'],
+            ['APCP_Mar_me'],
+            ['APCP_Feb_me'],
+            ['APCP_Jan_me'],
+
+            #[NH4.N], 
+            #['pH'],
+            #['Available.P'], 
+            #['pH'],
+            #['NO3.N'],
+            #['EC'],
+            #['Humus'],
+            #['Exchangeable.K'],
+            #['CEC'],
             # ['pH_dry_soil', 'available_P', 'EC_electric_conductivity', 'Total_C', 'Total_N']
   ]

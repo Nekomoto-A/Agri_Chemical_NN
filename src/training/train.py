@@ -832,6 +832,9 @@ class MAPELoss(nn.Module):
         # 平均を返す
         return torch.mean(relative_error)
 
+def worker_init_fn(worker_id):
+    np.random.seed(np.random.get_state()[1][0] + worker_id)
+
 def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, model_name,loss_sum, device, batch_size, #optimizer, 
                 scalers, 
                 train_ids, 
@@ -965,14 +968,15 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
     train_dataset = CustomDatasetAdv(x_tr, y_tr)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, 
                             shuffle=True,
-                            #sampler=sampler
                             )
 
     # 検証用 (シャッフルは必須ではない)
     #val_dataset = TensorDataset(x_val, y_val_tensor)
     #val_dataset = CustomDataset(x_val, y_val)
     val_dataset = CustomDatasetAdv(x_val, y_val)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, 
+                            shuffle=True,
+                            )
 
     if 'AE' in model_name:
         if adabn:
@@ -1052,7 +1056,10 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
                         loss = personal_losses[reg](mean_preds, std_preds, valid_labels)
                         train_losses[reg] = loss
                     else:
-                        valid_preds = output[mask]
+                        if output.shape[1] == 1:
+                            valid_preds = output[mask]
+                        else:
+                            valid_preds = output
                         #valid_preds = output
                         # ❺ 欠損値が除外されたデータのみで損失を計算
                         loss = personal_losses[reg](valid_preds, valid_labels)

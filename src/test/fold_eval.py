@@ -541,6 +541,69 @@ def fold_evaluate(reg_list, output_dir, device,
             scores.setdefault('R', {}).setdefault(method_st, {}).setdefault(r, []).append(r2_result[0])
             scores.setdefault('MAE', {}).setdefault(method_st, {}).setdefault(r, []).append(mse_result[0])
 
+            #FiLMなし
+            if 'FiLM' in model_name:
+                model_name_nolabel = model_name.replace("_FiLM", "")
+                method_nolabel = 'ST_nolabel'
+                
+                vis_dir_nolabel = os.path.join(fold_dir, method_nolabel)
+                os.makedirs(vis_dir_nolabel, exist_ok=True)
+                
+                predictions, trues, r2_result_nolabel, mse_result_nolabel, model_trained_st = train_and_test(
+                X_train = X_train_tensor, X_val = X_val_tensor, X_test = X_test_tensor, Y_train = Y_train_single, Y_val = Y_val_single, Y_test = Y_test_single, 
+                scalers = scalers, predictions = predictions, trues = trues, input_dim = input_dim, 
+                method = method_nolabel, 
+                index = index , reg_list = reg, csv_dir = csv_dir, 
+                vis_dir = vis_dir_nolabel, 
+                model_name = model_name_nolabel, 
+                train_ids = train_ids, test_ids = test_ids, features = features,
+                device = device,
+                reg_loss_fanction = loss_fanction, 
+                latent_dim = latent_dim, 
+                reg_encoders = reg_encoders,
+                labels_train=label_train_embedded,
+                labels_val=label_val_embedded,
+                labels_test=label_test_embedded,
+                label_encoders = label_encoders,
+                labels_train_original = label_train_tensor,
+                labels_val_original = label_val_tensor,
+                labels_test_original = label_test_tensor,
+                ae_dir = ae_dir
+                )
+                
+                scores.setdefault('R', {}).setdefault(method_nolabel, {}).setdefault(r, []).append(r2_result_nolabel[0])
+                scores.setdefault('MAE', {}).setdefault(method_nolabel, {}).setdefault(r, []).append(mse_result_nolabel[0])
+
+                model_name_concat = model_name_nolabel + '_mm'
+                method_concat = 'ST_concat'
+                vis_dir_concat = os.path.join(fold_dir, method_concat)
+                os.makedirs(vis_dir_concat, exist_ok=True)
+                
+                predictions, trues, r2_result_concat, mse_result_concat, model_trained_st = train_and_test(
+                X_train = X_train_tensor, X_val = X_val_tensor, X_test = X_test_tensor, Y_train = Y_train_single, Y_val = Y_val_single, Y_test = Y_test_single, 
+                scalers = scalers, predictions = predictions, trues = trues, input_dim = input_dim, 
+                method = method_concat, 
+                index = index , reg_list = reg, csv_dir = csv_dir, 
+                vis_dir = vis_dir_concat, 
+                model_name = model_name_concat, 
+                train_ids = train_ids, test_ids = test_ids, features = features,
+                device = device,
+                reg_loss_fanction = loss_fanction, 
+                latent_dim = latent_dim, 
+                reg_encoders = reg_encoders,
+                labels_train=label_train_embedded,
+                labels_val=label_val_embedded,
+                labels_test=label_test_embedded,
+                label_encoders = label_encoders,
+                labels_train_original = label_train_tensor,
+                labels_val_original = label_val_tensor,
+                labels_test_original = label_test_tensor,
+                ae_dir = ae_dir
+                )
+                
+                scores.setdefault('R', {}).setdefault(method_concat, {}).setdefault(r, []).append(r2_result_concat[0])
+                scores.setdefault('MAE', {}).setdefault(method_concat, {}).setdefault(r, []).append(mse_result_concat[0])
+
             stats_scores = stats_models_result(X_train = X_train_tensor, Y_train = Y_train_single, 
                                         X_test = X_test_tensor, Y_test = Y_test_single, scalers = scalers, reg = r, 
                                         result_dir = csv_dir, index = index, feature_names = features,
@@ -659,8 +722,10 @@ def fold_evaluate(reg_list, output_dir, device,
         for method_name,regs in models.items():
             for target,values in regs.items():
                 avg = f'{np.average(values):.3f}'
+                #avg = f'{np.average(values)}'
                 avg_dict.setdefault(metrics, {}).setdefault(method_name, {})[target] = np.average(values)
                 std = f'{np.std(values):.3f}'
+                #std = f'{np.std(values)}'
                 std_dict.setdefault(metrics, {}).setdefault(method_name, {})[target] = np.std(values)
                 result = f'{avg}±{std}'
                 avg_std.setdefault(metrics, {}).setdefault(method_name, {})[target] = result

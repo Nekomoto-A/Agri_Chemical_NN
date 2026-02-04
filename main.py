@@ -10,8 +10,30 @@ with open(yaml_path, "r", encoding="utf-8") as file:
 import torch
 import numpy as np
 import platform
-torch.manual_seed(42)
-np.random.seed(42)
+import torch
+import numpy as np
+import random
+import os
+
+def set_seed(seed=42):
+    # Python標準の乱数固定
+    random.seed(seed)
+    # Numpyの乱数固定
+    np.random.seed(seed)
+    # OS環境変数の固定（HASH生成用）
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    
+    # PyTorchの乱数固定
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed) # マルチGPUの場合
+    
+    # GPUの計算アルゴリズムを決定的なものに固定
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    
+    # (オプション) PyTorch 1.7以降でより厳密に固定する場合
+    # torch.use_deterministic_algorithms(True)
 
 import warnings
 # 不要な警告を非表示にする
@@ -19,6 +41,7 @@ warnings.filterwarnings('ignore', category=UserWarning)
 warnings.filterwarnings('ignore', category=FutureWarning)
 
 def main():
+    set_seed(42)
     # 1. デバイスの決定
     device = (
         "cuda"

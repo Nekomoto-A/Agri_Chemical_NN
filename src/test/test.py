@@ -131,7 +131,7 @@ import torch
 import numpy as np
 import os
 import matplotlib.pyplot as plt
-from sklearn.metrics import accuracy_score, f1_score, mean_absolute_error
+from sklearn.metrics import accuracy_score, f1_score, mean_absolute_error, root_mean_squared_error
 
 # (上記 import が実行されている前提)
 
@@ -352,14 +352,14 @@ def test_MT(x_te, y_te, x_val, y_val, model, reg_list, scalers, output_dir, devi
             
             try:
                 #mae = normalized_medae_iqr(true, pred) # カスタム指標
-                mae = mean_absolute_error(true, pred) # カスタム指標
+                #mae = mean_absolute_error(true, pred) # カスタム指標
+                mae = root_mean_squared_error(true, pred)
             except NameError:
                 print(f"WARN: normalized_medae_iqr が定義されていません。タスク {reg} の評価に MAE (mean_absolute_error) を使用します。")
                 mae = mean_absolute_error(true, pred)
             mse_scores.append(mae)
 
     return predicts, trues, r2_scores, mse_scores
-
 
 from src.training.train import training_MT
 import gpytorch
@@ -601,11 +601,11 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         if 'FiLM' in model_name:
             from src.models.AE import FineTuningModelWithFiLM
             model = FineTuningModelWithFiLM(pretrained_encoder=pretrained_encoder,
-                                        last_shared_layer_dim = latent_dim,
+                                        last_shared_layer_dim = latent_dim, 
                                         output_dims = output_dims,
                                         reg_list = reg_list,
                                         label_embedding_dim = labels_train.shape[1],
-                                        task_specific_layers = [16], 
+                                        #task_specific_layers = [latent_dim], 
                                         shared_learn = False,
                                         )
         elif 'mm' in model_name:
@@ -615,7 +615,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                         tabular_input_dim = labels_train.shape[1],
                                         output_dims = output_dims,
                                         reg_list = reg_list,
-                                        #task_specific_layers = [32], 
+                                        #task_specific_layers = [latent_dim], 
                                         shared_learn = False,
                                         )
         elif 'DKL_label' in model_name:
@@ -693,8 +693,18 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                         last_shared_layer_dim = latent_dim,
                                         output_dims = output_dims,
                                         reg_list = reg_list,
+                                        task_specific_layers = [latent_dim], 
                                         shared_learn = False,
                                         )
+                # from src.models.AE import FineTuningModelWithFiLM
+                # model = FineTuningModelWithFiLM(pretrained_encoder=pretrained_encoder,
+                #                         last_shared_layer_dim = latent_dim,
+                #                         output_dims = output_dims,
+                #                         reg_list = reg_list,
+                #                         label_embedding_dim = labels_train.shape[1],
+                #                         task_specific_layers = [16], 
+                #                         shared_learn = False,
+                #                         )
             
         model.to(device)
 
