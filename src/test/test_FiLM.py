@@ -42,7 +42,7 @@ def normalized_medae_iqr(y_true, y_pred):
     
     return medae / iqr
 
-from src.test.test import get_corrected_predictions 
+from src.test.test import get_corrected_predictions, eval_predictions
 from src.test.test import is_log1p_transformer
 
 from sklearn.metrics import confusion_matrix, classification_report
@@ -50,6 +50,7 @@ from sklearn.metrics import confusion_matrix, classification_report
 def test_FiLM(x_te, y_te, label_te,  
               model, reg_list, scalers, output_dir, device, 
               test_ids,
+              eval_reg, eval_class,
               label_encoders = None
               ):
     x_te = x_te.to(device)
@@ -63,10 +64,12 @@ def test_FiLM(x_te, y_te, label_te,
     
     mc_results = model.predict_with_mc_dropout(x_te,label_te, n_samples=50)
 
-    r2_scores, mse_scores = [], []
+    #r2_scores, mse_scores = [], []
+    scores = {}
     
     # --- 3. タスクごとに結果を処理 ---
     for reg in reg_list:
+        scores[reg] = {}
         # 分類タスクの処理 (省略)
         if '_rank' in reg or not torch.is_floating_point(y_te[reg]):
             true_tensor = y_te[reg]
@@ -76,11 +79,12 @@ def test_FiLM(x_te, y_te, label_te,
             true = true_tensor.cpu().detach().numpy()
 
             predicts[reg], trues[reg] = pred, true
-            r2 = accuracy_score(true, pred)
-            r2_scores.append(r2)
+            # r2 = accuracy_score(true, pred)
+            # r2_scores.append(r2)
             
-            mae = f1_score(true, pred, average='macro') # カスタム指標
-            mse_scores.append(mae)
+            # mae = f1_score(true, pred, average='macro') # カスタム指標
+            # mse_scores.append(mae)
+            score = eval_predictions(true, pred, eval_class)
 
             # true_labels = label_encoder.inverse_transform(true)
             # pred_labels = label_encoder.inverse_transform(pred)
@@ -174,18 +178,22 @@ def test_FiLM(x_te, y_te, label_te,
             plt.close()
 
             # 評価指標の計算 (変更なし)
-            corr_matrix = np.corrcoef(true.flatten(), pred.flatten())
-            #r2 = corr_matrix[0, 1]
-            r2 = median_absolute_error(true, pred)
-            r2_scores.append(r2)
+            # corr_matrix = np.corrcoef(true.flatten(), pred.flatten())
+            # #r2 = corr_matrix[0, 1]
+            # r2 = median_absolute_error(true, pred)
+            # r2_scores.append(r2)
             
-            try:
-                #mae = normalized_medae_iqr(true, pred) # カスタム指標
-                #mae = mean_absolute_error(true, pred)
-                mae = root_mean_squared_error(true, pred)
-            except NameError:
-                print(f"WARN: normalized_medae_iqr が定義されていません。タスク {reg} の評価に MAE (mean_absolute_error) を使用します。")
-                mae = mean_absolute_error(true, pred)
-            mse_scores.append(mae)
+            # try:
+            #     #mae = normalized_medae_iqr(true, pred) # カスタム指標
+            #     #mae = mean_absolute_error(true, pred)
+            #     mae = root_mean_squared_error(true, pred)
+            # except NameError:
+            #     print(f"WARN: normalized_medae_iqr が定義されていません。タスク {reg} の評価に MAE (mean_absolute_error) を使用します。")
+            #     mae = mean_absolute_error(true, pred)
+            # mse_scores.append(mae)
+            score = eval_predictions(true, pred, eval_reg)
+        
+        for metrix, value in score.items():
+            scores[reg][metrix] = value
 
-    return predicts, trues, r2_scores, mse_scores
+    return predicts, trues, scores

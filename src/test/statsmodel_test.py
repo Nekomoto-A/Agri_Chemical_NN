@@ -110,7 +110,9 @@ def normalized_medae_iqr(y_true, y_pred):
 
 from sklearn.metrics import confusion_matrix, classification_report
 
-def statsmodel_test(X, Y, models, scalers, reg, result_dir,index, feature_names, reg_encoders):
+from src.test.test import eval_predictions
+
+def statsmodel_test(X, Y, models, scalers, reg, result_dir,index, feature_names, reg_encoders, eval_reg, eval_class):
     X = X.numpy()
     X_df = pd.DataFrame(X, columns=feature_names)
     #X_df.columns = X_df.columns.astype(str)
@@ -119,7 +121,11 @@ def statsmodel_test(X, Y, models, scalers, reg, result_dir,index, feature_names,
     #print(Y.shape)
     #print(X.shape)
     scores = {}
+    #scores[reg] = {}
     for name, model in models.items():
+        scores[name] = {}
+        scores[name][reg] = {}
+
         re_dir = os.path.dirname(result_dir)
         #print(index[0])
         stats_dir = os.path.join(re_dir, index[0])
@@ -159,16 +165,17 @@ def statsmodel_test(X, Y, models, scalers, reg, result_dir,index, feature_names,
 
             #r2 = r2_score(pred,Y_pp)
             #r2 = r2_score(true,output)
-            corr_matrix = np.corrcoef(Y_pp.ravel(),pred.ravel())
-            # 相関係数（xとyの間の値）は [0, 1] または [1, 0] の位置
-            #r2 = corr_matrix[0, 1]
-            r2 = median_absolute_error(Y_pp, pred)
-            #mse = mean_squared_error(pred,Y_pp)
-            mse = mean_absolute_error(Y_pp, pred)
-            #mse = normalized_medae_iqr(pred, Y_pp)
-            print(f'{name}：')
-            print(f'決定係数：{r2}')
-            print(f'MAE：{mse}')
+            # corr_matrix = np.corrcoef(Y_pp.ravel(),pred.ravel())
+            # # 相関係数（xとyの間の値）は [0, 1] または [1, 0] の位置
+            # #r2 = corr_matrix[0, 1]
+            # r2 = median_absolute_error(Y_pp, pred)
+            # #mse = mean_squared_error(pred,Y_pp)
+            # mse = mean_absolute_error(Y_pp, pred)
+            # #mse = normalized_medae_iqr(pred, Y_pp)
+            # print(f'{name}：')
+            # print(f'決定係数：{r2}')
+            # print(f'MAE：{mse}')
+            score = eval_predictions(Y_pp, pred, eval_reg)
 
             if name in ['RF','XGB','LGB']:
                 calculate_and_save_shap_importance(model = model, X_test = X, feature_names = feature_names, output_dir = reg_dir)
@@ -177,8 +184,10 @@ def statsmodel_test(X, Y, models, scalers, reg, result_dir,index, feature_names,
             Y_pp = Y
             pred = models[name].predict(X)
 
-            r2 = accuracy_score(Y_pp,pred)
-            mse = f1_score(Y_pp,pred, average='macro')
+            # r2 = accuracy_score(Y_pp,pred)
+            # mse = f1_score(Y_pp,pred, average='macro')
+
+            score = eval_predictions(Y_pp, pred, eval_class)
 
             trues = reg_encoders[reg].inverse_transform(Y_pp)
             preds = reg_encoders[reg].inverse_transform(pred)
@@ -196,17 +205,20 @@ def statsmodel_test(X, Y, models, scalers, reg, result_dir,index, feature_names,
             cm_path = os.path.join(reg_dir, f"{reg}_confusion_matrix.csv")
             cm_df.to_csv(cm_path)
 
-        write_result(r2, mse, columns_list = [reg], csv_dir = result_dir, method = name, ind = index)
+        for metrics, s in score.items():
+            scores[name][reg][metrics] = s
+            write_result(scores[name], columns_list = [reg], csv_dir = result_dir, method = name, ind = index)
 
-        scores.setdefault('R', {}).setdefault(name, {}).setdefault(reg, []).append(r2)
-        scores.setdefault('MAE', {}).setdefault(name, {}).setdefault(reg, []).append(mse)
     return scores
 
-def stats_models_result(X_train, Y_train, X_test, Y_test, scalers, reg, result_dir,index, feature_names, reg_encoders):
+def stats_models_result(X_train, Y_train, X_test, Y_test, scalers, reg, result_dir,index, feature_names, reg_encoders,
+                        eval_reg, eval_class,
+                        ):
     #print(Y_train)
     models = statsmodel_train(X = X_train,Y = Y_train,scalers = scalers,reg = reg)
     scores = statsmodel_test(X = X_test, Y = Y_test, models = models, 
                              scalers = scalers, reg = reg, result_dir = result_dir, index = index, feature_names = feature_names,
                              reg_encoders=reg_encoders, 
+                             eval_reg = eval_reg, eval_class = eval_class, 
                              )
     return scores

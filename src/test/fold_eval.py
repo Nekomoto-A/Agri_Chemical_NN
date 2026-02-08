@@ -221,8 +221,8 @@ def save_tsne_plots(X, Y, target_columns, save_dir="tsne_results"):
 
     # 1. t-SNEの実行 (全てのプロットで共通の座標を使用)
     print("t-SNE計算中... (データ量によっては時間がかかる場合があります)")
-    #reducer = TSNE(n_components=2, random_state=42)
-    reducer = UMAP(n_components=2, random_state=42)
+    reducer = TSNE(n_components=2, random_state=42)
+    #reducer = UMAP(n_components=2, random_state=42)
     #X_embedded = tsne.fit_transform(X)
     X_embedded = reducer.fit_transform(X)
     
@@ -279,7 +279,8 @@ def fold_evaluate(reg_list, output_dir, device,
                   embedding = config['embedding'], 
                   latent_dim = config['latent_dim'], 
                   embedding_size = config['embedding_size'], 
-                  eval = config['eval']
+                  eval_reg = config['eval_reg'], 
+                  eval_class = config['eval_class'],
                   ):
     #if feature_selection_all:
     #   output_dir = os.path.join(fsdir, output_dir)
@@ -436,12 +437,13 @@ def fold_evaluate(reg_list, output_dir, device,
             os.makedirs(vis_dir_main,exist_ok=True)
         
             #print(X_train_tensor.shape)
-            predictions, trues, r2_results, mse_results,model_trained = train_and_test(
+            predictions, trues, result_scores,model_trained = train_and_test(
                 X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor, 
                 scalers, predictions, trues, input_dim, method, index , reg_list, csv_dir,
                 vis_dir = vis_dir_main, model_name = model_name, train_ids = train_ids, test_ids = test_ids, features= features,
                 device = device,
                 reg_encoders = reg_encoders,
+                eval_reg = eval_reg, eval_class = eval_class,
                 reg_loss_fanction = loss_fanctions,
                 latent_dim = latent_dim, 
                 labels_train=label_train_embedded,
@@ -455,17 +457,15 @@ def fold_evaluate(reg_list, output_dir, device,
 
                 )
             
-            for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
-                #print(r2_results)
-                t = reg_list[i]
-                scores.setdefault('R', {}).setdefault(method, {}).setdefault(t, []).append(r2)
-                scores.setdefault('MAE', {}).setdefault(method, {}).setdefault(t, []).append(mse)
+            for reg_name, dict in result_scores.items():
+                for metrics, value in dict.items():
+                    scores.setdefault(metrics, {}).setdefault(method, {}).setdefault(reg_name, []).append(value)
             
             if comp_method:
                 vis_dir_comp = os.path.join(fold_dir, method_comp)
                 os.makedirs(vis_dir_comp,exist_ok=True)
 
-                predictions, trues, r2_results, mse_results,model_trained_comp = train_and_test(
+                predictions, trues, result_scores_comp, model_trained_comp = train_and_test(
                     X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor, scalers, 
                     predictions, trues, 
                     input_dim, 
@@ -475,6 +475,7 @@ def fold_evaluate(reg_list, output_dir, device,
                     model_name = model_name, train_ids = train_ids, test_ids = test_ids, features = features,
                     device = device,
                     reg_encoders = reg_encoders,
+                    eval_reg = eval_reg, eval_class = eval_class,
                     reg_loss_fanction = loss_fanctions,
                     latent_dim = latent_dim, 
                     loss_sum = comp_method,
@@ -490,11 +491,9 @@ def fold_evaluate(reg_list, output_dir, device,
                 
                 #print(r2_results)
                 
-                for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
-                    #print(r2_results)
-                    t = reg_list[i]
-                    scores.setdefault('R', {}).setdefault(method_comp, {}).setdefault(t, []).append(r2)
-                    scores.setdefault('MAE', {}).setdefault(method_comp, {}).setdefault(t, []).append(mse)
+                for reg_name, dict in result_scores_comp.items():
+                    for metrics, value in dict.items():
+                        scores.setdefault(metrics, {}).setdefault(method_st, {}).setdefault(reg_name, []).append(value)
                 else:
                     pass
             else:
@@ -516,7 +515,7 @@ def fold_evaluate(reg_list, output_dir, device,
             reg = [r]
             print(X_train_tensor.shape)
 
-            predictions, trues, r2_result, mse_result, model_trained_st = train_and_test(
+            predictions, trues, result_scores_st, model_trained_st = train_and_test(
             X_train = X_train_tensor, X_val = X_val_tensor, X_test = X_test_tensor, Y_train = Y_train_single, Y_val = Y_val_single, Y_test = Y_test_single, 
             scalers = scalers, predictions = predictions, trues = trues, input_dim = input_dim, method = method_st, index = index , reg_list = reg, csv_dir = csv_dir, 
             vis_dir = vis_dir_st, model_name = model_name, train_ids = train_ids, test_ids = test_ids, features = features,
@@ -524,6 +523,7 @@ def fold_evaluate(reg_list, output_dir, device,
             reg_loss_fanction = loss_fanction, 
             latent_dim = latent_dim, 
             reg_encoders = reg_encoders,
+            eval_reg = eval_reg, eval_class = eval_class, 
             labels_train=label_train_embedded,
             labels_val=label_val_embedded,
             labels_test=label_test_embedded,
@@ -538,8 +538,12 @@ def fold_evaluate(reg_list, output_dir, device,
 
             #reduced_features = reduce_feature(model = model_trained, X = X_test_tensor, model_name = model_name)
 
-            scores.setdefault('R', {}).setdefault(method_st, {}).setdefault(r, []).append(r2_result[0])
-            scores.setdefault('MAE', {}).setdefault(method_st, {}).setdefault(r, []).append(mse_result[0])
+            # scores.setdefault('R', {}).setdefault(method_st, {}).setdefault(r, []).append(r2_result[0])
+            # scores.setdefault('MAE', {}).setdefault(method_st, {}).setdefault(r, []).append(mse_result[0])
+
+            for reg_name, dict in result_scores_st.items():
+                for metrics, value in dict.items():
+                    scores.setdefault(metrics, {}).setdefault(method_st, {}).setdefault(reg_name, []).append(value)
 
             #FiLMなし
             if 'FiLM' in model_name:
@@ -549,7 +553,7 @@ def fold_evaluate(reg_list, output_dir, device,
                 vis_dir_nolabel = os.path.join(fold_dir, method_nolabel)
                 os.makedirs(vis_dir_nolabel, exist_ok=True)
                 
-                predictions, trues, r2_result_nolabel, mse_result_nolabel, model_trained_st = train_and_test(
+                predictions, trues, result_scores_nolabel, model_trained_nolabel = train_and_test(
                 X_train = X_train_tensor, X_val = X_val_tensor, X_test = X_test_tensor, Y_train = Y_train_single, Y_val = Y_val_single, Y_test = Y_test_single, 
                 scalers = scalers, predictions = predictions, trues = trues, input_dim = input_dim, 
                 method = method_nolabel, 
@@ -560,7 +564,8 @@ def fold_evaluate(reg_list, output_dir, device,
                 device = device,
                 reg_loss_fanction = loss_fanction, 
                 latent_dim = latent_dim, 
-                reg_encoders = reg_encoders,
+                reg_encoders = reg_encoders, 
+                eval_reg = eval_reg, eval_class = eval_class, 
                 labels_train=label_train_embedded,
                 labels_val=label_val_embedded,
                 labels_test=label_test_embedded,
@@ -571,49 +576,57 @@ def fold_evaluate(reg_list, output_dir, device,
                 ae_dir = ae_dir
                 )
                 
-                scores.setdefault('R', {}).setdefault(method_nolabel, {}).setdefault(r, []).append(r2_result_nolabel[0])
-                scores.setdefault('MAE', {}).setdefault(method_nolabel, {}).setdefault(r, []).append(mse_result_nolabel[0])
+                # scores.setdefault('R', {}).setdefault(method_nolabel, {}).setdefault(r, []).append(r2_result_nolabel[0])
+                # scores.setdefault('MAE', {}).setdefault(method_nolabel, {}).setdefault(r, []).append(mse_result_nolabel[0])
+                for reg_name, dict in result_scores_nolabel.items():
+                    for metrics, value in dict.items():
+                        scores.setdefault(metrics, {}).setdefault(method_nolabel, {}).setdefault(reg_name, []).append(value)
 
                 model_name_concat = model_name_nolabel + '_mm'
                 method_concat = 'ST_concat'
                 vis_dir_concat = os.path.join(fold_dir, method_concat)
                 os.makedirs(vis_dir_concat, exist_ok=True)
                 
-                predictions, trues, r2_result_concat, mse_result_concat, model_trained_st = train_and_test(
-                X_train = X_train_tensor, X_val = X_val_tensor, X_test = X_test_tensor, Y_train = Y_train_single, Y_val = Y_val_single, Y_test = Y_test_single, 
-                scalers = scalers, predictions = predictions, trues = trues, input_dim = input_dim, 
-                method = method_concat, 
-                index = index , reg_list = reg, csv_dir = csv_dir, 
-                vis_dir = vis_dir_concat, 
-                model_name = model_name_concat, 
-                train_ids = train_ids, test_ids = test_ids, features = features,
-                device = device,
-                reg_loss_fanction = loss_fanction, 
-                latent_dim = latent_dim, 
-                reg_encoders = reg_encoders,
-                labels_train=label_train_embedded,
-                labels_val=label_val_embedded,
-                labels_test=label_test_embedded,
-                label_encoders = label_encoders,
-                labels_train_original = label_train_tensor,
-                labels_val_original = label_val_tensor,
-                labels_test_original = label_test_tensor,
-                ae_dir = ae_dir
-                )
+                predictions, trues, result_scores_concat, model_trained_concat = train_and_test(
+                    X_train = X_train_tensor, X_val = X_val_tensor, X_test = X_test_tensor, Y_train = Y_train_single, Y_val = Y_val_single, Y_test = Y_test_single, 
+                    scalers = scalers, predictions = predictions, trues = trues, input_dim = input_dim, 
+                    method = method_concat, 
+                    index = index , reg_list = reg, csv_dir = csv_dir, 
+                    vis_dir = vis_dir_concat, 
+                    model_name = model_name_concat, 
+                    train_ids = train_ids, test_ids = test_ids, features = features,
+                    device = device,
+                    reg_loss_fanction = loss_fanction, 
+                    latent_dim = latent_dim, 
+                    reg_encoders = reg_encoders, 
+                    eval_reg = eval_reg, eval_class = eval_class, 
+                    labels_train=label_train_embedded,
+                    labels_val=label_val_embedded,
+                    labels_test=label_test_embedded,
+                    label_encoders = label_encoders,
+                    labels_train_original = label_train_tensor,
+                    labels_val_original = label_val_tensor,
+                    labels_test_original = label_test_tensor,
+                    ae_dir = ae_dir
+                    )
                 
-                scores.setdefault('R', {}).setdefault(method_concat, {}).setdefault(r, []).append(r2_result_concat[0])
-                scores.setdefault('MAE', {}).setdefault(method_concat, {}).setdefault(r, []).append(mse_result_concat[0])
+                # scores.setdefault('R', {}).setdefault(method_concat, {}).setdefault(r, []).append(r2_result_concat[0])
+                # scores.setdefault('MAE', {}).setdefault(method_concat, {}).setdefault(r, []).append(mse_result_concat[0])
+                for reg_name, dict in result_scores_concat.items():
+                    for metrics, value in dict.items():
+                        scores.setdefault(metrics, {}).setdefault(method_concat, {}).setdefault(reg_name, []).append(value)
 
             stats_scores = stats_models_result(X_train = X_train_tensor, Y_train = Y_train_single, 
                                         X_test = X_test_tensor, Y_test = Y_test_single, scalers = scalers, reg = r, 
                                         result_dir = csv_dir, index = index, feature_names = features,
                                         reg_encoders = reg_encoders,
+                                        eval_reg = eval_reg,
+                                        eval_class = eval_class, 
                                         )
-            
-            for metrics, dict in stats_scores.items():
-                for method_name, regs in dict.items():
-                    for reg_name, value in regs.items():
-                        scores.setdefault(metrics, {}).setdefault(method_name, {}).setdefault(reg_name, []).append(value[0])
+            for method_name, regs in stats_scores.items():
+                for reg_name, dict in regs.items():
+                    for metrics, value in dict.items():
+                        scores.setdefault(metrics, {}).setdefault(method_name, {}).setdefault(reg_name, []).append(value)
 
     ids = np.concatenate(ids)
     test_df = pd.DataFrame(index = ids)
@@ -713,12 +726,6 @@ def fold_evaluate(reg_list, output_dir, device,
     std_dict = {}
     metrics_norm = {}
     for metrics,models in scores.items():
-        #met = []
-        #for reg in reg_list:
-        #    norm = models[method][reg]/models[method_st][reg]
-        #    met.append(norm)
-        #metrics_norm
-
         for method_name,regs in models.items():
             for target,values in regs.items():
                 avg = f'{np.average(values):.3f}'
@@ -730,7 +737,6 @@ def fold_evaluate(reg_list, output_dir, device,
                 result = f'{avg}±{std}'
                 avg_std.setdefault(metrics, {}).setdefault(method_name, {})[target] = result
 
-    
     #if comp_method != None:
     #    method_order = [method,method_comp, method_st]  # 先に固定するキー
     #else:
@@ -763,7 +769,6 @@ def fold_evaluate(reg_list, output_dir, device,
     print(f"CSVファイル '{final_output}' を作成しました。")
 
     return avg_dict, std_dict
-
 
 def loop_evaluate(reg_list, output_dir, device,
                   feature_selection_all = config['feature_selection_all'], 

@@ -30,7 +30,9 @@ def save_overall_analysis(df, output_dir, file_prefix='overall'):
 
     # 3. 混合行列の作成
     labels = sorted(list(set(y_true) | set(y_pred)))
-    cm = confusion_matrix(y_true, y_pred, labels=labels)
+    cm = confusion_matrix(y_true, y_pred, labels=labels, 
+                          #normalize='true'
+                          )
     cm_df = pd.DataFrame(cm, index=labels, columns=labels)
 
     # 4. 保存ディレクトリの準備
@@ -43,7 +45,10 @@ def save_overall_analysis(df, output_dir, file_prefix='overall'):
 
     # 6. ヒートマップの作成と保存
     plt.figure(figsize=(10, 8))
-    sns.heatmap(cm_df, annot=True, fmt='d', cmap='Blues', cbar=True)
+    sns.heatmap(cm_df, annot=True, 
+                fmt='d', 
+                #fmt='.2%', 
+                cmap='Blues', cbar=True)
     plt.title('Overall Confusion Matrix')
     plt.ylabel('Actual Label')
     plt.xlabel('Predicted Label')
@@ -67,5 +72,5 @@ if __name__ == '__main__':
     out_dir = "C:\\Users\\asahi\\Agri_Chemical_NN\\datas"
     
     _ = save_overall_analysis(data, out_dir ,
-                                      f'confusion_matrix_{label}'
+                                      f'confusion_matrix_original_{label}'
                                     )

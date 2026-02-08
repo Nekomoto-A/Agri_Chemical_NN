@@ -43,8 +43,10 @@ class SpecificTaskModel(nn.Module):
         # 目的のタスクの出力だけを返す
         return outputs_dict[self.task_name]
 
+
+
 # 1. 現在のタスク用のラッパー関数を定義
-def test_shap(x_tr, x_te,model,reg_list, features, output_dir):
+def test_shap(x_tr, x_te,model,reg_list, features, output_dir, ):
     background_data = x_tr[torch.randperm(x_tr.size(0))[:100]]
     feature_importance_dict = {}
 
@@ -131,7 +133,7 @@ import torch
 import numpy as np
 import os
 import matplotlib.pyplot as plt
-from sklearn.metrics import accuracy_score, f1_score, mean_absolute_error, root_mean_squared_error
+from sklearn.metrics import accuracy_score, f1_score, mean_absolute_error, root_mean_squared_log_error
 
 # (上記 import が実行されている前提)
 
@@ -220,11 +222,37 @@ def get_corrected_predictions(mc_output):
         
     return corrected_result
 
-from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.metrics import confusion_matrix, classification_report, root_mean_squared_error
 
-def test_MT(x_te, y_te, x_val, y_val, model, reg_list, scalers, output_dir, device, test_ids, 
+def eval_predictions(true, pred, eval):
+    result = {}
+    for metrix in eval:
+        if metrix == 'accuracy':
+            result[metrix] = accuracy_score(true, pred)
+        elif metrix == 'F1score':
+            result[metrix] = f1_score(true, pred, average='macro')
+        elif metrix == 'MAE':
+            result[metrix] = mean_absolute_error(true, pred)
+        elif metrix == 'MSE':
+            result[metrix] = mean_squared_error(true, pred)
+        elif metrix == 'R2':
+            result[metrix] = r2_score(true, pred)
+        elif metrix == 'MedAE':
+            result[metrix] = median_absolute_error(true, pred)
+        elif metrix == 'RMSE':
+            result[metrix] = root_mean_squared_error(true, pred)
+        elif metrix == 'SMAPE':
+            result[metrix] = smape(true, pred)
+        elif metrix == 'RMSLE':
+            pred = np.clip(pred, 0, None)
+            result[metrix] = root_mean_squared_log_error(true, pred)
+    return result
+
+def test_MT(x_te, y_te, x_val, y_val, model, reg_list, scalers, output_dir, device, test_ids,
+            eval_reg, eval_class, 
             label_encoders = None, 
             n_samples_mc=100):
+    
     x_te = x_te.to(device)
     predicts, trues = {}, {}
 
@@ -234,10 +262,12 @@ def test_MT(x_te, y_te, x_val, y_val, model, reg_list, scalers, output_dir, devi
 
     mc_results = model.predict_with_mc_dropout(x_te, n_samples=50)
 
-    r2_scores, mse_scores = [], []
+    #r2_scores, mse_scores = [], []
+    scores = {}
     
     # --- 3. タスクごとに結果を処理 ---
     for reg in reg_list:
+        scores[reg] = {}
         # 分類タスクの処理 (省略)
         if '_rank' in reg or not torch.is_floating_point(y_te[reg]):
             true_tensor = y_te[reg]
@@ -249,11 +279,15 @@ def test_MT(x_te, y_te, x_val, y_val, model, reg_list, scalers, output_dir, devi
             true = true_tensor.cpu().detach().numpy()
 
             predicts[reg], trues[reg] = pred, true
-            r2 = accuracy_score(true, pred)
-            r2_scores.append(r2)
+
+            # r2 = accuracy_score(true, pred)
+            # #r2_scores.append(r2)
             
-            mae = f1_score(true, pred, average='macro') # カスタム指標
-            mse_scores.append(mae)
+            # mae = f1_score(true, pred, average='macro') # カスタム指標
+            # mse_scores.append(mae)
+            
+            #scores[reg][]
+            score = eval_predictions(true, pred, eval_class)
 
             # 3. 混合行列の計算
             classes = label_encoders[reg].classes_ # 元のラベル名のリスト
@@ -287,6 +321,8 @@ def test_MT(x_te, y_te, x_val, y_val, model, reg_list, scalers, output_dir, devi
                 # スケーラーなし
                 pred = pred_tensor_for_eval.cpu().detach().numpy()
                 true = true_tensor.cpu().detach().numpy()
+
+            score = eval_predictions(true, pred, eval_reg)
 
             # --- 3-3. (★) MC Dropout 結果のCSV保存 ---
             # ( ... 元のコードと同じ ... )
@@ -344,55 +380,60 @@ def test_MT(x_te, y_te, x_val, y_val, model, reg_list, scalers, output_dir, devi
             plt.savefig(os.path.join(result_dir, 'loss_hist.png'))
             plt.close()
 
-            # 評価指標の計算 (変更なし)
-            corr_matrix = np.corrcoef(true.flatten(), pred.flatten())
-            #r2 = corr_matrix[0, 1]
-            r2 = median_absolute_error(true, pred)
-            r2_scores.append(r2)
+            # # 評価指標の計算 (変更なし)
+            # corr_matrix = np.corrcoef(true.flatten(), pred.flatten())
+            # #r2 = corr_matrix[0, 1]
+            # r2 = median_absolute_error(true, pred)
+            # r2_scores.append(r2)
             
-            try:
-                #mae = normalized_medae_iqr(true, pred) # カスタム指標
-                #mae = mean_absolute_error(true, pred) # カスタム指標
-                mae = root_mean_squared_error(true, pred)
-            except NameError:
-                print(f"WARN: normalized_medae_iqr が定義されていません。タスク {reg} の評価に MAE (mean_absolute_error) を使用します。")
-                mae = mean_absolute_error(true, pred)
-            mse_scores.append(mae)
+            # try:
+            #     #mae = normalized_medae_iqr(true, pred) # カスタム指標
+            #     #mae = mean_absolute_error(true, pred) # カスタム指標
+            #     mae = root_mean_squared_error(true, pred)
+            # except NameError:
+            #     print(f"WARN: normalized_medae_iqr が定義されていません。タスク {reg} の評価に MAE (mean_absolute_error) を使用します。")
+            #     mae = mean_absolute_error(true, pred)
+            # mse_scores.append(mae)
 
-    return predicts, trues, r2_scores, mse_scores
+        for metrix, value in score.items():
+            scores[reg][metrix] = value
+
+    return predicts, trues, scores
 
 from src.training.train import training_MT
 import gpytorch
 
 from src.models.MT_CNN import MTCNNModel
-from src.models.MT_CNN_Attention import MTCNNModel_Attention
-from src.models.MT_CNN_catph import MTCNN_catph
-from src.models.MT_NN import MTNNModel
-from src.models.MT_NN_attention import AttentionMTNNModel
-from src.models.MT_CNN_soft import MTCNN_SPS
-from src.models.MT_CNN_SA import MTCNNModel_SA
-from src.models.MT_CNN_Di import MTCNNModel_Di
-from src.models.MT_BNN_MG import MTBNNModel_MG
-#from src.models.HBM import MultitaskModel
 
 import numpy as np
 import os
 import pandas as pd
 
-import pyro
-import pyro.distributions as dist
-from pyro.infer import MCMC, NUTS, Predictive
-
-def write_result(r2_results, mse_results, columns_list, csv_dir, method, ind):
+def write_result(scores, columns_list, csv_dir, method, ind):
     index_tuples = list(zip(method, ind))
-    metrics = ["accuracy", "Loss"]
     index = pd.MultiIndex.from_tuples(index_tuples, names=["method", "fold"])
-    columns = pd.MultiIndex.from_product([metrics, columns_list])
+    #df = pd.DataFrame.from_dict(scores, orient='columns')
 
-    result = np.concatenate([np.array(r2_results).reshape(1,-1),
-            np.array(mse_results).reshape(1,-1)
-            ], 1)
-    result_data = pd.DataFrame(result,index = index,columns = columns)
+    # 3. 縦方向に積み上げる (stack)
+    # dropna=True（デフォルト）により、データがない組み合わせは自動で削除されます
+    #result_data = df.stack()
+    # flat_data = { (task, sub): val 
+    #           for task, sub_dict in scores.items() 
+    #           for sub, val in sub_dict.items() }
+    # s = pd.Series(flat_data)
+    # result_data = s.unstack(level=0)
+
+    # # 4. カラムの階層を入れ替えて、タスクが上にくるように調整
+    # result_data = result_data.T
+    
+    # print(result_data)
+    result_data = pd.DataFrame(scores).unstack().to_frame().T
+    #print(result_data)
+    # 4. 見栄えを整える
+    #result_data.index.names = ['Task', 'Key']
+
+    result_data.index = index
+
     # 既存のCSVのヘッダーを取得
     if os.path.exists(csv_dir):
         existing_data = pd.read_csv(csv_dir, index_col=[0,1], header=[0, 1])  # MultiIndexのヘッダーを読み込む
@@ -472,6 +513,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                   reg_loss_fanction, 
                   latent_dim, 
                   reg_encoders, 
+                  eval_reg, eval_class, 
                   labels_train = None, 
                   labels_val = None, 
                   labels_test = None, 
@@ -584,6 +626,9 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
             elif adapte == 'Adapter':
                 from src.training.adapt_AE import train_adapted_model_cae
                 ae_model, _ = train_adapted_model_cae(ae_model, X_train, X_val, device, vis_dir)
+            elif adapte == 'retrain':
+                from src.training.adapt_AE import retrain_model_cae
+                ae_model, _ = retrain_model_cae(ae_model, X_train, X_val, device, vis_dir)
             pretrained_encoder = ae_model.get_encoder()
 
         else: 
@@ -596,6 +641,9 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
             elif adapte == 'Adapter':
                 from src.training.adapt_AE import train_adapted_model
                 ae_model, _ = train_adapted_model(ae_model, X_train, X_val, device, vis_dir)
+            elif adapte == 'retrain':
+                from src.training.adapt_AE import retrain_model_cae
+                ae_model = retrain_model_cae(ae_model, X_train, X_val, device, vis_dir)
             pretrained_encoder = ae_model.get_encoder()
 
         if 'FiLM' in model_name:
@@ -811,7 +859,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                             )
 
         from src.test.test_BNN import test_BNN_MT
-        predicts, true, r2_results, mse_results = test_BNN_MT(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir)
+        predicts, true, scores = test_BNN_MT(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir)
 
     elif model_name == 'HBM':
         from src.training.train_HBM import training_HBM
@@ -826,7 +874,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                                     )
         
         from src.test.test_HBM import test_HBM
-        predicts, true, r2_results, mse_results = test_HBM(x_te = X_test, y_te = Y_test, label_te = labels_test_original['crop'], 
+        predicts, true, scores = test_HBM(x_te = X_test, y_te = Y_test, label_te = labels_test_original['crop'], 
                                                            #x_val, y_val, label_val, 
                                                             model = model_trained, guide = guide_trained, 
                                                             reg_list = reg_list, scalers = scalers, 
@@ -956,9 +1004,10 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                     )
         
         from src.test.test_FiLM import test_FiLM
-        predicts, true, r2_results, mse_results = test_FiLM(X_test,Y_test, labels_test,
+        predicts, true, scores = test_FiLM(X_test,Y_test, labels_test,
                                                           model_trained,reg_list,scalers,output_dir=vis_dir,
-                                                          device = device, test_ids = test_ids,
+                                                          device = device, test_ids = test_ids, 
+                                                          eval_reg= eval_reg, eval_class = eval_class,
                                                           label_encoders = reg_encoders, 
                                                           )
 
@@ -976,12 +1025,13 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                     model_name = model_name,
                                     loss_sum = loss_sum,
                                     device = device,
-                                    batch_size = batch_size
-
+                                    batch_size = batch_size,
                                     )
 
-        predicts, true, r2_results, mse_results = test_MT(X_test,Y_test, X_val, Y_val, 
-                                                          model_trained,reg_list,scalers,output_dir=vis_dir,device = device, test_ids = test_ids)
+        predicts, true, scores = test_MT(X_test,Y_test, X_val, Y_val, 
+                                                          model_trained,reg_list,scalers,output_dir=vis_dir,device = device, test_ids = test_ids,
+                                                          eval_reg= eval_reg, eval_class = eval_class,
+                                                          )
     elif 'DKL_label' in model_name:
         print('labelありのDKLを使用します')
         from src.training.train_GP_label import training_MT_DKL
@@ -995,10 +1045,11 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                         train_ids = train_ids, 
                                     )
         from src.test.test_GP_label import test_MT_DKL
-        predicts, true, r2_results, mse_results = test_MT_DKL(X_test,labels_test, Y_test, 
+        predicts, true, scores = test_MT_DKL(X_test,labels_test, Y_test, 
                                                                 model_trained,reg_list,scalers,
                                                                 output_dir=vis_dir,
-                                                                device = device, test_ids = test_ids
+                                                                device = device, test_ids = test_ids, 
+                                                                eval_reg= eval_reg, eval_class = eval_class,
                                                                 )
     
     elif 'DKL' in model_name:
@@ -1014,10 +1065,12 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                         )
 
         from src.test.test_GP import test_MT_DKL
-        predicts, true, r2_results, mse_results = test_MT_DKL(X_test,Y_test, 
+        predicts, true, scores = test_MT_DKL(X_test,Y_test, 
                                                           model_trained,reg_list,scalers,
                                                           output_dir=vis_dir,
-                                                          device = device, test_ids = test_ids)
+                                                          device = device, test_ids = test_ids,
+                                                          eval_reg= eval_reg, eval_class = eval_class,
+                                                          )
     elif 'NUTS' in model_name:
         print('NUTSによるDKLを使用します')
         from src.training.train_GP_NUTS import training_GP_NUTS
@@ -1032,7 +1085,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                         #train_ids = train_ids,
                                         )
         from src.test.test_GP_NUTS import test_GP_NUTS
-        predicts, true, r2_results, mse_results = test_GP_NUTS(X_test,Y_test, X_train, Y_train,
+        predicts, true, scores = test_GP_NUTS(X_test,Y_test, X_train, Y_train,
                                                           model_trained,reg_list, 
                                                           labels_train, labels_test,
                                                           model_name, scalers,
@@ -1052,7 +1105,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                         )
 
         from src.test.test_WGP import test_MT_WGP
-        predicts, true, r2_results, mse_results = test_MT_WGP(X_test,Y_test, 
+        predicts, true, scores = test_MT_WGP(X_test,Y_test, 
                                                           model_trained,reg_list,
                                                           #scalers,
                                                           output_dir=vis_dir,
@@ -1072,7 +1125,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                         )
 
         from src.test.test_DGP import test_MT_DKL
-        predicts, true, r2_results, mse_results = test_MT_DKL(X_test,Y_test, 
+        predicts, true, scores = test_MT_DKL(X_test,Y_test, 
                                                           model_trained,reg_list,scalers,
                                                           output_dir=vis_dir,
                                                           device = device, test_ids = test_ids)
@@ -1089,7 +1142,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                         train_ids = train_ids, 
                                     )
         from src.test.test_MGP_label import test_MT_DKL
-        predicts, true, r2_results, mse_results = test_MT_DKL(X_test,labels_test, Y_test, 
+        predicts, true, scores = test_MT_DKL(X_test,labels_test, Y_test, 
                                                                 model_trained,reg_list,scalers,
                                                                 output_dir=vis_dir,
                                                                 device = device, test_ids = test_ids
@@ -1113,9 +1166,10 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
 
                                     )
         
-        predicts, true, r2_results, mse_results = test_MT(X_test,Y_test, X_val, Y_val, 
+        predicts, true, scores = test_MT(X_test,Y_test, X_val, Y_val, 
                                                           model_trained,reg_list,scalers,output_dir=vis_dir,
                                                           device = device, test_ids = test_ids,
+                                                          eval_reg= eval_reg, eval_class = eval_class, 
                                                           label_encoders = reg_encoders,
                                                           )
         
@@ -1131,9 +1185,14 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
     #visualize_tsne(model = model_trained, model_name = model_name , X = X_test, Y = Y_test, reg_list = reg_list, output_dir = vis_dir, file_name = 'test.png')
 
     # --- 4. 結果を表示
-    for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
-        print(f"Output {i+1} ({reg_list[i]}): R^2 Score = {r2:.3f}, MSE = {mse:.3f}")
-
+    # for i, (r2, mse) in enumerate(zip(r2_results, mse_results)):
+    #     print(f"Output {i+1} ({reg_list[i]}): R^2 Score = {r2:.3f}, MSE = {mse:.3f}")
+    i = 1
+    for reg, metrix in scores.items():
+        print(f"Output {i} ({reg}):")
+        for met, score in metrix.items():
+            print(f"{met}: {score}")
+        i += 1
 
     out = os.path.join(vis_dir, 'loss.html')
     out_csv = os.path.join(vis_dir, 'loss.csv')
@@ -1205,7 +1264,6 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
             #test_df[reg] = loss.ravel()
             #test_df.to_csv(out_csv)
 
-
     # plt.figure(figsize=(18, 14))
     # plt.bar(test_ids.to_numpy().ravel(),loss.ravel())
     # plt.xticks(rotation=90)
@@ -1213,9 +1271,9 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
     # plt.savefig(out)
     # plt.close()
     
-    write_result(r2_results, mse_results, columns_list = reg_list, csv_dir = csv_dir, method = method, ind = index)
+    write_result(scores, columns_list = reg_list, csv_dir = csv_dir, method = method, ind = index)
 
-    return predictions, trues, r2_results, mse_results, model_trained
+    return predictions, trues, scores, model_trained
 
 import torch.nn.functional as F
 
