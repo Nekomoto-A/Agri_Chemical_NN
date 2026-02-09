@@ -53,7 +53,7 @@ def calculate_shared_elastic_net(model, lambda_l1, lambda_l2):
     return  l_elastic_net
 
 # ==============================================================================
-# 1. Fused Lassoペナルティを共有層に適用する関数
+# 1. Fused ペナルティを共有層に適用する関数
 # ==============================================================================
 def calculate_fused_lasso_for_shared_layers(model, lambda_1, lambda_2):
     """
