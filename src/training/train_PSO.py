@@ -79,9 +79,16 @@ def training_PSO(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, 
                 vis_step = config['vis_step'], 
                 tr_loss = config['tr_loss'],
 
-                W = config['W'], C1 = config['C1'], C2 = config['C2'],
+                W = config['W'], 
+                W_start = config['W_start'], W_end = config['W_end'],
+                C1 = config['C1'], C2 = config['C2'],
                 N_PARTICLES = config['n_particles'],
+                mutation_interval = config['mutation_interval'],
+                mutation_rate = config['mutation_rate'],
+                N_SWARMS = config['n_swarms'],
                 ):
+
+    particles_per_swarm = N_PARTICLES // N_SWARMS
 
     #personal_losses = []
     personal_losses = {}
@@ -119,10 +126,16 @@ def training_PSO(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, 
     # PSO初期化
     particles_pos = torch.randn(N_PARTICLES, param_dim).to(device) * 0.1
     particles_vel = torch.zeros(N_PARTICLES, param_dim).to(device)
+    
     p_best_pos = particles_pos.clone()
     p_best_score = torch.full((N_PARTICLES,), float('inf')).to(device)
     g_best_pos = None
     g_best_score = float('inf')
+
+    swarm_ids = (torch.arange(N_PARTICLES).to(device) // particles_per_swarm).clamp(max=N_SWARMS-1)
+    s_best_pos = torch.zeros(N_SWARMS, param_dim).to(device)
+    s_best_score = torch.full((N_SWARMS,), float('inf')).to(device)
+
 
     x_tr = x_tr.to(device)
     x_val = x_val.to(device)
@@ -144,6 +157,9 @@ def training_PSO(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, 
                                )
 
         running_train_losses = {key: 0.0 for key in ['SUM'] + reg_list}
+
+        # 1. 動的な慣性重みの計算
+        #current_W = W_start - (W_start - W_end) * (epoch / epochs)
 
         for p_idx in range(N_PARTICLES):
             # モデルに現在の粒子の重みをセット
@@ -182,20 +198,48 @@ def training_PSO(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, 
                 p_best_score[p_idx] = learning_loss
                 p_best_pos[p_idx] = particles_pos[p_idx].clone()
             
+            # スォーム内ベストの更新
+            s_idx = swarm_ids[p_idx]
+            if learning_loss < s_best_score[s_idx]:
+                s_best_score[s_idx] = learning_loss
+                s_best_pos[s_idx] = particles_pos[p_idx].clone()
+            
             # 全体ベストの更新
             if learning_loss < g_best_score:
                 g_best_score = learning_loss
                 g_best_pos = particles_pos[p_idx].clone()
-        # 粒子の速度と位置の更新
-        # r1, r2 = torch.rand(2).to(device)
-        # particles_vel = (W * particles_vel + 
-        #                  C1 * r1 * (p_best_pos - particles_pos) + 
-        #                  C2 * r2 * (g_best_pos - particles_pos))
-        # particles_pos += particles_vel
+
+        # 3. 突然変異の実行
+        # 一定間隔ごとに、g_best以外の粒子をランダムに再配置する
+        if (epoch + 1) % mutation_interval == 0:
+            # 突然変異させる粒子の数
+            num_mutation = int(N_PARTICLES * mutation_rate)
+            # g_bestを誤って消さないよう、ランダムにインデックスを選択
+            mutation_indices = torch.randperm(N_PARTICLES)[:num_mutation]
+            
+            # 選択された粒子を現在の g_best の周辺、あるいは完全にランダムに再配置
+            # ここでは「現在の分布より少し広め」に再初期化
+            particles_pos[mutation_indices] = torch.randn(num_mutation, param_dim).to(device) * 0.5
+            # 速度もリセットして、新しい場所から探索を開始させる
+            particles_vel[mutation_indices] = 0
 
         # 3. 粒子の移動
+        # r1, r2 = torch.rand(2).to(device)
+        # particles_vel = (W * particles_vel + C1 * r1 * (p_best_pos - particles_pos) + C2 * r2 * (g_best_pos - particles_pos))
+        # particles_pos += particles_vel
+        # 4. 粒子の移動 (速度と位置の更新)
+        # r1, r2 = torch.rand(2).to(device)
+        # particles_vel = (current_W * particles_vel + 
+        #                  C1 * r1 * (p_best_pos - particles_pos) + 
+        #                  C2 * r2 * (g_best_pos - particles_pos))
         r1, r2 = torch.rand(2).to(device)
-        particles_vel = (W * particles_vel + C1 * r1 * (p_best_pos - particles_pos) + C2 * r2 * (g_best_pos - particles_pos))
+        
+        # ターゲットとするスォームベストを各粒子に割り当て
+        current_s_best = s_best_pos[swarm_ids]
+        
+        particles_vel = (W * particles_vel + 
+                         C1 * r1 * (p_best_pos - particles_pos) + 
+                         C2 * r2 * (current_s_best - particles_pos))
         particles_pos += particles_vel
 
         set_params_vector(g_best_pos)

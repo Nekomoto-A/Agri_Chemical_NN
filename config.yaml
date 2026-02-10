@@ -57,10 +57,15 @@ train_PSO.py:
   vis_step: 5
   validation: True
   tr_loss: False
-  W: 0.5
-  C1: 1.5
-  C2: 1.5
-  n_particles: 30
+  W: 1.5
+  W_start: 2.0
+  W_end: 0.5
+  C1: 1.0
+  C2: 1.0
+  n_particles: 500
+  mutation_rate: 0.3
+  mutation_interval: 5
+  n_swarms: 4
 train_GP.py:
   epochs: 10000
   patience: 20
@@ -137,7 +142,7 @@ fold_eval.py:
   carr_calc: False
   marginal_hist: False
   k_fold: 5
-  model_name: 'CAE_PSO'
+  model_name: 'CAE_FiLM'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
@@ -163,8 +168,8 @@ fold_eval.py:
   feature_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\taxon_data\lv6.csv' #C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\lv6.csv #
   target_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\chem_data.xlsx' #C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\chem_data.xlsx #
   data_inte: False
-  transformer: [None, None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
-  reg_loss_fanction: ['mae', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
+  transformer: ['log', None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
+  reg_loss_fanction: ['mse', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
   eval_reg: ['R2', 'MedAE', 'MAE', 'RMSLE', 'RMSE']
   eval_class: ['Accuracy', 'F1score']
   labels: ['crop'] #['crop', 'pref', 'lati', 'long'] #['experimental_purpose'] #
@@ -172,7 +177,7 @@ fold_eval.py:
   embedding_size: 8
   latent_dim: 32
 main.py:
-  result_dir: 'result_CAE_PSO'
+  result_dir: 'result_CAE_FiLM_log'
   reg_list: [
             # ['pref'], 
             # ['crop'], 
@@ -195,7 +200,7 @@ main.py:
             # ['APCP_Feb_me'],
             # ['APCP_Jan_me'],
 
-            #[NH4.N], 
+            [NH4.N], 
             ['Available.P'], 
             ['pH'],
             ['NO3.N'],

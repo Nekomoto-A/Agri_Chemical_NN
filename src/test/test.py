@@ -742,7 +742,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                         last_shared_layer_dim = latent_dim,
                                         output_dims = output_dims,
                                         reg_list = reg_list,
-                                        task_specific_layers = [latent_dim], 
+                                        #task_specific_layers = [latent_dim], 
                                         shared_learn = False,
                                         )
                 # from src.models.AE import FineTuningModelWithFiLM
@@ -984,6 +984,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
     #                                 )
     #     from src.test.test_gate import test_MT_gate
     #     predicts, true, r2_results, mse_results = test_MT_gate(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir,device = device)
+
     elif 'PSO' in model_name:
         print('PSOによる学習を行います')
         from src.training.train_PSO import training_PSO
@@ -1001,6 +1002,29 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                     device = device,
                                     batch_size = batch_size
                                     ) 
+        predicts, true, scores = test_MT(X_test,Y_test, X_val, Y_val, 
+                                                          model_trained,reg_list,scalers,output_dir=vis_dir,
+                                                          device = device, test_ids = test_ids,
+                                                          eval_reg= eval_reg, eval_class = eval_class, 
+                                                          label_encoders = reg_encoders,
+                                                          )
+    elif 'ABC' in model_name:
+        print('ABCによる学習を行います')
+        from src.training.train_ABC import training_ABC
+        model_trained = training_ABC(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, 
+                                    model = model, 
+                                    #optimizer = optimizer, 
+                                    scalers = scalers,
+                                    train_ids = train_ids,
+                                    vis_label = labels_train_original, 
+                                    reg_loss_fanction = reg_loss_fanction,
+                                    output_dim=output_dims,
+                                    reg_list = reg_list, output_dir = vis_dir, 
+                                    model_name = model_name,
+                                    loss_sum = loss_sum,
+                                    device = device,
+                                    batch_size = batch_size
+                                    )
         predicts, true, scores = test_MT(X_test,Y_test, X_val, Y_val, 
                                                           model_trained,reg_list,scalers,output_dir=vis_dir,
                                                           device = device, test_ids = test_ids,
