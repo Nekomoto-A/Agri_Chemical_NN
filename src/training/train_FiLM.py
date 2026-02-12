@@ -688,10 +688,11 @@ def training_FiLM(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir,
     #writer = SummaryWriter(tensor_dir)
 
     lr = lr[0]
-    optimizer = optim.Adam(model.parameters() , lr=lr,
-                            weight_decay = 0.01
-                            )
-
+    # optimizer = optim.Adam(model.parameters() , lr=lr,
+    #                         weight_decay = 0.01
+    #                         )
+    optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=0.01)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100)
 
     #personal_losses = []
     personal_losses = {}
@@ -906,6 +907,7 @@ def training_FiLM(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir,
 
             learning_loss.backward()
             optimizer.step()
+            scheduler.step() # エポックごとに学習率を更新
 
         for reg in reg_list:
             if reg not in train_loss_history:

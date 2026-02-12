@@ -51,23 +51,24 @@ class CustomDatasetAdv(Dataset):
         # これら4つの情報をタプルとして返す
         return x_data, y_data, mask_data, pattern_label
 
-class GABCOptimizer:
-    def __init__(self, model, train_x, train_y, val_x, val_y, loss_fns, device, 
-                 n_bees=500, max_iter=1000, limit=3, c_factor=1.5):
-        # ... (初期化部分は元のコードと同じ) ...
-        self.model = model
-        self.train_x = train_x
-        self.train_y = train_y
-        self.val_x = val_x
+class ABCOptimizer:
+    def __init__(self, model, train_x, train_y, train_label, val_x, val_y, val_label, loss_fns, device, 
+                 n_bees=1000, max_iter=1000, limit=3):
+        self.model = model #.to(device)
+        self.train_x = train_x #.to(device)
+        self.train_y = train_y # 辞書型
+        self.val_x = val_x #.to(device)
         self.val_y = val_y
+        self.train_label = train_label
+        self.val_label = val_label
         self.device = device
         self.loss_fns = loss_fns
-        self.n_bees = n_bees
-        self.max_iter = max_iter
-        self.limit = limit
-        self.c_factor = c_factor # Gbestの影響度を調整する係数
         
-        # パラメータ取得
+        self.n_bees = n_bees          # 蜂の数（解の数）
+        self.max_iter = max_iter      # 最大イテレーション
+        self.limit = limit            # 改善が見られない場合の限界回数
+        
+        # 最適化対象のパラメータ（タスク固有ヘッドのみ）を取得
         self.param_shapes = []
         self.param_names = []
         initial_params = []
@@ -80,6 +81,7 @@ class GABCOptimizer:
         self.flat_params = torch.cat(initial_params)
         self.dim = self.flat_params.shape[0]
         
+        # 蜂の初期化
         self.population = torch.randn(self.n_bees, self.dim).to(device) * 0.1
         self.fitness = torch.full((self.n_bees,), float('inf')).to(device)
         self.trial = torch.zeros(self.n_bees).to(device)
@@ -104,10 +106,12 @@ class GABCOptimizer:
         # モードによってデータを切り替え
         data_x = self.train_x if mode == 'train' else self.val_x
         data_y = self.train_y if mode == 'train' else self.val_y
+        data_label = self.train_label if mode == 'train' else self.val_label
         
         with torch.no_grad():
-            inputs = data_x.to(self.device)
-            outputs, _ = self.model(inputs)
+            inputs_x = data_x.to(self.device)
+            inputs_label = data_label.to(self.device)
+            outputs, _ = self.model(inputs_x, inputs_label)
             total_loss = 0
             #criterion = torch.nn.MSELoss()
             
@@ -177,32 +181,21 @@ class GABCOptimizer:
         return self.model, self.history
 
     def _explore(self, i, iteration):
-        """Gbest-guided による近傍探索"""
+        """近傍探索の共通処理"""
+        #phi = (torch.rand(self.dim).to(self.device) * 2 - 1) # -1 ~ 1
+        # optimizeメソッド内で計算
         t = iteration / self.max_iter
+        # 線形に減衰させる係数 (1.0 -> 0.1)
         shrink = 1.0 - 0.9 * t 
 
-        # 1. 通常のランダム係数 phi (-1 ~ 1)
+        # _exploreメソッド内
         phi = (torch.rand(self.dim).to(self.device) * 2 - 1) * shrink
-        
-        # 2. Gbestへ引き寄せる係数 psi (0 ~ c_factor)
-        # この psi が GABC の肝です
-        psi = torch.rand(self.dim).to(self.device) * self.c_factor * shrink
-
-        # 比較対象の個体 k を選択
         k = np.random.randint(0, self.n_bees)
-        while k == i: 
-            k = np.random.randint(0, self.n_bees)
+        while k == i: k = np.random.randint(0, self.n_bees)
         
-        # --- GABC の更新式 ---
-        # 従来の項: phi * (self.population[i] - self.population[k])
-        # Gbest項 : psi * (self.best_params - self.population[i])
-        new_solution = (
-            self.population[i] + 
-            phi * (self.population[i] - self.population[k]) + 
-            psi * (self.best_params - self.population[i])
-        )
+        new_solution = self.population[i] + phi * (self.population[i] - self.population[k])
         
-        new_loss = self._calculate_loss(new_solution, mode='train')
+        new_loss = self._calculate_loss(new_solution)
         
         if new_loss < self.fitness[i]:
             self.population[i] = new_solution
@@ -214,9 +207,7 @@ class GABCOptimizer:
         else:
             self.trial[i] += 1
 
-
-
-def training_ABC(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, model_name,loss_sum, device, batch_size, #optimizer, 
+def training_ABC(x_tr,x_val,y_tr,y_val,label_tr,label_val,model, output_dim, reg_list, output_dir, model_name,loss_sum, device, batch_size, #optimizer, 
                 scalers, 
                 train_ids, 
                 vis_label, 
@@ -243,7 +234,7 @@ def training_ABC(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, 
             #print(f"{reg}:label")
             personal_losses[reg] = nn.CrossEntropyLoss()
 
-    abc = GABCOptimizer(model, x_tr, y_tr, x_val, y_val, personal_losses, device)
+    abc = ABCOptimizer(model, x_tr, y_tr, label_tr, x_val, y_val,label_val, personal_losses, device)
     print(f"最適化対象のパラメータ数 (dim): {abc.dim}")
     model, history = abc.optimize()
 
@@ -251,8 +242,6 @@ def training_ABC(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, 
     x_val = x_val.to(device)
     y_tr = {k: v.to(device) for k, v in y_tr.items()}
     y_val = {k: v.to(device) for k, v in y_val.items()}
-
-    
 
     train_dir = os.path.join(output_dir, 'train')
     os.makedirs(train_dir,exist_ok=True)

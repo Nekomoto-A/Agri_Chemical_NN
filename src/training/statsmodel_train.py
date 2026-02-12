@@ -1,4 +1,5 @@
 from sklearn.ensemble import RandomForestRegressor,RandomForestClassifier
+from sklearn.cross_decomposition import PLSRegression
 from sklearn.svm import SVR,SVC
 from xgboost import XGBRegressor,XGBClassifier
 from sklearn.datasets import make_regression
@@ -43,7 +44,8 @@ def statsmodel_train(X,Y,scalers,reg):
             #"GL": GammaRegressor(),
 
             "SVR": SVR(),
-            "LR": LinearRegression()
+            "LR": LinearRegression(), 
+            #"PLS": PLSRegression(n_components = 200)
         }
     else:
         models = {

@@ -85,7 +85,8 @@ class FineTuningModel(nn.Module):
             in_features_task = last_shared_layer_dim
             for i, hidden_units in enumerate(task_specific_layers):
                 task_head.add_module(f"task_fc_{i+1}", nn.Linear(in_features_task, hidden_units))
-                task_head.add_module(f"task_relu_{i+1}", nn.ReLU())
+                #task_head.add_module(f"task_relu_{i+1}", nn.ReLU())
+                task_head.add_module(f"task_relu_{i+1}", nn.LeakyReLU())
                 in_features_task = hidden_units
             task_head.add_module("task_output_layer", nn.Linear(in_features_task, out_dim))
             self.task_specific_heads.append(task_head)
@@ -159,36 +160,6 @@ class FiLMLayer(nn.Module):
         # ブロードキャストで計算されます
         return x * (1 + gamma) + beta
 
-class LabelAwareOutputScaler(nn.Module):
-    """
-    ラベル埋め込みを受け取り、最終出力に対する Scale (掛け算) と Shift (足し算) を予測します。
-    これにより、ラベルごとに異なる目的変数のレンジに対応します。
-    """
-    def __init__(self, label_emb_dim, target_output_dim=1):
-        super(LabelAwareOutputScaler, self).__init__()
-        # シンプルなMLPで、そのラベルにおける「平均的な値(shift)」と「ばらつき(scale)」を予測
-        self.meta_net = nn.Sequential(
-            nn.Linear(label_emb_dim, label_emb_dim),
-            nn.ReLU(),
-            nn.Linear(label_emb_dim, target_output_dim * 2) # scaleとshift
-        )
-        self.target_output_dim = target_output_dim
-
-    def forward(self, raw_output, label_emb):
-        # raw_output: [batch, target_output_dim] (タスクヘッドからの生の出力)
-        # label_emb: [batch, label_emb_dim]
-        
-        stats = self.meta_net(label_emb)
-        scale_pred, shift_pred = torch.split(stats, self.target_output_dim, dim=1)
-        
-        # Scaleは正の値である必要があるため、SoftplusやExpを通すのが一般的です
-        # ここでは学習初期の安定性のため 1 + ... の形にし、負にならないよう処理します
-        scale = F.softplus(scale_pred) + 1.0  # 初期値は1.0付近、かつ常に正
-        shift = shift_pred                    # 初期値は0付近
-
-        # 最終的な補正: y = y_raw * scale + shift
-        return raw_output * scale + shift
-
 # --- FiLMGenerator, FiLMLayer, LabelAwareOutputScaler は変更なし ---
 
 class FineTuningModelWithFiLM(nn.Module):
@@ -213,15 +184,14 @@ class FineTuningModelWithFiLM(nn.Module):
             input_dim = last_shared_layer_dim
             for hidden_dim in task_specific_layers:
                 layers.append(nn.Linear(input_dim, hidden_dim))
-                layers.append(nn.ReLU())
+                #layers.append(nn.ReLU())
+                layers.append(nn.LeakyReLU())
                 layers.append(FiLMLayer(label_embedding_dim, hidden_dim))
                 input_dim = hidden_dim
             
             # 最終層を明確に区別するために記録しておく
             layers.append(nn.Linear(input_dim, out_dim))
             self.task_specific_heads.append(layers)
-            self.output_scalers.append(LabelAwareOutputScaler(label_embedding_dim, out_dim))
-
     def forward(self, x, label_emb):
         # 1. 共有エンコーダーとFiLM変調
         shared_features = self.shared_block(x)
@@ -230,9 +200,9 @@ class FineTuningModelWithFiLM(nn.Module):
         outputs = {}
         latent_features = {} # ★追加: 可視化用の中間出力を格納
         
-        iterator = zip(self.reg_list, self.task_specific_heads, self.output_scalers)
+        iterator = zip(self.reg_list, self.task_specific_heads)
         
-        for reg, head_layers, scaler in iterator:
+        for reg, head_layers in iterator:
             current_features = modulated_features
             
             # --- ヘッド内の処理 ---
@@ -243,21 +213,13 @@ class FineTuningModelWithFiLM(nn.Module):
                 else:
                     current_features = layer(current_features)
             
-            # ★ここが「出力直前の中間層出力」です
-            # 可視化用にデータを保存（勾配計算から切り離したい場合は .detach() を検討してください）
-            #latent_features[reg] = current_features
             latent_features = current_features 
             
             # 最後の層を適用して raw_output を得る
             raw_output = head_layers[-1](current_features)
             
-            # ラベル情報を基に出力をスケーリング
-            # warped_output = scaler(raw_output, label_emb)
-            # outputs[reg] = warped_output
             outputs[reg] = raw_output
             
-        # latent_features も一緒に返すように変更
-        #return outputs, modulated_features, latent_features
         return outputs, latent_features
 
     def predict_with_mc_dropout(self, x, label_emb, n_samples=100):
