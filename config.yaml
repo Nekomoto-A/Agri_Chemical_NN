@@ -6,7 +6,7 @@ dataset.py:
   non_outlier: None
   val_size: 0.3
   level: 7
-  feature_transformer: 'CLR'
+  feature_transformer: 'ILR'
   softlabel: True
   data_vis: 'visualize'
   data_augumentation: None #'smoter' #None #'smoter' #'smoter' #'smoter' #'gaussian_copula'
@@ -106,7 +106,7 @@ train_FT_DAE.py:
   tsne_plot_epoch_freq: 0
   tsne_perplexity: 30
   tsne_max_samples: 10000
-  noise_type: 'mask'
+  noise_type: 'mask' #'gaussian' #
   noise_ratio: 0.2
 train_MoE.py:
   lr: 0.01
@@ -137,7 +137,7 @@ fold_eval.py:
   carr_calc: False
   marginal_hist: False
   k_fold: 5
-  model_name: 'CAE_FiLM'
+  model_name: 'DCAE_FiLM'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
@@ -172,7 +172,7 @@ fold_eval.py:
   embedding_size: 8
   latent_dim: 32
 main.py:
-  result_dir: 'result_CAE_FiLM_mae_b256_es'
+  result_dir: 'result_DCAE_FiLM_ILR'
   reg_list: [
             # ['pref'], 
             # ['crop'], 

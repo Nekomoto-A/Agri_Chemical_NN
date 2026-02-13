@@ -75,6 +75,7 @@ class data_create:
 
     def __iter__(self):
         if self.features_list is not None:
+            use_columns = self.features_list
             print(self.asv_data.shape)
             asv_data = self.asv_data.reindex(columns=self.features_list, fill_value=0)
             print(f'ファインチューニングデータ：{asv_data.shape}')
@@ -134,6 +135,7 @@ class data_create:
                 asv_data = asv_data[tax_sorted.index]
             else:
                 asv_data = self.asv_data.drop('index',axis = 1)
+            use_columns = asv_data.columns.to_list()
 
         chem_data = self.chem_data
         #print(asv_data)
@@ -260,6 +262,7 @@ class data_create:
         yield asv_feature
         yield chem_data
         yield label_encoders
+        yield use_columns
 
         #if self.label_list != None:
         #    label_data = chem_data[self.label_list]

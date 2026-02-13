@@ -314,14 +314,14 @@ def fold_evaluate(reg_list, output_dir, device,
         features_list, ae_dir = pretrain_foundation(model_name = model_name, device = device, out_dir = sub_dir, latent_dim = latent_dim)
 
         if data_inte:
-            X,Y,reg_encoders = data_create(feature_path, target_path, reg_list, exclude_ids, feature_transformer='NON_TR',features_list=features_list)
+            X,Y,reg_encoders, _ = data_create(feature_path, target_path, reg_list, exclude_ids, feature_transformer='NON_TR',features_list=features_list)
         else:
-            X,Y,reg_encoders = data_create(feature_path, target_path, reg_list, exclude_ids,features_list=features_list)
+            X,Y,reg_encoders, _ = data_create(feature_path, target_path, reg_list, exclude_ids,features_list=features_list)
     else:
         if data_inte:
-            X,Y,reg_encoders = data_create(feature_path, target_path, reg_list, exclude_ids, feature_transformer='NON_TR',)
+            X,Y,reg_encoders, _ = data_create(feature_path, target_path, reg_list, exclude_ids, feature_transformer='NON_TR',)
         else:
-            X,Y,reg_encoders = data_create(feature_path, target_path, reg_list, exclude_ids)
+            X,Y,reg_encoders, _ = data_create(feature_path, target_path, reg_list, exclude_ids)
         
         ae_dir = None
 
