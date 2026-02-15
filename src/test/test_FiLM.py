@@ -48,6 +48,7 @@ from src.test.test import is_log1p_transformer
 from sklearn.metrics import confusion_matrix, classification_report
 
 def test_FiLM(x_te, y_te, label_te,  
+              x_train, y_train, label_tr, 
               model, reg_list, scalers, output_dir, device, 
               test_ids,
               eval_reg, eval_class,
@@ -110,14 +111,19 @@ def test_FiLM(x_te, y_te, label_te,
             if reg in scalers:
                 scaler = scalers[reg]
                 true = scaler.inverse_transform(true_tensor.cpu().detach().numpy())
-                if is_log1p_transformer(scaler):
-                    mc_result = mc_results[reg]
-                    pred_tensor_for_eval = get_corrected_predictions(mc_result)
-                    pred = pred_tensor_for_eval.cpu().detach().numpy()
-                else:
-                    # --- 通常のスケーリング解除 ---
-                    pred = scaler.inverse_transform(pred_tensor_for_eval.cpu().detach().numpy())
+                # if is_log1p_transformer(scaler):
+                #     train_out, _ = model(x_train.to(device), label_tr.to(device))
+                #     y_train_pred_log1p = train_out[reg].cpu().detach().numpy()
+                #     y_train_log1p = y_train[reg].cpu().detach().numpy()
 
+                #     pred_log = pred_tensor_for_eval.cpu().detach().numpy()
+                #     from src.test.test import apply_smearing_log1p
+                #     pred, coff = apply_smearing_log1p(y_train_log1p, y_train_pred_log1p, pred_log)
+                #     print(f'対数変換のためスメアリング推定による補正を行います(係数：{coff})')
+                # else:
+                #     # --- 通常のスケーリング解除 ---
+                #     pred = scaler.inverse_transform(pred_tensor_for_eval.cpu().detach().numpy())
+                pred = scaler.inverse_transform(pred_tensor_for_eval.cpu().detach().numpy())
             else:
                 # スケーラーなし
                 pred = pred_tensor_for_eval.cpu().detach().numpy()

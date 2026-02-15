@@ -53,10 +53,39 @@ def ilr_transform(data_array):
     ilr_data = np.dot(clr_data, basis)
     return ilr_data
 
+def drop_sparse_columns(df, threshold=0.1):
+    """
+    非ゼロの値の割合がしきい値以下のカラムを削除する関数
+    
+    Parameters:
+    df (pd.DataFrame): 対象のデータフレーム
+    threshold (float): 非ゼロの割合のしきい値 (0.0 ~ 1.0)
+    
+    Returns:
+    pd.DataFrame: カラム削除後のデータフレーム
+    """
+    
+    # 1. 各カラムの非ゼロの割合を計算
+    # (df != 0) は 0以外なら True (1), 0なら False (0) となる
+    non_zero_ratio = (df != 0).mean()
+    
+    # 2. 削除対象ではない（しきい値より大きい）カラムを特定
+    keep_columns = non_zero_ratio[non_zero_ratio > threshold].index
+    
+    # 3. 削除されたカラム数を計算
+    dropped_count = df.shape[1] - len(keep_columns)
+    
+    # 4. 結果の表示
+    print(f"削除されたカラム数: {dropped_count}")
+    
+    # 5. 指定したカラムのみを抽出して返す
+    return df[keep_columns]
+
 class data_create:
     def __init__(self,path_asv,path_chem,reg_list,exclude_ids, label_list = None, feature_transformer = config['feature_transformer'], 
                  #label_data = config['labels'], 
-                 unknown_drop  = config['unknown_drop'], non_outlier = config['non_outlier'],
+                 unknown_drop  = config['unknown_drop'], non_outlier = config['non_outlier'], 
+                 sparce_drop = config['sparce_drop'], drop_threshold = config['drop_threshold'], 
                  features_list = None
                  ):
         self.path_asv = path_asv
@@ -72,6 +101,9 @@ class data_create:
         self.unknown_drop = unknown_drop
         self.non_outlier = non_outlier
         self.features_list = features_list
+
+        self.sparce_drop = sparce_drop
+        self.drop_threshold = drop_threshold
 
     def __iter__(self):
         if self.features_list is not None:
@@ -121,7 +153,7 @@ class data_create:
 
                     asv_data = asv_data.drop(columns_to_drop, axis=1)
                     taxa = asv_data.columns.to_list()
-                
+
                 # 分類階層の分割情報をDataFrame化
                 tax_split = pd.DataFrame(
                     [taxon.split(";") for taxon in taxa],
@@ -133,6 +165,10 @@ class data_create:
                 tax_sorted = tax_split.sort_values(by=tax_levels)
                 # 並び替えた分類名で元のデータフレームの列順を並び替え
                 asv_data = asv_data[tax_sorted.index]
+
+                if self.sparce_drop:
+                    asv_data = drop_sparse_columns(asv_data, threshold = self.drop_threshold)
+
             else:
                 asv_data = self.asv_data.drop('index',axis = 1)
             use_columns = asv_data.columns.to_list()
@@ -306,6 +342,7 @@ from src.datasets.data_augumentation import augment_with_ctgan, augment_with_smo
 import platform
 
 def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer, 
+                          all_x, all_y, 
                           feature_selection,num_selected_features, data_name, data_inte,
                           labels, 
                           val_size = config['val_size'],
@@ -330,7 +367,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
                           fold = None, 
                           stats_features = config['stats_features']
                           ):
-    
+
     if isinstance(val_size, (int, float)):
         x_train_split,x_val,y_train_split,y_val = train_test_split(x_train,y_train,test_size = val_size,random_state=0)
     else:
@@ -553,22 +590,24 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
     _ = full_analysis_pipeline(
         train_df=y_train_split,
         test_df=y_test,
+        all_df = all_y, 
         target_col=reg_list,
         feature_cols=stats_features,
         id_col = 'crop-id',
         output_dir=fold
     )
 
-    _ = features_label_analysis_pipeline(
-                features_train = x_train_split, 
-                features_test = x_test, 
-                train_df=y_train_split,
-                test_df=y_test,
-                target_col=reg_list,
-                feature_cols=stats_features,
-                id_col = 'crop-id',
-                output_dir=fold
-                )
+    # _ = features_label_analysis_pipeline(
+    #             features_train = x_train_split, 
+    #             features_test = x_test, 
+    #             train_df=y_train_split,
+    #             test_df=y_test,
+    #             all_df = all_y, 
+    #             target_col=reg_list,
+    #             feature_cols=stats_features,
+    #             id_col = 'crop-id',
+    #             output_dir=fold
+    #             )
 
     for reg,tr in zip(reg_list,transformer):
         if '_rank' in reg:
@@ -1108,7 +1147,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, median_absolute_error, r2_score
 from sklearn.decomposition import PCA
 
-def full_analysis_pipeline(train_df, test_df, target_col, feature_cols, id_col, output_dir):
+def full_analysis_pipeline(train_df, test_df, all_df, target_col, feature_cols, id_col, output_dir):
     """
     データの学習、予測、評価、IDアノテーション付きプロット、
     およびSHAPによる解析結果をすべて保存する統合関数
@@ -1133,7 +1172,9 @@ def full_analysis_pipeline(train_df, test_df, target_col, feature_cols, id_col, 
     label_cols = X_train.select_dtypes(include=['object', 'category']).columns.tolist()
     for col in label_cols:
         le = LabelEncoder()
-        X_train[col] = le.fit_transform(X_train[col].astype(str))
+        le.fit(all_df[col])
+        #X_train[col] = le.fit_transform(X_train[col].astype(str))
+        X_train[col] = le.transform(X_train[col].astype(str))
         X_test[col] = le.transform(X_test[col].astype(str))
 
     # 2. モデル学習
@@ -1274,7 +1315,7 @@ def full_analysis_pipeline(train_df, test_df, target_col, feature_cols, id_col, 
     print(f"すべての工程が完了しました。出力先: {output_dir}")
     return model
 
-def features_label_analysis_pipeline(features_train, features_test, train_df, test_df, target_col, feature_cols, id_col, output_dir):
+def features_label_analysis_pipeline(features_train, features_test, train_df, test_df, all_df, target_col, feature_cols, id_col, output_dir):
     """
     データの学習、予測、評価、IDアノテーション付きプロット、
     およびSHAPによる解析結果をすべて保存する統合関数
@@ -1301,6 +1342,8 @@ def features_label_analysis_pipeline(features_train, features_test, train_df, te
     label_cols = X_train.select_dtypes(include=['object', 'category']).columns.tolist()
     for col in label_cols:
         le = LabelEncoder()
+        le.fit(all_df)
+        #X_train[col] = le.fit_transform(X_train[col].astype(str))
         X_train[col] = le.fit_transform(X_train[col].astype(str))
         X_test[col] = le.transform(X_test[col].astype(str))
 

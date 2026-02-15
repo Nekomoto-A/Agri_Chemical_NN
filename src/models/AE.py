@@ -85,8 +85,8 @@ class FineTuningModel(nn.Module):
             in_features_task = last_shared_layer_dim
             for i, hidden_units in enumerate(task_specific_layers):
                 task_head.add_module(f"task_fc_{i+1}", nn.Linear(in_features_task, hidden_units))
-                #task_head.add_module(f"task_relu_{i+1}", nn.ReLU())
-                task_head.add_module(f"task_relu_{i+1}", nn.LeakyReLU())
+                task_head.add_module(f"task_relu_{i+1}", nn.ReLU())
+                #task_head.add_module(f"task_relu_{i+1}", nn.LeakyReLU())
                 in_features_task = hidden_units
             task_head.add_module("task_output_layer", nn.Linear(in_features_task, out_dim))
             self.task_specific_heads.append(task_head)
@@ -131,6 +131,7 @@ class FiLMGenerator(nn.Module):
         self.mlp = nn.Sequential(
             nn.Linear(input_dim, input_dim * 2),
             nn.ReLU(),
+            #nn.LeakyReLU(), 
             nn.Linear(input_dim * 2, output_dim * 2) # gammaとbetaの両方を出力するため2倍
         )
         self.output_dim = output_dim
@@ -160,8 +161,6 @@ class FiLMLayer(nn.Module):
         # ブロードキャストで計算されます
         return x * (1 + gamma) + beta
 
-# --- FiLMGenerator, FiLMLayer, LabelAwareOutputScaler は変更なし ---
-
 class FineTuningModelWithFiLM(nn.Module):
     def __init__(self, pretrained_encoder, last_shared_layer_dim, output_dims, reg_list, 
                  label_embedding_dim,
@@ -184,8 +183,8 @@ class FineTuningModelWithFiLM(nn.Module):
             input_dim = last_shared_layer_dim
             for hidden_dim in task_specific_layers:
                 layers.append(nn.Linear(input_dim, hidden_dim))
-                #layers.append(nn.ReLU())
-                layers.append(nn.LeakyReLU())
+                layers.append(nn.ReLU())
+                #layers.append(nn.LeakyReLU())
                 layers.append(FiLMLayer(label_embedding_dim, hidden_dim))
                 input_dim = hidden_dim
             

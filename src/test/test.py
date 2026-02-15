@@ -173,43 +173,45 @@ def debug_smearing_factor(y_pred_log, y_true_log):
     else:
         print("判定: 予測値が全体的に上方修正されています。")
 
-# 実行例
-# debug_smearing_factor(y_val_pred_log, y_val_true_log)
+import numpy as np
 
-def get_smearing_corrected_predictions(y_pred_log, y_true_log, new_pred_log):
+def apply_smearing_log1p(y_train_log1p, y_train_pred_log1p, y_test_pred_log1p):
     """
-    スミアリング推定量を用いて、対数変換（log1p）された予測値を補正・逆変換する関数
+    log1p変換されたデータに対してスメアリング補正を行い、実数スケールに戻す
     
-    Args:
-        y_pred_log (torch.Tensor): 検証データに対するモデルの予測値（対数スケール）
-        y_true_log (torch.Tensor): 検証データの実際の値（対数スケール）
-        new_pred_log (torch.Tensor): 補正したい新しい予測値（対数スケール）
+    Parameters:
+    -----------
+    y_train_log1p : array-like
+        学習データの実測値 (np.log1p 済み)
+    y_train_pred_log1p : array-like
+        学習データに対するモデルの予測値 (np.log1p 済み)
+    y_test_pred_log1p : array-like
+        テストデータ（または未知データ）に対するモデルの予測値 (np.log1p 済み)
         
     Returns:
-        torch.Tensor: スミアリング補正された元のスケールの予測値
+    --------
+    y_final_pred : array-like
+        スメアリング補正後の実数スケール予測値
     """
+    # 1. 残差を計算 (対数スケール)
+    # log1p(y) - log1p(y_hat) = log((y+1)/(y_hat+1))
+    residuals_log = y_train_log1p - y_train_pred_log1p
     
-    debug_smearing_factor(y_pred_log, y_true_log)
+    # 2. 補正係数 (Smearing Coefficient) の算出
+    # 指数変換 (exp) して平均をとる
+    smearing_coeff = np.mean(np.exp(residuals_log))
+    
+    # 3. 予測値の補正と逆変換
+    # 補正は「y + 1」のスケールに対して行うため、expしてから係数を掛け、最後に -1 する
+    y_final_pred = (np.exp(y_test_pred_log1p) * smearing_coeff) - 1
+    
+    # 0未満にならないようクリッピング（必要に応じて）
+    y_final_pred = np.maximum(0, y_final_pred)
+    
+    return y_final_pred, smearing_coeff
 
-    # 1. 対数スケールでの残差（誤差）を計算
-    # residuals = 実際の対数値 - 予測された対数値
-    residuals = y_true_log - y_pred_log
-    
-    # 2. スミアリング係数（補正値）の計算
-    # 残差を指数変換してから平均をとります
-    # ※ log1p(x) = log(1+x) なので、その誤差を戻すために torch.exp を使用
-    smearing_factor = torch.mean(torch.exp(residuals))
-    
-    # 3. 新しい予測値の補正と逆変換
-    # 通常の逆変換: exp(new_pred_log) * smearing_factor
-    # log1pの逆変換を考慮すると: (exp(new_pred_log) * smearing_factor) - 1
-    corrected_pred = (torch.exp(new_pred_log) * smearing_factor) - 1
-    
-    # 負の値にならないように調整（必要に応じて）
-    corrected_pred = torch.clamp(corrected_pred, min=0)
-    
-    return corrected_pred
-
+# --- 使用例 ---
+# y_test_corrected, coeff = apply_smearing_log1p(train_log, train_pred_log, test_pred_log)
 def get_corrected_predictions(mc_output):
     mu = mc_output['mean']
     sigma = mc_output['std']
@@ -248,7 +250,7 @@ def eval_predictions(true, pred, eval):
             result[metrix] = root_mean_squared_log_error(true, pred)
     return result
 
-def test_MT(x_te, y_te, x_val, y_val, model, reg_list, scalers, output_dir, device, test_ids,
+def test_MT(x_te, y_te, x_train, y_train, model, reg_list, scalers, output_dir, device, test_ids,
             eval_reg, eval_class, 
             label_encoders = None, 
             n_samples_mc=100):
@@ -309,13 +311,18 @@ def test_MT(x_te, y_te, x_val, y_val, model, reg_list, scalers, output_dir, devi
             if reg in scalers:
                 scaler = scalers[reg]
                 true = scaler.inverse_transform(true_tensor.cpu().detach().numpy())
-                if is_log1p_transformer(scaler):
-                    mc_result = mc_results[reg]
-                    pred_tensor_for_eval = get_corrected_predictions(mc_result)
-                    pred = pred_tensor_for_eval.cpu().detach().numpy()
-                else:
-                    # --- 通常のスケーリング解除 ---
-                    pred = scaler.inverse_transform(pred_tensor_for_eval.cpu().detach().numpy())
+                # if is_log1p_transformer(scaler):
+                #     train_out, _ = model(x_train.to(device))
+                #     y_train_pred_log1p = train_out[reg].cpu().detach().numpy()
+                #     y_train_log1p = y_train[reg].cpu().detach().numpy()
+
+                #     pred_log = pred_tensor_for_eval.cpu().detach().numpy()
+                #     pred, coff = apply_smearing_log1p(y_train_log1p, y_train_pred_log1p, pred_log)
+                #     print(f'対数変換のためスメアリング推定による補正を行います(係数：{coff})')
+                # else:
+                #     # --- 通常のスケーリング解除 ---
+                #     pred = scaler.inverse_transform(pred_tensor_for_eval.cpu().detach().numpy())
+                pred = scaler.inverse_transform(pred_tensor_for_eval.cpu().detach().numpy())
                    
             else:
                 # スケーラーなし
@@ -505,7 +512,74 @@ def calculate_initial_scales(targets, labels_onehot, method='max', fallback_valu
 #     for eval in evals:
 #         if eval == 'MSE':
             
+import torch
+import numpy as np
+import matplotlib.pyplot as plt
+import os
+from sklearn.metrics import r2_score
 
+def save_reconstruction_plots(model, dataloader, device, save_dir="evaluation_plots"):
+    """
+    各変数ごとに再構成精度をプロットし、フォルダに保存する
+    """
+    # 保存用フォルダの作成
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+        print(f"Created directory: {save_dir}")
+
+    model.eval()
+    all_inputs = []
+    all_reconstructed = []
+
+    # 1. データの収集（テストデータ全体）
+    with torch.no_grad():
+        for inputs, _ in dataloader:
+            # inputsが(batch_size, features)の想定
+            outputs, _ = model(inputs.to(device))
+            all_inputs.append(inputs.cpu().numpy())
+            all_reconstructed.append(outputs.cpu().numpy())
+
+    # リストを結合して大きな行列にする
+    x_true = np.vstack(all_inputs)
+    x_pred = np.vstack(all_reconstructed)
+
+    # 2. 変数ごとにループしてプロットを作成
+    num_features = x_true.shape[1]
+    
+    for i in range(num_features):
+        plt.figure(figsize=(6, 6))
+        
+        # データの取得
+        true_val = x_true[:, i]
+        pred_val = x_pred[:, i]
+        
+        # 決定係数 (R2 Score) の計算
+        r2 = r2_score(true_val, pred_val)
+        
+        # 散布図のプロット
+        plt.scatter(true_val, pred_val, alpha=0.5, s=10, c='blue', label='Data Points')
+        
+        # 理想線 (y=x) の描画
+        min_val = min(true_val.min(), pred_val.min())
+        max_val = max(true_val.max(), pred_val.max())
+        plt.plot([min_val, max_val], [min_val, max_val], 'r--', lw=2, label='Ideal (y=x)')
+        
+        # グラフの設定
+        #feature_name = feature_names[i] if i < len(feature_names) else f"feature_{i}"
+        plt.title(f"\n$R^2$ Score: {r2:.4f}")
+        plt.xlabel("Original Value")
+        plt.ylabel("Reconstructed Value")
+        plt.legend()
+        plt.grid(True, linestyle='--', alpha=0.7)
+        
+        # 保存
+        filename = f"{save_dir}/dim{i}_reconstruction.png"
+        plt.savefig(filename)
+        plt.close() # メモリ解放のために閉じる
+
+    print(f"All {num_features} plots have been saved to '{save_dir}'.")
+
+from torch.utils.data import Dataset, DataLoader
 
 def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predictions, trues, 
                   input_dim, method, index, reg_list, csv_dir, vis_dir, model_name, train_ids, test_ids, features,
@@ -524,7 +598,8 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                   loss_sum = config['loss_sum'], shap_eval = config['shap_eval'], save_feature = config['save_feature'],
                   batch_size = config['batch_size'], 
                   ae_dir = None, 
-                  adapte = config['Adapte']
+                  adapte = config['Adapte'], 
+                  reconstruction_plots = config['reconstruction_plots'],
                   ):
 
     # 2. ユニークなラベルを抽出
@@ -602,6 +677,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
             elif adapte == 'Adapter':
                 from src.training.adapt_AE import train_adapted_model
                 ae_model, _ = train_adapted_model(ae_model, X_train, X_val, device, vis_dir)
+        
             pretrained_encoder = ae_model.get_encoder()
             
         elif 'VAE' in model_name:
@@ -645,6 +721,28 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                 from src.training.adapt_AE import retrain_model_cae
                 ae_model = retrain_model_cae(ae_model, X_train, X_val, device, vis_dir)
             pretrained_encoder = ae_model.get_encoder()
+
+        if reconstruction_plots:
+            recon_path = os.path.join(vis_dir, 'reconstruction_eval')
+            class AutoEncoderDataset(Dataset):
+                def __init__(self, data):
+                    # データをFloatのTensorに変換
+                    self.data = torch.FloatTensor(data)
+
+                def __len__(self):
+                    return len(self.data)
+
+                def __getitem__(self, idx):
+                    # 入力(x)とターゲット(y)として同じデータを返す
+                    x = self.data[idx]
+                    return x, x  # ここがポイント
+            
+            dataset = AutoEncoderDataset(X_test)
+            dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+            
+            save_reconstruction_plots(ae_model, dataloader, device, 
+                                      #feature_names = features, 
+                                      save_dir=recon_path)
 
         if 'FiLM' in model_name:
             from src.models.AE import FineTuningModelWithFiLM
@@ -1079,6 +1177,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         
         from src.test.test_FiLM import test_FiLM
         predicts, true, scores = test_FiLM(X_test,Y_test, labels_test,
+                                           X_train, Y_train, labels_train, 
                                                           model_trained,reg_list,scalers,output_dir=vis_dir,
                                                           device = device, test_ids = test_ids, 
                                                           eval_reg= eval_reg, eval_class = eval_class,
@@ -1240,7 +1339,9 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
 
                                     )
         
-        predicts, true, scores = test_MT(X_test,Y_test, X_val, Y_val, 
+        predicts, true, scores = test_MT(X_test,Y_test, 
+                                         #X_val, Y_val,
+                                         X_train, Y_train,  
                                                           model_trained,reg_list,scalers,output_dir=vis_dir,
                                                           device = device, test_ids = test_ids,
                                                           eval_reg= eval_reg, eval_class = eval_class, 

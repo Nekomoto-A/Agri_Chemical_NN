@@ -6,7 +6,7 @@ dataset.py:
   non_outlier: None
   val_size: 0.3
   level: 7
-  feature_transformer: 'ILR'
+  feature_transformer: 'CLR'
   softlabel: True
   data_vis: 'visualize'
   data_augumentation: None #'smoter' #None #'smoter' #'smoter' #'smoter' #'gaussian_copula'
@@ -18,7 +18,7 @@ dataset.py:
   hist: False
   num_clusters: 2
   marginal_hist_train: False
-  unknown_drop: True
+  unknown_drop: False
   asv_path_linux: '/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/lv6.csv' #'data/raw/riken/taxon_data/lv6.csv' # # #
   chem_path_linux:  '/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/chem_data.xlsx' #'data/raw/riken/chem_data.xlsx' # # #
   asv_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\lv6.csv'
@@ -27,6 +27,8 @@ dataset.py:
   exclude_ids2: []
   combat: False
   stats_features: ['crop', 'pref', 'lati', 'long']
+  sparce_drop: True
+  drop_threshold: 0.01
 train.py:
   early_stopping: True
   patience: 20
@@ -36,7 +38,7 @@ train.py:
   vis_step: 5
   validation: True
   lambda: 0.1
-  learning_rate: [0.01]
+  learning_rate: [0.001]
   weights: [0.1, 0.9, 1.0, 1.0, 1.0, 1.0]
   SUM_train_lim: 10
   personal_train_lim: 1
@@ -125,7 +127,8 @@ test.py:
   shap_eval: False
   save_feature: False
   batch_size: 256
-  Adapte: 'retrain' #'Adapter'
+  Adapte: None #'retrain' #'Adapter'
+  reconstruction_plots: False #True
 fold_eval.py:
   feature_selection: None
   num_selected_features: 15
@@ -147,11 +150,14 @@ fold_eval.py:
     
     '041_20_Sait_Carr', '043_20_Sait_Carr', '046_20_Sait_Burd', '047_20_Sait_Burd', 
     '044_20_Sait_Broc', '045_20_Sait_Broc', '061_20_Naga_Barl', '062_20_Naga_Barl', 
-    '331_22_Niig_jpea', '332_22_Niig_jpea', '042_20_Sait_Eggp', 
+    '331_22_Niig_jpea', '332_22_Niig_jpea',  
     '063_20_Naga_Onio', '064_20_Naga_Onio', '065_20_Naga_Onio', '066_20_Naga_Onio',
     '067_20_Naga_Pump', '050_20_Sait_Stra', '048_20_Sait_Yama',  '049_20_Sait_Yama', 
 
-    '214_21_Miyz_Edam', '273_22_Naga_Rice', '235_21_Miyz_Spin',
+    '042_20_Sait_Eggp', '214_21_Miyz_Edam', '273_22_Naga_Rice', '235_21_Miyz_Spin',
+
+
+
     #'164_21_Miyz_Spin', 
 
     #'171_21_Miyz_Spin', '159_21_Miyz_Spin', '163_21_Miyz_Spin', '164_21_Miyz_Spin',
@@ -163,8 +169,8 @@ fold_eval.py:
   feature_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\taxon_data\lv6.csv' #C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\lv6.csv #
   target_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\chem_data.xlsx' #C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\chem_data.xlsx #
   data_inte: False
-  transformer: [None, None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
-  reg_loss_fanction: ['mae', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
+  transformer: ['log', None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
+  reg_loss_fanction: ['mse', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
   eval_reg: ['R2', 'MedAE', 'MAE', 'RMSLE', 'RMSE']
   eval_class: ['Accuracy', 'F1score']
   labels: ['crop'] #['crop', 'pref', 'lati', 'long'] #['experimental_purpose'] #
@@ -172,7 +178,7 @@ fold_eval.py:
   embedding_size: 8
   latent_dim: 32
 main.py:
-  result_dir: 'result_DCAE_FiLM_ILR'
+  result_dir: 'result_DCAE_FiLM_P2'
   reg_list: [
             # ['pref'], 
             # ['crop'], 
@@ -195,14 +201,14 @@ main.py:
             # ['APCP_Feb_me'],
             # ['APCP_Jan_me'],
 
-            [NH4.N], 
+            #[NH4.N], 
             ['Available.P'], 
-            ['pH'],
-            ['NO3.N'],
-            ['EC'],
-            ['Humus'],
-            ['Exchangeable.K'],
-            ['CEC'],
+            #['pH'],
+            #['NO3.N'], 
+            #['EC'], 
+            #['Humus'], 
+            #['Exchangeable.K'], 
+            #['CEC'], 
             # ['pH_dry_soil', 'available_P', 'EC_electric_conductivity', 'Total_C', 'Total_N']
-            #['pH', 'Available.P']
+            #['pH', 'Available.P'] 
   ]

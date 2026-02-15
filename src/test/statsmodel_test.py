@@ -138,9 +138,10 @@ def statsmodel_test(X, Y, models, scalers, reg, result_dir,index, feature_names,
         if np.issubdtype(Y.dtype, np.floating):
             #print(f'test:{reg}:{Y.dtype}')
             # 特徴量の重要度を取得
-            
             if reg in scalers:
-                Y_pp = scalers[reg].inverse_transform(Y)
+                scaler = scalers[reg]
+                Y_pp = scaler.inverse_transform(Y)
+                #Y_pp = scalers[reg].inverse_transform(Y)
                 pred = scalers[reg].inverse_transform(model.predict(X).reshape(-1, 1))
                 #pred = scalers[reg].inverse_transform(model.predict(X_top_features).reshape(-1, 1))
             else:

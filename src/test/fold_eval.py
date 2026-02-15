@@ -324,7 +324,6 @@ def fold_evaluate(reg_list, output_dir, device,
             X,Y,reg_encoders, _ = data_create(feature_path, target_path, reg_list, exclude_ids)
         
         ae_dir = None
-
     
     #print(X)
     if corr_calc:
@@ -358,8 +357,8 @@ def fold_evaluate(reg_list, output_dir, device,
             kf = KFold(n_splits=k, shuffle=True, random_state=42)
         else:
             #kf = StratifiedKFold(n_splits=k, shuffle=True, random_state=42)
-            #kf = ContinuousStratifiedKFold(n_splits=k, shuffle=True, random_state=42)
-            kf = KFold(n_splits=k, shuffle=True, random_state=42)
+            kf = ContinuousStratifiedKFold(n_splits=k, shuffle=True, random_state=42)
+            #kf = KFold(n_splits=k, shuffle=True, random_state=42)
     predictions = {}
     trues = {}
 
@@ -388,6 +387,7 @@ def fold_evaluate(reg_list, output_dir, device,
         os.makedirs(fold_dir,exist_ok=True)
         
         X_train_tensor, X_val_tensor, X_test_tensor,features, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids,label_train_tensor,label_test_tensor,label_val_tensor, label_encoders = transform_after_split(X_train,X_test,Y_train,Y_test, reg_list = reg_list,
+                                                                                                                                                                                                                                              all_x = X, all_y = Y, 
                                                                                                                                                                                                                               transformer = transformer, 
                                                                                                                                                                                                                               fold = fold_dir,
                                                                                                                                                                                                                               feature_selection = feature_selection,
@@ -517,23 +517,23 @@ def fold_evaluate(reg_list, output_dir, device,
             print(X_train_tensor.shape)
 
             predictions, trues, result_scores_st, model_trained_st = train_and_test(
-            X_train = X_train_tensor, X_val = X_val_tensor, X_test = X_test_tensor, Y_train = Y_train_single, Y_val = Y_val_single, Y_test = Y_test_single, 
-            scalers = scalers, predictions = predictions, trues = trues, input_dim = input_dim, method = method_st, index = index , reg_list = reg, csv_dir = csv_dir, 
-            vis_dir = vis_dir_st, model_name = model_name, train_ids = train_ids, test_ids = test_ids, features = features,
-            device = device,
-            reg_loss_fanction = loss_fanction, 
-            latent_dim = latent_dim, 
-            reg_encoders = reg_encoders,
-            eval_reg = eval_reg, eval_class = eval_class, 
-            labels_train=label_train_embedded,
-            labels_val=label_val_embedded,
-            labels_test=label_test_embedded,
-            label_encoders = label_encoders,
-            labels_train_original = label_train_tensor,
-            labels_val_original = label_val_tensor,
-            labels_test_original = label_test_tensor,
-            ae_dir = ae_dir
-            )
+                X_train = X_train_tensor, X_val = X_val_tensor, X_test = X_test_tensor, Y_train = Y_train_single, Y_val = Y_val_single, Y_test = Y_test_single, 
+                scalers = scalers, predictions = predictions, trues = trues, input_dim = input_dim, method = method_st, index = index , reg_list = reg, csv_dir = csv_dir, 
+                vis_dir = vis_dir_st, model_name = model_name, train_ids = train_ids, test_ids = test_ids, features = features,
+                device = device,
+                reg_loss_fanction = loss_fanction, 
+                latent_dim = latent_dim, 
+                reg_encoders = reg_encoders,
+                eval_reg = eval_reg, eval_class = eval_class, 
+                labels_train=label_train_embedded,
+                labels_val=label_val_embedded,
+                labels_test=label_test_embedded,
+                label_encoders = label_encoders,
+                labels_train_original = label_train_tensor,
+                labels_val_original = label_val_tensor,
+                labels_test_original = label_test_tensor,
+                ae_dir = ae_dir
+                )
             
             #pprint.pprint(predictions)
 
@@ -729,12 +729,12 @@ def fold_evaluate(reg_list, output_dir, device,
     for metrics,models in scores.items():
         for method_name,regs in models.items():
             for target,values in regs.items():
-                avg = f'{np.average(values):.3f}'
-                #avg = f'{np.average(values)}'
+                #avg = f'{np.average(values):.3f}'
+                avg = f'{np.average(values)}'
                 avg_dict.setdefault(metrics, {}).setdefault(method_name, {})[target] = np.average(values)
                 std = f'{np.std(values):.3f}'
-                #std = f'{np.std(values)}'
-                std_dict.setdefault(metrics, {}).setdefault(method_name, {})[target] = np.std(values)
+                std = f'{np.std(values)}'
+                #std_dict.setdefault(metrics, {}).setdefault(method_name, {})[target] = np.std(values)
                 result = f'{avg}±{std}'
                 avg_std.setdefault(metrics, {}).setdefault(method_name, {})[target] = result
 

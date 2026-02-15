@@ -832,8 +832,17 @@ class MAPELoss(nn.Module):
         # 平均を返す
         return torch.mean(relative_error)
 
-def worker_init_fn(worker_id):
-    np.random.seed(np.random.get_state()[1][0] + worker_id)
+# --- 手順2: He初期化（Kaiming初期化）の設定 ---
+def init_weights(m):
+    # 線形層（Linear）に対してのみ初期化を実行
+    if isinstance(m, nn.Linear):
+        # Heの初期化（正規分布）
+        # nonlinearity='relu' を指定することで、ReLUに最適なスケーリングが行われます
+        nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+        
+        # バイアスがある場合は0で初期化するのが一般的です
+        if m.bias is not None:
+            nn.init.constant_(m.bias, 0)
 
 def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, model_name,loss_sum, device, batch_size, #optimizer, 
                 scalers, 
@@ -860,6 +869,8 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
     # TensorBoardのライターを初期化
     #tensor_dir = os.path.join(output_dir, 'runs/gradient_monitoring_experiment')
     #writer = SummaryWriter(tensor_dir)
+
+    #model.apply(init_weights)
 
     lr = lr[0]
     optimizer = optim.Adam(model.parameters() , lr=lr,

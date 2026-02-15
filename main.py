@@ -41,6 +41,9 @@ warnings.filterwarnings('ignore', category=UserWarning)
 warnings.filterwarnings('ignore', category=FutureWarning)
 
 def main():
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
     set_seed(42)
     # 1. デバイスの決定
     device = (
