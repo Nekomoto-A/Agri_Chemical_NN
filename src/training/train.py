@@ -874,7 +874,7 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
 
     lr = lr[0]
     optimizer = optim.Adam(model.parameters() , lr=lr,
-                            weight_decay = 0.01
+                            weight_decay = 0.1
                             )
     #optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=0.01)
     #scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100)

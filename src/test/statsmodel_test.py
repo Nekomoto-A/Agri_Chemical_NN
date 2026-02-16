@@ -111,8 +111,57 @@ def normalized_medae_iqr(y_true, y_pred):
 from sklearn.metrics import confusion_matrix, classification_report
 
 from src.test.test import eval_predictions
+from sklearn.preprocessing import FunctionTransformer
 
-def statsmodel_test(X, Y, models, scalers, reg, result_dir,index, feature_names, reg_encoders, eval_reg, eval_class):
+# 判定対象の変数が pp だとする
+def is_log1p_transformer(transformer):
+    # 1. まず FunctionTransformer インスタンスであるか確認
+    if not isinstance(transformer, FunctionTransformer):
+        return False
+    
+    # 2. func と inverse_func が期待通りか判定
+    # numpyの関数は「is」演算子で直接比較可能です
+    check_func = transformer.func is np.log1p
+    check_inv = transformer.inverse_func is np.expm1
+    
+    return check_func and check_inv
+
+def apply_smearing_log1p(y_train_log1p, y_train_pred_log1p, y_test_pred_log1p):
+    """
+    log1p変換されたデータに対してスメアリング補正を行い、実数スケールに戻す
+    
+    Parameters:
+    -----------
+    y_train_log1p : array-like
+        学習データの実測値 (np.log1p 済み)
+    y_train_pred_log1p : array-like
+        学習データに対するモデルの予測値 (np.log1p 済み)
+    y_test_pred_log1p : array-like
+        テストデータ（または未知データ）に対するモデルの予測値 (np.log1p 済み)
+        
+    Returns:
+    --------
+    y_final_pred : array-like
+        スメアリング補正後の実数スケール予測値
+    """
+    # 1. 残差を計算 (対数スケール)
+    # log1p(y) - log1p(y_hat) = log((y+1)/(y_hat+1))
+    residuals_log = y_train_log1p - y_train_pred_log1p
+    
+    # 2. 補正係数 (Smearing Coefficient) の算出
+    # 指数変換 (exp) して平均をとる
+    smearing_coeff = np.mean(np.exp(residuals_log))
+    
+    # 3. 予測値の補正と逆変換
+    # 補正は「y + 1」のスケールに対して行うため、expしてから係数を掛け、最後に -1 する
+    y_final_pred = (np.exp(y_test_pred_log1p) * smearing_coeff) - 1
+    
+    # 0未満にならないようクリッピング（必要に応じて）
+    y_final_pred = np.maximum(0, y_final_pred)
+    
+    return y_final_pred, smearing_coeff
+
+def statsmodel_test(X, Y, train_x_original, train_y_original, models, scalers, reg, result_dir,index, feature_names, reg_encoders, eval_reg, eval_class):
     X = X.numpy()
     X_df = pd.DataFrame(X, columns=feature_names)
     #X_df.columns = X_df.columns.astype(str)
@@ -122,6 +171,10 @@ def statsmodel_test(X, Y, models, scalers, reg, result_dir,index, feature_names,
     #print(X.shape)
     scores = {}
     #scores[reg] = {}
+
+    train_x = train_x_original.numpy()
+    train_y = train_y_original[reg].numpy().reshape(-1, 1)
+
     for name, model in models.items():
         scores[name] = {}
         scores[name][reg] = {}
@@ -142,12 +195,26 @@ def statsmodel_test(X, Y, models, scalers, reg, result_dir,index, feature_names,
                 scaler = scalers[reg]
                 Y_pp = scaler.inverse_transform(Y)
                 #Y_pp = scalers[reg].inverse_transform(Y)
-                pred = scalers[reg].inverse_transform(model.predict(X).reshape(-1, 1))
+                # if is_log1p_transformer(scaler):
+                #     y_train_pred_log1p = model.predict(train_x)
+                #     y_train_log1p = train_y
+
+                #     pred_log = model.predict(X).reshape(-1, 1)
+                #     pred, coff = apply_smearing_log1p(y_train_log1p, y_train_pred_log1p, pred_log)
+                #     print(f'対数変換のためスメアリング推定による補正を行います(係数：{coff})')
+                # else:
+                #     # --- 通常のスケーリング解除 ---
+                #     pred = scalers[reg].inverse_transform(model.predict(X).reshape(-1, 1))
+                #     #pred = model.predict(X).reshape(-1, 1)
+                pred = model.predict(X)
+                #pred = scalers[reg].inverse_transform(model.predict(X).reshape(-1, 1))
                 #pred = scalers[reg].inverse_transform(model.predict(X_top_features).reshape(-1, 1))
             else:
                 Y_pp = Y
                 pred = model.predict(X).reshape(-1, 1)
                 #pred = model.predict(X_top_features).reshape(-1, 1)
+            # Y_pp = Y
+            # pred = model.predict(X)
             
             met_dir = os.path.join(reg_dir, f'{name}_result.png')
 
@@ -217,7 +284,7 @@ def stats_models_result(X_train, Y_train, X_test, Y_test, scalers, reg, result_d
                         ):
     #print(Y_train)
     models = statsmodel_train(X = X_train,Y = Y_train,scalers = scalers,reg = reg)
-    scores = statsmodel_test(X = X_test, Y = Y_test, models = models, 
+    scores = statsmodel_test(X = X_test, Y = Y_test, train_x_original = X_train, train_y_original = Y_train, models = models, 
                              scalers = scalers, reg = reg, result_dir = result_dir, index = index, feature_names = feature_names,
                              reg_encoders=reg_encoders, 
                              eval_reg = eval_reg, eval_class = eval_class, 

@@ -719,7 +719,7 @@ def fold_evaluate(reg_list, output_dir, device,
     test_df.to_csv(loss_dir)
 
     #pprint.pprint(reduced)
-    #pprint.pprint(scores)    
+    pprint.pprint(scores) 
 
     # 平均値を格納する辞書
     avg_std = {}

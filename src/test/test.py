@@ -226,13 +226,43 @@ def get_corrected_predictions(mc_output):
 
 from sklearn.metrics import confusion_matrix, classification_report, root_mean_squared_error
 
-def eval_predictions(true, pred, eval):
+def adjusted_r2(y_true, y_pred, n_features):
+    """
+    自由度調整済み決定係数を計算する関数
+    y_true: 実測値
+    y_pred: 予測値
+    n_features: 説明変数の数 (k)
+    """
+    n = len(y_true)  # サンプルサイズ
+    r2 = r2_score(y_true, y_pred) # 通常の決定係数
+    
+    # 調整済み決定係数の公式
+    adj_r2 = 1 - (1 - r2) * (n - 1) / (n - n_features - 1)
+    return adj_r2
+
+def adjusted_r2(y_true, y_pred, n_features):
+    """
+    自由度調整済み決定係数を計算する関数
+    y_true: 実測値
+    y_pred: 予測値
+    n_features: 説明変数の数 (k)
+    """
+    n = len(y_true)  # サンプルサイズ
+    r2 = r2_score(y_true, y_pred) # 通常の決定係数
+    
+    # 調整済み決定係数の公式
+    adj_r2 = 1 - (1 - r2) * (n - 1) / (n - n_features - 1)
+    return adj_r2
+
+def eval_predictions(true, pred, eval, n_features = None):
     result = {}
     for metrix in eval:
         if metrix == 'accuracy':
             result[metrix] = accuracy_score(true, pred)
         elif metrix == 'F1score':
             result[metrix] = f1_score(true, pred, average='macro')
+        elif metrix == 'adjR2':
+            result[metrix] = adjusted_r2(true, pred, n_features)
         elif metrix == 'MAE':
             result[metrix] = mean_absolute_error(true, pred)
         elif metrix == 'MSE':
@@ -249,6 +279,56 @@ def eval_predictions(true, pred, eval):
             pred = np.clip(pred, 0, None)
             result[metrix] = root_mean_squared_log_error(true, pred)
     return result
+
+def apply_smearing_yeo_johnson(pt, y_train_transformed, y_train_pred_transformed, y_test_pred_transformed):
+    """
+    PowerTransformer(Yeo-Johnson)で変換されたデータに対し、
+    スメアリング補正を行って実数スケールに戻す。
+    
+    Parameters:
+    -----------
+    pt : sklearn.preprocessing.PowerTransformer
+        学習済みのPowerTransformerオブジェクト
+    y_train_transformed : array-like
+        学習データの実測値（変換済み）
+    y_train_pred_transformed : array-like
+        学習データに対するモデルの予測値（変換済み）
+    y_test_pred_transformed : array-like
+        テストデータに対するモデルの予測値（変換済み）
+        
+    Returns:
+    --------
+    y_final_pred : np.ndarray
+        スメアリング補正後の実数スケール予測値
+    smearing_coeff : float
+        算出された補正係数
+    """
+    # 二次元配列に整形（sklearnの仕様対応）
+    y_train_trans = np.array(y_train_transformed).reshape(-1, 1)
+    y_train_pred_trans = np.array(y_train_pred_transformed).reshape(-1, 1)
+    y_test_pred_trans = np.array(y_test_pred_transformed).reshape(-1, 1)
+
+    # 1. 変換後の空間での残差を計算
+    residuals_trans = y_train_trans - y_train_pred_trans
+    
+    # 2. 補正係数の算出
+    # 学習データの予測値（元のスケール）
+    y_train_pred_original = pt.inverse_transform(y_train_pred_trans)
+    # 実測値（元のスケール）
+    y_train_original = pt.inverse_transform(y_train_trans)
+    
+    # スメアリング係数: (実際の値 / 逆変換した予測値) の平均
+    # ※ 0除算を防ぐため微小値を加える場合があります
+    smearing_coeff = np.mean(y_train_original / np.maximum(y_train_pred_original, 1e-9))
+    
+    # 3. テストデータの予測と補正
+    # まず普通に逆変換する
+    y_test_pred_original = pt.inverse_transform(y_test_pred_trans)
+    
+    # 補正係数を掛ける
+    y_final_pred = y_test_pred_original * smearing_coeff
+    
+    return y_final_pred, smearing_coeff
 
 def test_MT(x_te, y_te, x_train, y_train, model, reg_list, scalers, output_dir, device, test_ids,
             eval_reg, eval_class, 
@@ -311,18 +391,18 @@ def test_MT(x_te, y_te, x_train, y_train, model, reg_list, scalers, output_dir, 
             if reg in scalers:
                 scaler = scalers[reg]
                 true = scaler.inverse_transform(true_tensor.cpu().detach().numpy())
-                # if is_log1p_transformer(scaler):
-                #     train_out, _ = model(x_train.to(device))
-                #     y_train_pred_log1p = train_out[reg].cpu().detach().numpy()
-                #     y_train_log1p = y_train[reg].cpu().detach().numpy()
+                if is_log1p_transformer(scaler):
+                    train_out, _ = model(x_train.to(device))
+                    y_train_pred_log1p = train_out[reg].cpu().detach().numpy()
+                    y_train_log1p = y_train[reg].cpu().detach().numpy()
 
-                #     pred_log = pred_tensor_for_eval.cpu().detach().numpy()
-                #     pred, coff = apply_smearing_log1p(y_train_log1p, y_train_pred_log1p, pred_log)
-                #     print(f'対数変換のためスメアリング推定による補正を行います(係数：{coff})')
-                # else:
-                #     # --- 通常のスケーリング解除 ---
-                #     pred = scaler.inverse_transform(pred_tensor_for_eval.cpu().detach().numpy())
-                pred = scaler.inverse_transform(pred_tensor_for_eval.cpu().detach().numpy())
+                    pred_log = pred_tensor_for_eval.cpu().detach().numpy()
+                    pred, coff = apply_smearing_log1p(y_train_log1p, y_train_pred_log1p, pred_log)
+                    print(f'対数変換のためスメアリング推定による補正を行います(係数：{coff})')
+                else:
+                    # --- 通常のスケーリング解除 ---
+                    pred = scaler.inverse_transform(pred_tensor_for_eval.cpu().detach().numpy())
+                #pred = scaler.inverse_transform(pred_tensor_for_eval.cpu().detach().numpy())
                    
             else:
                 # スケーラーなし
@@ -350,20 +430,20 @@ def test_MT(x_te, y_te, x_train, y_train, model, reg_list, scalers, output_dir, 
             plt.scatter(true.flatten(), pred.flatten(), color='royalblue', alpha=0.7)
             
             # IDのアノテーション
-            if len(ids_flat) == len(true_flat):
-                # (★注意) データが多いと重なるため、件数が多い場合はコメントアウトを推奨
-                # print(f"INFO: タスク {reg} のプロットに {len(ids_flat)} 件のアノテーションを追加します。")
-                if len(ids_flat) <= 200: # 例: 200件以下ならアノテーション
-                    for i in range(len(ids_flat)):
-                        plt.annotate(
-                            ids_flat[i], (true_flat[i], pred_flat[i]),
-                            textcoords="offset points", xytext=(0, 5),
-                            ha='center', fontsize=6, alpha=0.5
-                        )
-                else:
-                    print(f"INFO: タスク {reg} のデータ件数 ({len(ids_flat)}) が多いため、アノテーションをスキップします。")
-            else:
-                 print(f"WARN: タスク {reg} の test_ids (len {len(ids_flat)}) と予測 (len {len(true_flat)}) の長さが異なります。アノテーションをスキップします。")
+            # if len(ids_flat) == len(true_flat):
+            #     # (★注意) データが多いと重なるため、件数が多い場合はコメントアウトを推奨
+            #     # print(f"INFO: タスク {reg} のプロットに {len(ids_flat)} 件のアノテーションを追加します。")
+            #     if len(ids_flat) <= 200: # 例: 200件以下ならアノテーション
+            #         for i in range(len(ids_flat)):
+            #             plt.annotate(
+            #                 ids_flat[i], (true_flat[i], pred_flat[i]),
+            #                 textcoords="offset points", xytext=(0, 5),
+            #                 ha='center', fontsize=6, alpha=0.5
+            #             )
+            #     else:
+            #         print(f"INFO: タスク {reg} のデータ件数 ({len(ids_flat)}) が多いため、アノテーションをスキップします。")
+            # else:
+            #      print(f"WARN: タスク {reg} の test_ids (len {len(ids_flat)}) と予測 (len {len(true_flat)}) の長さが異なります。アノテーションをスキップします。")
 
             min_val = min(np.min(true), np.min(pred))
             max_val = max(np.max(true), np.max(pred))
@@ -1154,7 +1234,6 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                                           eval_reg= eval_reg, eval_class = eval_class, 
                                                           label_encoders = reg_encoders,
                                                           )
-
 
     elif ("FiLM" in model_name) or ("mm" in model_name):
         print('FiLMによるFTを使用します')

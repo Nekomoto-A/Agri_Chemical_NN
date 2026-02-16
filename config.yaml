@@ -27,7 +27,7 @@ dataset.py:
   exclude_ids2: []
   combat: False
   stats_features: ['crop', 'pref', 'lati', 'long']
-  sparce_drop: True
+  sparce_drop: False
   drop_threshold: 0.01
 train.py:
   early_stopping: True
@@ -151,12 +151,12 @@ fold_eval.py:
     '041_20_Sait_Carr', '043_20_Sait_Carr', '046_20_Sait_Burd', '047_20_Sait_Burd', 
     '044_20_Sait_Broc', '045_20_Sait_Broc', '061_20_Naga_Barl', '062_20_Naga_Barl', 
     '331_22_Niig_jpea', '332_22_Niig_jpea',  
-    '063_20_Naga_Onio', '064_20_Naga_Onio', '065_20_Naga_Onio', '066_20_Naga_Onio',
     '067_20_Naga_Pump', '050_20_Sait_Stra', '048_20_Sait_Yama',  '049_20_Sait_Yama', 
+    '063_20_Naga_Onio', '064_20_Naga_Onio', '065_20_Naga_Onio', '066_20_Naga_Onio',
 
     '042_20_Sait_Eggp', '214_21_Miyz_Edam', '273_22_Naga_Rice', '235_21_Miyz_Spin',
 
-
+    #'137_21_Akit_Soyb'
 
     #'164_21_Miyz_Spin', 
 
@@ -178,7 +178,7 @@ fold_eval.py:
   embedding_size: 8
   latent_dim: 32
 main.py:
-  result_dir: 'result_DCAE_FiLM_P2'
+  result_dir: 'result_DCAE_FiLM_P_out'
   reg_list: [
             # ['pref'], 
             # ['crop'], 

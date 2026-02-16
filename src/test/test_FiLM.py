@@ -45,6 +45,8 @@ def normalized_medae_iqr(y_true, y_pred):
 from src.test.test import get_corrected_predictions, eval_predictions
 from src.test.test import is_log1p_transformer
 
+from sklearn.preprocessing import PowerTransformer
+
 from sklearn.metrics import confusion_matrix, classification_report
 
 def test_FiLM(x_te, y_te, label_te,  
@@ -111,19 +113,28 @@ def test_FiLM(x_te, y_te, label_te,
             if reg in scalers:
                 scaler = scalers[reg]
                 true = scaler.inverse_transform(true_tensor.cpu().detach().numpy())
-                # if is_log1p_transformer(scaler):
-                #     train_out, _ = model(x_train.to(device), label_tr.to(device))
-                #     y_train_pred_log1p = train_out[reg].cpu().detach().numpy()
-                #     y_train_log1p = y_train[reg].cpu().detach().numpy()
+                if is_log1p_transformer(scaler):
+                    train_out, _ = model(x_train.to(device), label_tr.to(device))
+                    y_train_pred_log1p = train_out[reg].cpu().detach().numpy()
+                    y_train_log1p = y_train[reg].cpu().detach().numpy()
 
-                #     pred_log = pred_tensor_for_eval.cpu().detach().numpy()
-                #     from src.test.test import apply_smearing_log1p
-                #     pred, coff = apply_smearing_log1p(y_train_log1p, y_train_pred_log1p, pred_log)
-                #     print(f'対数変換のためスメアリング推定による補正を行います(係数：{coff})')
-                # else:
-                #     # --- 通常のスケーリング解除 ---
-                #     pred = scaler.inverse_transform(pred_tensor_for_eval.cpu().detach().numpy())
-                pred = scaler.inverse_transform(pred_tensor_for_eval.cpu().detach().numpy())
+                    pred_log = pred_tensor_for_eval.cpu().detach().numpy()
+                    from src.test.test import apply_smearing_log1p
+                    pred, coff = apply_smearing_log1p(y_train_log1p, y_train_pred_log1p, pred_log)
+                    print(f'対数変換のためスメアリング推定による補正を行います(係数：{coff})')
+                elif isinstance(scaler, PowerTransformer):
+                    train_out, _ = model(x_train.to(device), label_tr.to(device))
+                    y_train_pred_log1p = train_out[reg].cpu().detach().numpy()
+                    y_train_log1p = y_train[reg].cpu().detach().numpy()
+
+                    pred_log = pred_tensor_for_eval.cpu().detach().numpy()
+                    from src.test.test import apply_smearing_yeo_johnson
+                    pred, coff = apply_smearing_yeo_johnson(scaler,y_train_log1p, y_train_pred_log1p, pred_log)
+
+                else:
+                    # --- 通常のスケーリング解除 ---
+                    pred = scaler.inverse_transform(pred_tensor_for_eval.cpu().detach().numpy())
+                #pred = scaler.inverse_transform(pred_tensor_for_eval.cpu().detach().numpy())
             else:
                 # スケーラーなし
                 pred = pred_tensor_for_eval.cpu().detach().numpy()
@@ -146,20 +157,20 @@ def test_FiLM(x_te, y_te, label_te,
             plt.figure(figsize=(12, 12))
             plt.scatter(true_flat, pred_flat, color='royalblue', alpha=0.7)
             # IDのアノテーション
-            if len(ids_flat) == len(true_flat):
-                # (★注意) データが多いと重なるため、件数が多い場合はコメントアウトを推奨
-                # print(f"INFO: タスク {reg} のプロットに {len(ids_flat)} 件のアノテーションを追加します。")
-                if len(ids_flat) <= 200: # 例: 200件以下ならアノテーション
-                    for i in range(len(ids_flat)):
-                        plt.annotate(
-                            ids_flat[i], (true_flat[i], pred_flat[i]),
-                            textcoords="offset points", xytext=(0, 5),
-                            ha='center', fontsize=6, alpha=0.5
-                        )
-                else:
-                    print(f"INFO: タスク {reg} のデータ件数 ({len(ids_flat)}) が多いため、アノテーションをスキップします。")
-            else:
-                 print(f"WARN: タスク {reg} の test_ids (len {len(ids_flat)}) と予測 (len {len(true_flat)}) の長さが異なります。アノテーションをスキップします。")
+            # if len(ids_flat) == len(true_flat):
+            #     # (★注意) データが多いと重なるため、件数が多い場合はコメントアウトを推奨
+            #     # print(f"INFO: タスク {reg} のプロットに {len(ids_flat)} 件のアノテーションを追加します。")
+            #     if len(ids_flat) <= 200: # 例: 200件以下ならアノテーション
+            #         for i in range(len(ids_flat)):
+            #             plt.annotate(
+            #                 ids_flat[i], (true_flat[i], pred_flat[i]),
+            #                 textcoords="offset points", xytext=(0, 5),
+            #                 ha='center', fontsize=6, alpha=0.5
+            #             )
+            #     else:
+            #         print(f"INFO: タスク {reg} のデータ件数 ({len(ids_flat)}) が多いため、アノテーションをスキップします。")
+            # else:
+            #      print(f"WARN: タスク {reg} の test_ids (len {len(ids_flat)}) と予測 (len {len(true_flat)}) の長さが異なります。アノテーションをスキップします。")
 
             min_val = min(np.min(true), np.min(pred))
             max_val = max(np.max(true), np.max(pred))

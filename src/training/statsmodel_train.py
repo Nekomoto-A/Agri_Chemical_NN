@@ -17,6 +17,8 @@ def statsmodel_train(X,Y,scalers,reg):
 
     X = X.numpy()
     Y = Y[reg].numpy().reshape(-1, 1)
+    Y = scalers[reg].inverse_transform(Y)
+
     # 欠損値がない行だけを残すマスクを作成
     mask = ~np.isnan(Y).ravel()  # Yを1次元化してNaNチェック
 
