@@ -38,7 +38,7 @@ train.py:
   vis_step: 5
   validation: True
   lambda: 0.1
-  learning_rate: [0.001]
+  learning_rate: [0.01]
   weights: [0.1, 0.9, 1.0, 1.0, 1.0, 1.0]
   SUM_train_lim: 10
   personal_train_lim: 1
@@ -158,10 +158,13 @@ fold_eval.py:
 
     '042_20_Sait_Eggp', '214_21_Miyz_Edam', '273_22_Naga_Rice', '235_21_Miyz_Spin',
 
+    #'163_21_Miyz_Spin', '171_21_Miyz_Spin',
+    '141_21_Miyz_Spin', '146_21_Miyz_Spin',
+    '166_21_Miyz_Spin', 
+    #'137_21_Akit_Soyb', '231_21_Miyz_Edam'
+
     #'239_21_Aomo_Appl'
     #'125_20_Miyz_Spin', '121_20_Miyz_Spin', 
-
-
   ]
   feature_path_linux: 'data/raw/riken/taxon_data/lv6.csv' #'/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/lv6.csv' # # #
   target_path_linux:  'data/raw/riken/chem_data.xlsx' #'/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/chem_data.xlsx' # # #
@@ -177,7 +180,7 @@ fold_eval.py:
   embedding_size: 8
   latent_dim: 32
 main.py:
-  result_dir: 'result_DCAE_FiLM_CEC_ILR'
+  result_dir: 'result_DCAE_FiLM_P_mse'
   reg_list: [
             # ['pref'], 
             # ['crop'], 
@@ -201,13 +204,13 @@ main.py:
             # ['APCP_Jan_me'],
 
             #[NH4.N], 
-            #['Available.P'], 
+            ['Available.P'], 
             #['pH'],
             #['NO3.N'], 
             #['EC'], 
             #['Humus'], 
             #['Exchangeable.K'], 
-            ['CEC'], 
+            #['CEC'], 
             # ['pH_dry_soil', 'available_P', 'EC_electric_conductivity', 'Total_C', 'Total_N']
             #['pH', 'Available.P'] 
   ]

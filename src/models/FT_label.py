@@ -22,7 +22,7 @@ class MultiModalFineTuningModel(nn.Module):
             
             for i, hidden_units in enumerate(task_specific_layers):
                 task_head.add_module(f"task_fc_{i+1}", nn.Linear(in_features_task, hidden_units))
-                task_head.add_module(f"task_relu_{i+1}", nn.ReLU())
+                #task_head.add_module(f"task_relu_{i+1}", nn.ReLU())
                 in_features_task = hidden_units
             
             task_head.add_module("task_output_layer", nn.Linear(in_features_task, out_dim))

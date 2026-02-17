@@ -80,15 +80,19 @@ class FineTuningModel(nn.Module):
             param.requires_grad = shared_learn
         
         self.task_specific_heads = nn.ModuleList()
+        # for out_dim in output_dims:
+        #     task_head = nn.Sequential()
+        #     in_features_task = last_shared_layer_dim
+        #     for i, hidden_units in enumerate(task_specific_layers):
+        #         task_head.add_module(f"task_fc_{i+1}", nn.Linear(in_features_task, hidden_units))
+        #         task_head.add_module(f"task_relu_{i+1}", nn.ReLU())
+        #         #task_head.add_module(f"task_relu_{i+1}", nn.LeakyReLU())
+        #         in_features_task = hidden_units
+        #     task_head.add_module("task_output_layer", nn.Linear(in_features_task, out_dim))
+        #     self.task_specific_heads.append(task_head)
         for out_dim in output_dims:
-            task_head = nn.Sequential()
-            in_features_task = last_shared_layer_dim
-            for i, hidden_units in enumerate(task_specific_layers):
-                task_head.add_module(f"task_fc_{i+1}", nn.Linear(in_features_task, hidden_units))
-                task_head.add_module(f"task_relu_{i+1}", nn.ReLU())
-                #task_head.add_module(f"task_relu_{i+1}", nn.LeakyReLU())
-                in_features_task = hidden_units
-            task_head.add_module("task_output_layer", nn.Linear(in_features_task, out_dim))
+            # 入力(last_shared_layer_dim)から出力(out_dim)へ直接接続
+            task_head = nn.Linear(last_shared_layer_dim, out_dim)
             self.task_specific_heads.append(task_head)
 
     def forward(self, x):
@@ -124,42 +128,73 @@ import torch.nn.functional as F
 class FiLMGenerator(nn.Module):
     """
     ラベル埋め込みから Gamma と Beta を生成するネットワーク。
-    単なるLinearではなく、MLPにすることで表現力を高めます。
+    MLPからシンプルな線形層（Linear）に変更しました。
     """
     def __init__(self, input_dim, output_dim):
         super(FiLMGenerator, self).__init__()
-        self.mlp = nn.Sequential(
-            nn.Linear(input_dim, input_dim * 2),
-            nn.ReLU(),
-            #nn.LeakyReLU(), 
-            nn.Linear(input_dim * 2, output_dim * 2) # gammaとbetaの両方を出力するため2倍
-        )
+        # 隠れ層とReLUを削除し、直接 gamma と beta を出力します
+        self.linear = nn.Linear(input_dim, output_dim * 2) 
         self.output_dim = output_dim
 
     def forward(self, label_emb):
-        # [batch, output_dim * 2] -> [batch, output_dim], [batch, output_dim]
-        out = self.mlp(label_emb)
-        #out = self.mlp(label_emb.float())
+        # [batch, input_dim] -> [batch, output_dim * 2]
+        out = self.linear(label_emb)
         gamma, beta = torch.split(out, self.output_dim, dim=1)
         return gamma, beta
 
 class FiLMLayer(nn.Module):
     """
     特徴量を受け取り、FiLM変調を適用する層。
+    内部のジェネレーターが線形になっています。
     """
     def __init__(self, label_emb_dim, feature_dim):
         super(FiLMLayer, self).__init__()
-        # 専用のジェネレーターを持つことで、層ごとに異なる変調が可能になります
         self.generator = FiLMGenerator(label_emb_dim, feature_dim)
 
     def forward(self, x, label_emb):
-        # 1. パラメータ生成
         gamma, beta = self.generator(label_emb)
-        
-        # 2. 変調 (Modulation)
-        # x: [batch, features], gamma/beta: [batch, features]
-        # ブロードキャストで計算されます
+        # x * (1 + gamma) + beta は線形変換の一種です
         return x * (1 + gamma) + beta
+    
+# class FiLMGenerator(nn.Module):
+#     """
+#     ラベル埋め込みから Gamma と Beta を生成するネットワーク。
+#     単なるLinearではなく、MLPにすることで表現力を高めます。
+#     """
+#     def __init__(self, input_dim, output_dim):
+#         super(FiLMGenerator, self).__init__()
+#         self.mlp = nn.Sequential(
+#             nn.Linear(input_dim, input_dim * 2),
+#             nn.ReLU(),
+#             #nn.LeakyReLU(), 
+#             nn.Linear(input_dim * 2, output_dim * 2) # gammaとbetaの両方を出力するため2倍
+#         )
+#         self.output_dim = output_dim
+
+#     def forward(self, label_emb):
+#         # [batch, output_dim * 2] -> [batch, output_dim], [batch, output_dim]
+#         out = self.mlp(label_emb)
+#         #out = self.mlp(label_emb.float())
+#         gamma, beta = torch.split(out, self.output_dim, dim=1)
+#         return gamma, beta
+
+# class FiLMLayer(nn.Module):
+#     """
+#     特徴量を受け取り、FiLM変調を適用する層。
+#     """
+#     def __init__(self, label_emb_dim, feature_dim):
+#         super(FiLMLayer, self).__init__()
+#         # 専用のジェネレーターを持つことで、層ごとに異なる変調が可能になります
+#         self.generator = FiLMGenerator(label_emb_dim, feature_dim)
+
+#     def forward(self, x, label_emb):
+#         # 1. パラメータ生成
+#         gamma, beta = self.generator(label_emb)
+        
+#         # 2. 変調 (Modulation)
+#         # x: [batch, features], gamma/beta: [batch, features]
+#         # ブロードキャストで計算されます
+#         return x * (1 + gamma) + beta
 
 class FineTuningModelWithFiLM(nn.Module):
     def __init__(self, pretrained_encoder, last_shared_layer_dim, output_dims, reg_list, 
@@ -178,19 +213,34 @@ class FineTuningModelWithFiLM(nn.Module):
         self.task_specific_heads = nn.ModuleList()
         self.output_scalers = nn.ModuleList()
 
+        # for out_dim in output_dims:
+        #     layers = nn.ModuleList()
+        #     input_dim = last_shared_layer_dim
+        #     for hidden_dim in task_specific_layers:
+        #         layers.append(nn.Linear(input_dim, hidden_dim))
+        #         layers.append(nn.ReLU())
+        #         #layers.append(nn.LeakyReLU())
+        #         layers.append(FiLMLayer(label_embedding_dim, hidden_dim))
+        #         input_dim = hidden_dim
+            
+        #     # 最終層を明確に区別するために記録しておく
+        #     layers.append(nn.Linear(input_dim, out_dim))
+        #     self.task_specific_heads.append(layers)
+
         for out_dim in output_dims:
             layers = nn.ModuleList()
             input_dim = last_shared_layer_dim
+            
+            # 各タスク固有の層から ReLU（非線形）を削除
             for hidden_dim in task_specific_layers:
                 layers.append(nn.Linear(input_dim, hidden_dim))
-                layers.append(nn.ReLU())
-                #layers.append(nn.LeakyReLU())
+                # 非線形活性化関数 (ReLU) を削除しました
                 layers.append(FiLMLayer(label_embedding_dim, hidden_dim))
                 input_dim = hidden_dim
             
-            # 最終層を明確に区別するために記録しておく
             layers.append(nn.Linear(input_dim, out_dim))
             self.task_specific_heads.append(layers)
+
     def forward(self, x, label_emb):
         # 1. 共有エンコーダーとFiLM変調
         shared_features = self.shared_block(x)

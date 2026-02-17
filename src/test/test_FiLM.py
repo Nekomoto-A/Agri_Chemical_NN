@@ -157,20 +157,20 @@ def test_FiLM(x_te, y_te, label_te,
             plt.figure(figsize=(12, 12))
             plt.scatter(true_flat, pred_flat, color='royalblue', alpha=0.7)
             # IDのアノテーション
-            # if len(ids_flat) == len(true_flat):
-            #     # (★注意) データが多いと重なるため、件数が多い場合はコメントアウトを推奨
-            #     # print(f"INFO: タスク {reg} のプロットに {len(ids_flat)} 件のアノテーションを追加します。")
-            #     if len(ids_flat) <= 200: # 例: 200件以下ならアノテーション
-            #         for i in range(len(ids_flat)):
-            #             plt.annotate(
-            #                 ids_flat[i], (true_flat[i], pred_flat[i]),
-            #                 textcoords="offset points", xytext=(0, 5),
-            #                 ha='center', fontsize=6, alpha=0.5
-            #             )
-            #     else:
-            #         print(f"INFO: タスク {reg} のデータ件数 ({len(ids_flat)}) が多いため、アノテーションをスキップします。")
-            # else:
-            #      print(f"WARN: タスク {reg} の test_ids (len {len(ids_flat)}) と予測 (len {len(true_flat)}) の長さが異なります。アノテーションをスキップします。")
+            if len(ids_flat) == len(true_flat):
+                # (★注意) データが多いと重なるため、件数が多い場合はコメントアウトを推奨
+                # print(f"INFO: タスク {reg} のプロットに {len(ids_flat)} 件のアノテーションを追加します。")
+                if len(ids_flat) <= 200: # 例: 200件以下ならアノテーション
+                    for i in range(len(ids_flat)):
+                        plt.annotate(
+                            ids_flat[i], (true_flat[i], pred_flat[i]),
+                            textcoords="offset points", xytext=(0, 5),
+                            ha='center', fontsize=6, alpha=0.5
+                        )
+                else:
+                    print(f"INFO: タスク {reg} のデータ件数 ({len(ids_flat)}) が多いため、アノテーションをスキップします。")
+            else:
+                 print(f"WARN: タスク {reg} の test_ids (len {len(ids_flat)}) と予測 (len {len(true_flat)}) の長さが異なります。アノテーションをスキップします。")
 
             min_val = min(np.min(true), np.min(pred))
             max_val = max(np.max(true), np.max(pred))
