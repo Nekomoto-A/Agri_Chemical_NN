@@ -689,6 +689,7 @@ def training_FiLM(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir,
 
                 lasso = config['lasso'],
                 lasso_alpha = config['lasso_alpha'],
+                weight_decay = config['weight_decay']
 
                 #adabn = config['AdaBN']
                 ):
@@ -701,9 +702,9 @@ def training_FiLM(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir,
 
     lr = lr[0]
     optimizer = optim.Adam(model.parameters() , lr=lr,
-                            weight_decay = 0.1
+                            weight_decay = weight_decay
                             )
-    #optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=0.01)
+    #optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     #scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100)
 
     #personal_losses = []

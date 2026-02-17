@@ -330,6 +330,8 @@ def apply_smearing_yeo_johnson(pt, y_train_transformed, y_train_pred_transformed
     
     return y_final_pred, smearing_coeff
 
+from sklearn.preprocessing import PowerTransformer
+
 def test_MT(x_te, y_te, x_train, y_train, model, reg_list, scalers, output_dir, device, test_ids,
             eval_reg, eval_class, 
             label_encoders = None, 
@@ -399,6 +401,14 @@ def test_MT(x_te, y_te, x_train, y_train, model, reg_list, scalers, output_dir, 
                     pred_log = pred_tensor_for_eval.cpu().detach().numpy()
                     pred, coff = apply_smearing_log1p(y_train_log1p, y_train_pred_log1p, pred_log)
                     print(f'対数変換のためスメアリング推定による補正を行います(係数：{coff})')
+                elif isinstance(scaler, PowerTransformer):
+                    train_out, _ = model(x_train.to(device))
+                    y_train_pred_log1p = train_out[reg].cpu().detach().numpy()
+                    y_train_log1p = y_train[reg].cpu().detach().numpy()
+
+                    pred_log = pred_tensor_for_eval.cpu().detach().numpy()
+                    from src.test.test import apply_smearing_yeo_johnson
+                    pred, coff = apply_smearing_yeo_johnson(scaler,y_train_log1p, y_train_pred_log1p, pred_log)
                 else:
                     # --- 通常のスケーリング解除 ---
                     pred = scaler.inverse_transform(pred_tensor_for_eval.cpu().detach().numpy())
@@ -680,6 +690,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                   ae_dir = None, 
                   adapte = config['Adapte'], 
                   reconstruction_plots = config['reconstruction_plots'],
+                  shared_learn = config['shared_learn']
                   ):
 
     # 2. ユニークなラベルを抽出
@@ -832,7 +843,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                         reg_list = reg_list,
                                         label_embedding_dim = labels_train.shape[1],
                                         #task_specific_layers = [latent_dim], 
-                                        shared_learn = False,
+                                        shared_learn = shared_learn,
                                         )
         elif 'mm' in model_name:
             from src.models.FT_label import MultiModalFineTuningModel
@@ -842,7 +853,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                         output_dims = output_dims,
                                         reg_list = reg_list,
                                         #task_specific_layers = [latent_dim], 
-                                        shared_learn = False,
+                                        shared_learn = shared_learn,
                                         )
         elif 'DKL_label' in model_name:
             from src.models.MT_GP_label import GPFineTuningModel
@@ -851,7 +862,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                  label_emb_dim = label_dim, 
                                  reg_list = reg_list, 
                                  target_means = target_means_dict,
-                                 shared_learn = False
+                                 shared_learn = shared_learn
                                  )
 
         elif 'DKL' in model_name:
@@ -859,7 +870,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
             model = GPFineTuningModel(pretrained_encoder=pretrained_encoder,
                                     last_shared_layer_dim = latent_dim,
                                     reg_list = reg_list,
-                                    shared_learn = False,
+                                    shared_learn = shared_learn,
                                     )
             
         elif 'WGP_NUTS' in model_name:
@@ -885,7 +896,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
             model = WarpedGPFineTuningModel(pretrained_encoder=pretrained_encoder,
                                     last_shared_layer_dim = latent_dim,
                                     reg_list = reg_list,
-                                    shared_learn = False,
+                                    shared_learn = shared_learn,
                                     )
             #model.to(device)
             model.device = device
@@ -902,7 +913,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                  last_shared_layer_dim = latent_dim, 
                                  label_emb_dim = label_dim, 
                                  reg_list = reg_list, 
-                                 shared_learn = False
+                                 shared_learn = shared_learn
                                  )
             
         else:
@@ -912,7 +923,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                         latent_dim = latent_dim,
                                         output_dims = output_dims,
                                         reg_list = reg_list, 
-                                        shared_learn = False,
+                                        shared_learn = shared_learn,
                                         )
             else:
                 from src.models.AE import FineTuningModel
@@ -921,7 +932,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                         output_dims = output_dims,
                                         reg_list = reg_list,
                                         #task_specific_layers = [latent_dim], 
-                                        shared_learn = False,
+                                        shared_learn = shared_learn,
                                         )
                 # from src.models.AE import FineTuningModelWithFiLM
                 # model = FineTuningModelWithFiLM(pretrained_encoder=pretrained_encoder,

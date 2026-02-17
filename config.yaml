@@ -6,7 +6,7 @@ dataset.py:
   non_outlier: None
   val_size: 0.3
   level: 7
-  feature_transformer: 'CLR'
+  feature_transformer: 'ILR'
   softlabel: True
   data_vis: 'visualize'
   data_augumentation: None #'smoter' #None #'smoter' #'smoter' #'smoter' #'gaussian_copula'
@@ -18,7 +18,7 @@ dataset.py:
   hist: False
   num_clusters: 2
   marginal_hist_train: False
-  unknown_drop: False
+  unknown_drop: True
   asv_path_linux: '/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/lv6.csv' #'data/raw/riken/taxon_data/lv6.csv' # # #
   chem_path_linux:  '/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/chem_data.xlsx' #'data/raw/riken/chem_data.xlsx' # # #
   asv_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\lv6.csv'
@@ -53,6 +53,7 @@ train.py:
   lasso_alpha: 0.0
   AdaBN: False
   FDS: 'DWMixup'
+  weight_decay: 0.1
 train_PSO.py: 
   visualize: False
   epochs: 300
@@ -129,6 +130,7 @@ test.py:
   batch_size: 256
   Adapte: None #'retrain' #'Adapter'
   reconstruction_plots: False #True
+  shared_learn: False
 fold_eval.py:
   feature_selection: None
   num_selected_features: 15
@@ -156,12 +158,9 @@ fold_eval.py:
 
     '042_20_Sait_Eggp', '214_21_Miyz_Edam', '273_22_Naga_Rice', '235_21_Miyz_Spin',
 
-    #'137_21_Akit_Soyb'
+    #'239_21_Aomo_Appl'
+    #'125_20_Miyz_Spin', '121_20_Miyz_Spin', 
 
-    #'164_21_Miyz_Spin', 
-
-    #'171_21_Miyz_Spin', '159_21_Miyz_Spin', '163_21_Miyz_Spin', '164_21_Miyz_Spin',
-    #'172_21_Miyz_Spin', '158_21_Miyz_Spin', '152_21_Miyz_Spin', '165_21_Miyz_Spin'
 
   ]
   feature_path_linux: 'data/raw/riken/taxon_data/lv6.csv' #'/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/lv6.csv' # # #
@@ -169,7 +168,7 @@ fold_eval.py:
   feature_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\taxon_data\lv6.csv' #C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\lv6.csv #
   target_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\chem_data.xlsx' #C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\chem_data.xlsx #
   data_inte: False
-  transformer: ['log', None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
+  transformer: ['YJ', None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
   reg_loss_fanction: ['mse', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
   eval_reg: ['R2', 'MedAE', 'MAE', 'RMSLE', 'RMSE']
   eval_class: ['Accuracy', 'F1score']
@@ -178,7 +177,7 @@ fold_eval.py:
   embedding_size: 8
   latent_dim: 32
 main.py:
-  result_dir: 'result_DCAE_FiLM_P_out'
+  result_dir: 'result_DCAE_FiLM_CEC_ILR'
   reg_list: [
             # ['pref'], 
             # ['crop'], 
@@ -202,13 +201,13 @@ main.py:
             # ['APCP_Jan_me'],
 
             #[NH4.N], 
-            ['Available.P'], 
+            #['Available.P'], 
             #['pH'],
             #['NO3.N'], 
             #['EC'], 
             #['Humus'], 
             #['Exchangeable.K'], 
-            #['CEC'], 
+            ['CEC'], 
             # ['pH_dry_soil', 'available_P', 'EC_electric_conductivity', 'Total_C', 'Total_N']
             #['pH', 'Available.P'] 
   ]
