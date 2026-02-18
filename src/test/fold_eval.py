@@ -732,7 +732,7 @@ def fold_evaluate(reg_list, output_dir, device,
                 #avg = f'{np.average(values):.3f}'
                 avg = f'{np.average(values)}'
                 avg_dict.setdefault(metrics, {}).setdefault(method_name, {})[target] = np.average(values)
-                std = f'{np.std(values):.3f}'
+                #std = f'{np.std(values):.3f}'
                 std = f'{np.std(values)}'
                 #std_dict.setdefault(metrics, {}).setdefault(method_name, {})[target] = np.std(values)
                 result = f'{avg}±{std}'

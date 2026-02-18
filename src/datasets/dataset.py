@@ -609,7 +609,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
     #             output_dir=fold
     #             )
 
-    for reg,tr in zip(reg_list,transformer):
+    for reg, tr in zip(reg_list,transformer):
         if '_rank' in reg:
             #print(reg)
             SCALE = 2.0
