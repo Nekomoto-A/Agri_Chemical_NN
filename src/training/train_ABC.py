@@ -53,7 +53,7 @@ class CustomDatasetAdv(Dataset):
 
 class GABCOptimizer:
     def __init__(self, model, train_x, train_y, val_x, val_y, loss_fns, device, 
-                 n_bees=500, max_iter=1000, limit=3, c_factor=1.5):
+                 n_bees=8, max_iter=5000, limit=10, c_factor=1.5):
         # ... (初期化部分は元のコードと同じ) ...
         self.model = model
         self.train_x = train_x

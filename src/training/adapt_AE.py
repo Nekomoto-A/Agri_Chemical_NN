@@ -325,3 +325,90 @@ def retrain_model_cae(
         print(f"Best model weights restored from {save_path}")
             
     return model, history
+
+from src.training.train_FT import vae_loss_function
+
+def retrain_model_vae(
+    pretrained_vae, 
+    x_train, 
+    x_val, 
+    device, 
+    output_dir, 
+    epochs=300, 
+    batch_size=32, 
+    lr=1e-3, 
+    patience=10
+):
+    """
+    VAEのエンコーダーを固定し、アダプターとデコーダー全体を学習させる関数。
+    """
+    
+    # 1. モデルの準備
+    # AdaptedAutoencoderが内部でpretrained_aeの各パーツを保持していると想定
+    #model = AdaptedConvolutionalAutoencoder(pretrained_ae).to(device)
+    model = pretrained_vae
+    
+    # 2. データの準備
+    train_loader = DataLoader(TensorDataset(x_train), batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(TensorDataset(x_val), batch_size=batch_size)
+
+    optimizer = optim.Adam(model.parameters(), lr=lr)
+    #criterion = nn.MSELoss()
+    criterion = nn.MSELoss() # + KL Divergence を加える場合は、VAEの損失関数を定義する必要があります。
+
+    # 4. EarlyStoppingの初期化
+    save_path = os.path.join(output_dir, 'best_adapter_model.pt')
+    early_stopping = EarlyStopping(patience=patience, verbose=True, path=save_path)
+    
+    history = {'train_loss': [], 'val_loss': []}
+
+    print(f"--- アダプター学習開始 (保存先: {save_path}) ---")
+
+    for epoch in range(epochs):
+        # --- 学習フェーズ ---
+        model.train()
+        train_loss = 0
+        for batch in train_loader:
+            inputs = batch[0].to(device)
+            
+            optimizer.zero_grad()
+            # CAEの出力 (reconstructed_x, encoded_features)
+            outputs, _ = model(inputs)
+            
+            # 入力と出力のサイズを合わせる (Ensure3Dの効果で outputs が (N, L) になっている想定)
+            loss = criterion(outputs, inputs)
+            loss.backward()
+            optimizer.step()
+            train_loss += loss.item()
+            
+        # --- 検証フェーズ ---
+        model.eval()
+        val_loss = 0
+        with torch.no_grad():
+            for batch in val_loader:
+                inputs = batch[0].to(device)
+                outputs, _ = model(inputs)
+                v_loss = criterion(outputs, inputs)
+                val_loss += v_loss.item()
+        
+        avg_train = train_loss / len(train_loader)
+        avg_val = val_loss / len(val_loader)
+        history['train_loss'].append(avg_train)
+        history['val_loss'].append(avg_val)
+        
+        if (epoch + 1) % 10 == 0 or epoch == 0:
+            print(f"Epoch [{epoch+1}/{epochs}] Train Loss: {avg_train:.6f} | Val Loss: {avg_val:.6f}")
+
+        # --- EarlyStoppingの判定 ---
+        early_stopping(avg_val, model)
+        
+        if early_stopping.early_stop:
+            print(f"Early stopping triggered at epoch {epoch+1}.")
+            break
+            
+    # --- 最良の状態の重みをロード ---
+    if os.path.exists(save_path):
+        model.load_state_dict(torch.load(save_path, map_location=device))
+        print(f"Best model weights restored from {save_path}")
+            
+    return model, history

@@ -31,73 +31,20 @@ def smape(y_true, y_pred):
     
     return np.mean(ratio) * 100
 
-class SpecificTaskModel(nn.Module):
-    def __init__(self, original_model, task_name):
+# 1. 計算対象のタスク（reg_list内の1つ）を指定するラッパー
+class TaskSpecificWrapper(torch.nn.Module):
+    def __init__(self, model, task_name, label_emb):
         super().__init__()
-        self.original_model = original_model
+        self.model = model
         self.task_name = task_name
+        self.label_emb = label_emb # FiLM用の埋め込み（固定または入力）
 
     def forward(self, x):
-        # 元のモデルは (出力辞書, 共有特徴量) のタプルを返す
-        outputs_dict, _ = self.original_model(x)
-        # 目的のタスクの出力だけを返す
-        return outputs_dict[self.task_name]
-
-
-
-# 1. 現在のタスク用のラッパー関数を定義
-def test_shap(x_tr, x_te,model,reg_list, features, output_dir, ):
-    background_data = x_tr[torch.randperm(x_tr.size(0))[:100]]
-    feature_importance_dict = {}
-
-    for reg in reg_list:
-        #def model_wrapper(x):
-        #    outputs_dict, _ = model(x)
-        #    return outputs_dict[reg]
-        #explainer = shap.DeepExplainer(model_wrapper, background_data)
-        task_model = SpecificTaskModel(model, reg)
-        explainer = shap.DeepExplainer(task_model, background_data)
-        shap_values = explainer.shap_values(x_te)
-        mean_abs_shap = np.abs(shap_values).mean(axis=0).flatten()
-        feature_importance_dict[reg] = mean_abs_shap
-
-        # 1. サマリープロット（バー形式）を保存
-        # 新しい図の描画準備
-        save_path_bar = os.path.join(output_dir, f'shap_summary_bar_{reg}.png')
-        x_te_numpy = x_te.cpu().numpy()
-
-        # 1. サマリープロット（バー形式）を保存
-        plt.figure()
-        plt.title(f'Feature Importance for {reg} (Bar)')
-        # x_te の代わりに変換した x_te_numpy を渡す
-        #shap.summary_plot(shap_values, x_te_numpy, feature_names=features, plot_type="bar", show=False)
-        shap.summary_plot(shap_values[0], x_te_numpy, feature_names=features, plot_type="bar", show=False)
-        plt.savefig(save_path_bar, bbox_inches='tight')
-        plt.close()
-        print(f"  - サマリープロット（バー）を {save_path_bar} に保存しました。")
-
-    shap_df = pd.DataFrame(feature_importance_dict, index=features)
-    # (前回のコードで shap_df が作成済みであることを前提とします)
-
-    # 保存するExcelファイルの名前を設定
-    excel_filename = 'shap_importance_sorted_by_task.xlsx'
-    result_dir = os.path.join(output_dir, excel_filename)
-
-    # ExcelWriterを使用して、複数のシートに書き込みを行う
-    with pd.ExcelWriter(result_dir, engine='openpyxl') as writer:
-        # データフレームのカラム（各タスク名）でループ処理
-        for task_name in shap_df.columns:
-            print(f"シート '{task_name}' を作成し、データを書き込んでいます...")
-            
-            # 該当タスクの列を選択し、値の大きい順（降順）にソートする
-            # [[task_name]] のように二重括弧で囲むことで、結果をDataFrameとして保持
-            sorted_df_for_task = shap_df[[task_name]].sort_values(by=task_name, ascending=False)
-            
-            # ソートしたデータフレームを、タスク名をシート名にしてExcelファイルに書き込む
-            # index=Trueはデフォルトですが、特徴量名を行名として残すために明示しています
-            sorted_df_for_task.to_excel(writer, sheet_name=task_name, index=True)
-    return feature_importance_dict
-
+        # model.forward は (outputs, latent) を返す
+        outputs, _ = self.model(x, self.label_emb)
+        # 指定したタスクの出力のみを抽出 (Batch, OutDim)
+        return outputs[self.task_name]
+    
 def normalized_medae_iqr(y_true, y_pred):
     """
     中央絶対誤差（MedAE）を四分位範囲（IQR）で正規化した、
@@ -607,8 +554,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 from sklearn.metrics import r2_score
+import re
 
-def save_reconstruction_plots(model, dataloader, device, save_dir="evaluation_plots"):
+def save_reconstruction_plots(model, dataloader, device, feature_names, save_dir="evaluation_plots"):
     """
     各変数ごとに再構成精度をプロットし、フォルダに保存する
     """
@@ -636,7 +584,8 @@ def save_reconstruction_plots(model, dataloader, device, save_dir="evaluation_pl
     # 2. 変数ごとにループしてプロットを作成
     num_features = x_true.shape[1]
     
-    for i in range(num_features):
+    #for i in range(num_features):
+    for i, feature_name in enumerate(feature_names):
         plt.figure(figsize=(6, 6))
         
         # データの取得
@@ -662,8 +611,23 @@ def save_reconstruction_plots(model, dataloader, device, save_dir="evaluation_pl
         plt.legend()
         plt.grid(True, linestyle='--', alpha=0.7)
         
+        # セミコロン「;」で区切られた最後の要素を取得する（例: g__Deep_Sea...）
+        if ";" in feature_name:
+            # セミコロンで分割し、一番最後の要素を取得
+            genus_name = feature_name.split(";")[-1]
+            # .png 拡張子が消えてしまう場合は付け直す
+            if not genus_name.endswith(".png"):
+                genus_name += ".png"
+        else:
+            # セミコロンがない場合はそのまま（あるいは別のルールで短縮）
+            genus_name = feature_name
+
         # 保存
-        filename = f"{save_dir}/dim{i}_reconstruction.png"
+        os.makedirs(save_dir, exist_ok=True)
+        clean_name = re.sub(r'[\\/:*?"<>|;\[\]]', '_', genus_name)
+        
+        filename = os.path.join(save_dir, f"dim{i}_{clean_name}.png")
+        #print(filename)
         plt.savefig(filename)
         plt.close() # メモリ解放のために閉じる
 
@@ -781,6 +745,9 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
             elif adapte == 'Adapter':
                 from src.training.adapt_AE import train_adapted_model
                 ae_model, _ = train_adapted_model(ae_model, X_train, X_val, device, vis_dir)
+            elif adapte == 'retrain':
+                from src.training.adapt_AE import retrain_model_vae
+                ae_model = retrain_model_vae(ae_model, X_train, X_val, device, vis_dir)
             pretrained_encoder = ae_model.get_encoder()
 
         elif 'CAE' in model_name:
@@ -831,7 +798,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
             dataset = AutoEncoderDataset(X_test)
             dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
             
-            save_reconstruction_plots(ae_model, dataloader, device, 
+            save_reconstruction_plots(ae_model, dataloader, device, feature_names=features,
                                       #feature_names = features, 
                                       save_dir=recon_path)
 

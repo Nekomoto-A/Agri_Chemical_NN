@@ -63,6 +63,19 @@ def save_loss_plot(train_loss, val_loss, path):
     plt.close()
     print(f"Loss plot saved to {path}")
 
+# 1. KLダイバージェンスを計算する関数の定義
+def kl_divergence(rho, rho_hat):
+    """
+    rho: ターゲットとなるスパース度 (例: 0.05)
+    rho_hat: 実際の潜在層の平均活性度
+    """
+    # 数値安定性のために微小値を加算
+    rho_hat = torch.mean(rho_hat, dim=0) 
+    rho_hat = torch.clamp(rho_hat, min=1e-10, max=1-1e-10)
+    
+    # KL Divergence の公式
+    return torch.sum(rho * torch.log(rho / rho_hat) + (1 - rho) * torch.log((1 - rho) / (1 - rho_hat)))
+
 # --- ここからが修正された学習関数 ---
 
 def train_pretraining(model, x_tr, x_val,  device, output_dir, 
@@ -73,7 +86,8 @@ def train_pretraining(model, x_tr, x_val,  device, output_dir,
                       tsne_plot_epoch_freq=config['tsne_plot_epoch_freq'], # デフォルト0 (実行しない)
                       tsne_perplexity=config['tsne_perplexity'],
                       tsne_max_samples=config['tsne_max_samples'],
-                      sparse_lambda = config['sparse_lambda']
+                      sparse_lambda = config['sparse_lambda'],
+                      sparsity_target = config['sparsity_target'],
                       ):
     """
     オートエンコーダーの事前学習を実行します（EarlyStopping、グラフ保存対応）。
@@ -125,17 +139,12 @@ def train_pretraining(model, x_tr, x_val,  device, output_dir,
             
             loss = criterion(reconstructed_x, target)
 
-            sparsity_loss = torch.mean(torch.abs(encoded_features))
+            rho_hat = torch.sigmoid(encoded_features).mean(dim=0)  # 各潜在次元の平均活性化
 
-            l1_norm = 0.0
-            if l1_lambda > 0:
-                for param in model.parameters():
-                    # バイアス項（1次元）を除外し、重み（2次元以上）のみを対象
-                    if param.dim() > 1 and param.requires_grad:
-                        l1_norm += torch.abs(param).sum()
-            
+            # 損失の計算
+            sparse_loss = kl_divergence(sparsity_target, rho_hat)
             # 2. 最終的な損失 = 主損失 + L1ペナルティ
-            loss = loss + l1_lambda * l1_norm + sparse_lambda * sparsity_loss
+            loss = loss + sparse_lambda * sparse_loss
 
             loss.backward()
             optimizer.step()
@@ -150,7 +159,15 @@ def train_pretraining(model, x_tr, x_val,  device, output_dir,
         with torch.no_grad():
             for data, target in validation_loader:
                 data, target = data.to(device), target.to(device)
-                reconstructed_x, _ = model(data)
+                reconstructed_x, encoded_features = model(data)
+
+                rho_hat = torch.sigmoid(encoded_features).mean(dim=0)  # 各潜在次元の平均活性化
+
+                # 損失の計算
+                sparse_loss = kl_divergence(sparsity_target, rho_hat)
+                # 2. 最終的な損失 = 主損失 + L1ペナルティ
+                loss = loss + sparse_lambda * sparse_loss
+
                 loss = criterion(reconstructed_x, target)
                 val_loss += loss.item() * data.size(0) # バッチサイズを考慮した損失
         

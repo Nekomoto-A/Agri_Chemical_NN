@@ -30,7 +30,7 @@ def save_combined_data_to_csv(filepath, original_labels, embedded_tensor, output
     
     # dfにベクトルの列を結合
     df = pd.concat([df, df_emb], axis=1)
-    print(df)
+    #print(df)
 
     # 3. 目的変数の辞書を列として追加
     # 目的変数の追加（ここでエラーが起きていたので、チェックを入れる）
@@ -213,8 +213,6 @@ def w2v_encode_and_split(train_labels, val_labels, test_labels, label_encoders, 
     else:
         return out_train, out_val, out_test
     
-
-
 def concat_encode_and_split(train_labels, val_labels, test_labels,):
     """
     数値を元のラベルに戻し、Word2Vecで埋め込み（Embedding）を行って分割する関数。

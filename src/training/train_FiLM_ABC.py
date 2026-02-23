@@ -53,7 +53,7 @@ class CustomDatasetAdv(Dataset):
 
 class ABCOptimizer:
     def __init__(self, model, train_x, train_y, train_label, val_x, val_y, val_label, loss_fns, device, 
-                 n_bees=1000, max_iter=1000, limit=3):
+                 n_bees=10, max_iter=1000, limit=5):
         self.model = model #.to(device)
         self.train_x = train_x #.to(device)
         self.train_y = train_y # 辞書型

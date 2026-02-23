@@ -42,6 +42,92 @@ def normalized_medae_iqr(y_true, y_pred):
     
     return medae / iqr
 
+# 1. 計算対象のタスク（reg_list内の1つ）を指定するラッパー
+class TaskSpecificWrapper(torch.nn.Module):
+    def __init__(self, model, task_name, label_emb):
+        super().__init__()
+        self.model = model
+        self.task_name = task_name
+        self.label_emb = label_emb # FiLM用の埋め込み（固定または入力）
+
+    def forward(self, x):
+        # model.forward は (outputs, latent) を返す
+        outputs, _ = self.model(x, self.label_emb)
+        # 指定したタスクの出力のみを抽出 (Batch, OutDim)
+        return outputs[self.task_name]
+import pandas as pd
+import torch
+import shap
+import matplotlib.pyplot as plt
+import os
+
+def save_shap_force_plots(model, task_name, label_emb, bg_tensor, test, feature_names, id_list, output_dir):
+    """
+    DeepExplainerを用いてSHAP値を計算し、各データ点のForce Plotを保存する
+    
+    Args:
+        model: 学習済みFineTuningModelWithFiLM
+        task_name: 計算対象のタスク名 (reg_listに含まれる文字列)
+        label_emb: そのタスク/ドメインに対応するラベル埋め込みテンソル
+        background_df: 背景データ (pd.DataFrame)
+        test_df: 解析対象のデータ (pd.DataFrame)
+        id_list: ファイル名に使用する各データ点の識別子リスト
+        output_dir: 画像の保存先ディレクトリ
+    """
+
+    # 1. 保存先ディレクトリの作成
+    shap_path = os.path.join(output_dir, "shap_values")
+    os.makedirs(shap_path, exist_ok=True)
+    
+    # 2. ラッパーの準備と推論モード設定
+    wrapper = TaskSpecificWrapper(model, task_name, label_emb)
+    wrapper.eval()
+    
+    # 3. データのテンソル変換
+    # ※ Ensure3Dが内部にあるため (Batch, Col) の形状で渡す
+    # bg_tensor = torch.tensor(background_df.values).float()
+    # test_tensor = torch.tensor(test_df.values).float()
+    
+    # 4. DeepExplainerの初期化
+    # 背景データが多い場合は shap.sample(bg_tensor, 100) などで制限
+    explainer = shap.DeepExplainer(wrapper, bg_tensor)
+    
+    # 5. SHAP値の計算
+    # shap_values[0] は (NumSamples, NumFeatures) の形状
+    shap_values = explainer.shap_values(test)
+    
+    # 出力が1つの場合でもリストで返ることが多いため調整
+    if isinstance(shap_values, list):
+        shap_values = shap_values[0]
+
+    # 6. 各データ点ごとにForce Plotを生成・保存
+    expected_value = explainer.expected_value
+    if isinstance(expected_value, list):
+        expected_value = expected_value[0]
+
+    print(f"Generating plots for {len(test)} samples...")
+    
+    for i in range(len(test)):
+        sample_id = id_list[i]
+        
+        # Matplotlib形式でForce Plotを作成
+        # matplotlib=Trueにすることで、plt.savefigで保存可能になる
+        shap.force_plot(
+            expected_value, 
+            shap_values[i, :], 
+            test[i, :], 
+            feature_names=feature_names,
+            matplotlib=True,
+            show=False
+        )
+        
+        # ファイル名の設定と保存
+        file_path = os.path.join(shap_path, f"force_plot_{task_name}_{sample_id}.png")
+        plt.savefig(file_path, bbox_inches='tight', dpi=150)
+        plt.close() # メモリ解放
+
+    print(f"Done. Plots are saved in '{output_dir}'.")
+
 from src.test.test import get_corrected_predictions, eval_predictions
 from src.test.test import is_log1p_transformer
 
@@ -53,6 +139,7 @@ def test_FiLM(x_te, y_te, label_te,
               x_train, y_train, label_tr, 
               model, reg_list, scalers, output_dir, device, 
               test_ids,
+              feature_names,
               eval_reg, eval_class,
               label_encoders = None
               ):
@@ -72,6 +159,8 @@ def test_FiLM(x_te, y_te, label_te,
     
     # --- 3. タスクごとに結果を処理 ---
     for reg in reg_list:
+        save_shap_force_plots(model, reg, label_tr, x_train, x_te, feature_names=feature_names, test_ids=test_ids, output_dir=output_dir)
+
         scores[reg] = {}
         # 分類タスクの処理 (省略)
         if '_rank' in reg or not torch.is_floating_point(y_te[reg]):

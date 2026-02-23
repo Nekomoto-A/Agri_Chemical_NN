@@ -13,7 +13,7 @@ class Ensure3D(nn.Module):
 class ConvolutionalAutoencoder(nn.Module):
     def __init__(self, input_dim, shared_layers=[32, 
                                                  64, 
-                                                 #128
+                                                 128
                                                  ], 
                  latent_dim=64):
         super(ConvolutionalAutoencoder, self).__init__()
