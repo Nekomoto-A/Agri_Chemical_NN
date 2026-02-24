@@ -279,7 +279,177 @@ def apply_smearing_yeo_johnson(pt, y_train_transformed, y_train_pred_transformed
 
 from sklearn.preprocessing import PowerTransformer
 
-def test_MT(x_te, y_te, x_train, y_train, model, reg_list, scalers, output_dir, device, test_ids,
+import pandas as pd
+import numpy as np
+import shap
+import torch
+
+def calculate_shap_values(model, background_data, test_data, feature_names, task_name):
+    model.eval()
+    
+    # --- 追加: デバイスの取得とデータの転送 ---
+    device = next(model.parameters()).device
+    background_data = background_data.to(device)
+    test_data = test_data.to(device)
+    # ---------------------------------------
+
+    class ModelWrapper(torch.nn.Module):
+        def __init__(self, original_model, target_task):
+            super().__init__()
+            self.model = original_model
+            self.target_task = target_task
+            
+        def forward(self, x):
+            outputs, _ = self.model(x)
+            return outputs[self.target_task]
+
+    wrapped_model = ModelWrapper(model, task_name)
+    
+    # DeepExplainerを実行
+    explainer = shap.DeepExplainer(wrapped_model, background_data)
+    
+    # SHAP値の計算
+    shap_values = explainer.shap_values(test_data)
+    
+    # 1. SHAP値がリストで返ってきた場合の処理
+    if isinstance(shap_values, list):
+        shap_values = shap_values[0]
+
+    # 2. 【重要】(Batch, Features, 1) を (Batch, Features) に変換
+    # numpyのsqueeze()を使用して、サイズが1の次元をすべて削除します
+    if hasattr(shap_values, 'squeeze'):
+        shap_values = shap_values.squeeze()
+
+    # 3. 再度、形状をチェック（デバッグ用）
+    # print(f"SHAP values shape after squeeze: {shap_values.shape}")
+
+    # 4. DataFrame化
+    df_shap = pd.DataFrame(shap_values, columns=feature_names)
+    
+    return df_shap, explainer
+
+def save_shap_summary_plot(shap_values, test_data_tensor, feature_names, task_name, save_dir="shap_results"):
+    """
+    SHAPのsummary_plotを作成し、指定したディレクトリに保存する関数
+    
+    Args:
+        shap_values (np.ndarray): calculate_shap_valuesで取得したSHAP値
+        test_data_tensor (torch.Tensor): SHAP値を計算した元の入力データ
+        feature_names (list): 特徴量のカラム名
+        task_name (str): 保存ファイル名に使用するタスク名
+        save_dir (str): 保存先のディレクトリ名
+    """
+    # 1. 保存先ディレクトリの作成
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    
+    # 2. データの変換 (Tensor -> Numpy)
+    # SHAPのプロット関数はNumpy形式を期待するため
+    test_data_np = test_data_tensor.detach().cpu().numpy()
+    
+    # 3. 描画の設定
+    plt.figure(figsize=(12, 8)) # 図のサイズを調整
+    
+    # 4. Summary Plotの作成
+    # show=False にすることで、即座に表示せずファイル保存を優先する
+    shap.summary_plot(
+        shap_values, 
+        test_data_np, 
+        feature_names=feature_names, 
+        show=False
+    )
+    
+    # 5. タイトルの追加（任意）
+    plt.title(f"SHAP Summary Plot - {task_name}")
+    
+    # 6. 保存とクローズ
+    save_path = os.path.join(save_dir, f"shap_summary_{task_name}.png")
+    plt.tight_layout()
+    plt.savefig(save_path, bbox_inches='tight', dpi=300)
+    plt.close() # メモリ解放のために閉じる
+    
+    print(f"Summary plot saved at: {save_path}")
+
+import shap
+import matplotlib.pyplot as plt
+import os
+import torch
+
+def save_individual_shap_plots(explainer, shap_df, test_data_tensor, ids, task_name, base_dir):
+    """
+    個別データごとのWaterfall plotとForce plotを保存する
+    
+    Args:
+        explainer: DeepExplainerのインスタンス
+        shap_df (pd.DataFrame): calculate_shap_valuesで取得したDataFrame
+        test_data_tensor (torch.Tensor): 計算に使用した入力データ(2D)
+        ids (list/np.ndarray): 各データの識別子(ID)
+        task_name (str): タスク名
+        base_dir (str): 保存ルートディレクトリ
+    """
+    # 保存ディレクトリの作成
+    waterfall_dir = os.path.join(base_dir, task_name, "waterfall")
+    force_dir = os.path.join(base_dir, task_name, "force")
+    os.makedirs(waterfall_dir, exist_ok=True)
+    os.makedirs(force_dir, exist_ok=True)
+
+    # SHAP値とベース値（期待値）の取得
+    # DeepExplainerの場合、expected_valueはスカラーまたはリスト
+    base_value = explainer.expected_value
+    if isinstance(base_value, (list, torch.Tensor, np.ndarray)):
+        base_value = base_value[0]
+
+    test_data_np = test_data_tensor.detach().cpu().numpy()
+    feature_names = shap_df.columns.tolist()
+
+    for i in range(len(ids)):
+        # ids[i] ではなく、位置ベースの .iloc[i] を使用するか、
+        # ids が配列であることを確実にするために ids.values[i] などを使います
+        if hasattr(ids, 'iloc'):
+            sample_id = str(ids.iloc[i])
+        else:
+            sample_id = str(ids[i])
+            
+        # 1. Explanationオブジェクトの作成 (SHAPの新しい描画APIに必要)
+        # 3次元エラー対策でsqueezeした後のSHAP値を使用
+        exp = shap.Explanation(
+            values=shap_df.iloc[i].values,
+            base_values=base_value,
+            data=test_data_np[i],
+            feature_names=feature_names
+        )
+
+        # --- Waterfall Plot ---
+        plt.figure(figsize=(10, 6))
+        shap.plots.waterfall(exp, show=False)
+        plt.tight_layout()
+        plt.savefig(os.path.join(waterfall_dir, f"waterfall_{sample_id}.png"), bbox_inches='tight')
+        plt.close()
+
+        # --- Force Plot ---
+        # Force plotはMatplotlib形式とHTML形式がありますが、保存にはMatplotlib形式が便利です
+        plt.figure(figsize=(12, 3))
+        shap.force_plot(
+            base_value, 
+            shap_df.iloc[i].values, 
+            test_data_np[i], 
+            feature_names=feature_names, 
+            matplotlib=True, 
+            show=False
+        )
+        plt.savefig(os.path.join(force_dir, f"force_{sample_id}.png"), bbox_inches='tight')
+        plt.close()
+
+    print(f"Individual plots for {task_name} saved in {os.path.join(base_dir, task_name)}")
+
+# --- 使用例 ---
+"""
+# shap_df, explainer = calculate_shap_values(...)
+# test_ids = df_test['ID'].values
+# save_individual_shap_plots(explainer, shap_df, x_te, test_ids, 'regression_task')
+"""
+
+def test_MT(x_te, y_te, x_train, y_train, model, reg_list, scalers, output_dir, device, test_ids, feature_names, 
             eval_reg, eval_class, 
             label_encoders = None, 
             n_samples_mc=100):
@@ -298,6 +468,14 @@ def test_MT(x_te, y_te, x_train, y_train, model, reg_list, scalers, output_dir, 
     
     # --- 3. タスクごとに結果を処理 ---
     for reg in reg_list:
+        df_shap, explainer = calculate_shap_values(model = model, background_data = x_train, test_data = x_te, feature_names = feature_names, task_name = reg)
+        # 要約プロット (全サンプルでの特徴量重要度)
+
+        shap_dir = os.path.join(output_dir, 'shap_results')
+        os.makedirs(shap_dir, exist_ok=True)
+        save_shap_summary_plot(shap_values = df_shap.values, test_data_tensor = x_te, feature_names = feature_names, task_name = reg, save_dir = shap_dir)
+        save_individual_shap_plots(explainer = explainer, shap_df = df_shap, test_data_tensor = x_te, ids = test_ids, task_name = reg, base_dir = shap_dir)
+
         scores[reg] = {}
         # 分類タスクの処理 (省略)
         if '_rank' in reg or not torch.is_floating_point(y_te[reg]):
@@ -1400,7 +1578,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                          #X_val, Y_val,
                                          X_train, Y_train,  
                                                           model_trained,reg_list,scalers,output_dir=vis_dir,
-                                                          device = device, test_ids = test_ids,
+                                                          device = device, test_ids = test_ids, feature_names = features,
                                                           eval_reg= eval_reg, eval_class = eval_class, 
                                                           label_encoders = reg_encoders,
                                                           )
