@@ -129,9 +129,9 @@ test.py:
   shap_eval: False
   save_feature: False
   batch_size: 256
-  Adapte: 'retrain' #'AdaBN' #'retrain' #None #'retrain' #
+  Adapte: None #'retrain' #'AdaBN' #'retrain' #None #'retrain' #
   reconstruction_plots: False #False #True
-  shared_learn: False
+  shared_learn: False #True #False
 fold_eval.py:
   feature_selection: None
   num_selected_features: 15
@@ -143,7 +143,7 @@ fold_eval.py:
   carr_calc: False
   marginal_hist: False
   k_fold: 5
-  model_name: 'DCAE'
+  model_name: 'CAE'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
@@ -194,9 +194,9 @@ fold_eval.py:
   labels: ['crop'] #['crop', 'pref', 'lati', 'long'] #['experimental_purpose'] #
   embedding: 'Word2Vec' #'Onehot' # #"concat" #
   embedding_size: 8
-  latent_dim: 32
+  latent_dim: 64
 main.py:
-  result_dir: 'result_DCAE_shap_mae'
+  result_dir: 'result_SCAE'
   reg_list: [
             # ['pref'], 
             # ['crop'], 

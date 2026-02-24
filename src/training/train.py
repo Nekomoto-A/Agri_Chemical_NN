@@ -877,6 +877,21 @@ def training_MT(x_tr,x_val,y_tr,y_val,model, output_dim, reg_list, output_dir, m
     optimizer = optim.Adam(model.parameters() , lr=lr,
                             weight_decay = weight_decay
                             )
+    # 2. パラメーターをグループ分けする
+    # エンコーダー(shared_block)のパラメーター
+    # encoder_params = model.shared_block.parameters()
+
+    # # タスク固有ヘッド(task_specific_heads)のパラメーター
+    # # それ以外のすべてのパラメーターを取得する場合の書き方です
+    # head_params = model.task_specific_heads.parameters()
+
+    # # 3. オプティマイザに異なる学習率を設定
+    # optimizer = optim.Adam([
+    #     {'params': encoder_params, 'lr': 1e-4},    # エンコーダーは小さく (例: 0.00001)
+    #     {'params': head_params, 'lr': 1e-2}       # ヘッドは大きく (例: 0.001)
+    # ],
+    # weight_decay = weight_decay,
+    # )
     #optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     #scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100)
 

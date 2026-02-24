@@ -371,6 +371,8 @@ def save_shap_summary_plot(shap_values, test_data_tensor, feature_names, task_na
     print(f"Summary plot saved at: {save_path}")
 
 import shap
+import matplotlib
+matplotlib.use('Agg')  # 必須：import pyplot の前に行う
 import matplotlib.pyplot as plt
 import os
 import torch
@@ -420,25 +422,69 @@ def save_individual_shap_plots(explainer, shap_df, test_data_tensor, ids, task_n
         )
 
         # --- Waterfall Plot ---
-        plt.figure(figsize=(10, 6))
+        # plt.figure(figsize=(10, 6))
+        # shap.plots.waterfall(exp, show=False)
+        # plt.tight_layout()
+        # plt.savefig(os.path.join(waterfall_dir, f"waterfall_{sample_id}.png"), bbox_inches='tight')
+        # plt.close()
+        fig1 = plt.figure(figsize=(10, 6)) # インスタンスを変数に入れる
         shap.plots.waterfall(exp, show=False)
-        plt.tight_layout()
         plt.savefig(os.path.join(waterfall_dir, f"waterfall_{sample_id}.png"), bbox_inches='tight')
-        plt.close()
+        plt.clf()   # 現在のフィギュアの内容をクリア
+        plt.close(fig1) # 特定のフィギュアを確実に閉じる
 
         # --- Force Plot ---
         # Force plotはMatplotlib形式とHTML形式がありますが、保存にはMatplotlib形式が便利です
-        plt.figure(figsize=(12, 3))
+        # plt.figure(figsize=(12, 3))
+        # shap.force_plot(
+        #     base_value, 
+        #     shap_df.iloc[i].values, 
+        #     test_data_np[i], 
+        #     feature_names=feature_names, 
+        #     matplotlib=True, 
+        #     show=False
+        # )
+        # plt.savefig(os.path.join(force_dir, f"force_{sample_id}.png"), bbox_inches='tight')
+        # plt.close()
+        # --- Force Plot ---
+        fig2 = plt.figure(figsize=(12, 3))
+        # shap.force_plot(
+        #     # ... 引数 ...
+        #     matplotlib=True, 
+        #     show=False
+        # )
+        # plt.savefig(os.path.join(force_dir, f"force_{sample_id}.png"), bbox_inches='tight')
+        
+        # plt.clf()   # クリア
+        # plt.close(fig2) # 閉じる
+        # --- Force Plot ---
+        # 1. base_value が配列やリストなら、最初の要素（スカラー）を取り出す
+        # すでに上で処理されていますが、念のため再度チェック
+        bv = base_value
+        if hasattr(bv, "__len__") and not isinstance(bv, (str, bytes)):
+            bv = bv[0]
+            if hasattr(bv, "item"): # numpy や torch の 0次元テンソル対策
+                bv = bv.item()
+
+        # 2. キーワード引数を全て明示して呼び出す
         shap.force_plot(
-            base_value, 
-            shap_df.iloc[i].values, 
-            test_data_np[i], 
+            base_value=bv,                  # 明示的に指定
+            shap_values=shap_df.iloc[i].values, 
+            features=test_data_np[i], 
             feature_names=feature_names, 
             matplotlib=True, 
             show=False
         )
+        
+        # 保存処理
         plt.savefig(os.path.join(force_dir, f"force_{sample_id}.png"), bbox_inches='tight')
-        plt.close()
+        plt.clf()
+        plt.close(fig2)
+        
+        # 任意：GC（ガベージコレクション）を明示的に呼び出す
+        import gc
+        if i % 10 == 0: # 10回ごとに掃除
+            gc.collect()
 
     print(f"Individual plots for {task_name} saved in {os.path.join(base_dir, task_name)}")
 
@@ -565,20 +611,20 @@ def test_MT(x_te, y_te, x_train, y_train, model, reg_list, scalers, output_dir, 
             plt.scatter(true.flatten(), pred.flatten(), color='royalblue', alpha=0.7)
             
             # IDのアノテーション
-            # if len(ids_flat) == len(true_flat):
-            #     # (★注意) データが多いと重なるため、件数が多い場合はコメントアウトを推奨
-            #     # print(f"INFO: タスク {reg} のプロットに {len(ids_flat)} 件のアノテーションを追加します。")
-            #     if len(ids_flat) <= 200: # 例: 200件以下ならアノテーション
-            #         for i in range(len(ids_flat)):
-            #             plt.annotate(
-            #                 ids_flat[i], (true_flat[i], pred_flat[i]),
-            #                 textcoords="offset points", xytext=(0, 5),
-            #                 ha='center', fontsize=6, alpha=0.5
-            #             )
-            #     else:
-            #         print(f"INFO: タスク {reg} のデータ件数 ({len(ids_flat)}) が多いため、アノテーションをスキップします。")
-            # else:
-            #      print(f"WARN: タスク {reg} の test_ids (len {len(ids_flat)}) と予測 (len {len(true_flat)}) の長さが異なります。アノテーションをスキップします。")
+            if len(ids_flat) == len(true_flat):
+                # (★注意) データが多いと重なるため、件数が多い場合はコメントアウトを推奨
+                # print(f"INFO: タスク {reg} のプロットに {len(ids_flat)} 件のアノテーションを追加します。")
+                if len(ids_flat) <= 200: # 例: 200件以下ならアノテーション
+                    for i in range(len(ids_flat)):
+                        plt.annotate(
+                            ids_flat[i], (true_flat[i], pred_flat[i]),
+                            textcoords="offset points", xytext=(0, 5),
+                            ha='center', fontsize=6, alpha=0.5
+                        )
+                else:
+                    print(f"INFO: タスク {reg} のデータ件数 ({len(ids_flat)}) が多いため、アノテーションをスキップします。")
+            else:
+                 print(f"WARN: タスク {reg} の test_ids (len {len(ids_flat)}) と予測 (len {len(true_flat)}) の長さが異なります。アノテーションをスキップします。")
 
             min_val = min(np.min(true), np.min(pred))
             max_val = max(np.max(true), np.max(pred))
@@ -1384,9 +1430,11 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                     device = device,
                                     batch_size = batch_size
                                     )
-        predicts, true, scores = test_MT(X_test,Y_test, X_val, Y_val, 
+        predicts, true, scores = test_MT(X_test,Y_test, 
+                                         #X_val, Y_val,
+                                         X_train, Y_train,  
                                                           model_trained,reg_list,scalers,output_dir=vis_dir,
-                                                          device = device, test_ids = test_ids,
+                                                          device = device, test_ids = test_ids, feature_names = features,
                                                           eval_reg= eval_reg, eval_class = eval_class, 
                                                           label_encoders = reg_encoders,
                                                           )

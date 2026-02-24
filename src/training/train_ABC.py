@@ -53,7 +53,7 @@ class CustomDatasetAdv(Dataset):
 
 class GABCOptimizer:
     def __init__(self, model, train_x, train_y, val_x, val_y, loss_fns, device, 
-                 n_bees=8, max_iter=5000, limit=10, c_factor=1.5):
+                 n_bees=30, max_iter=5000, limit=5, c_factor=1.5):
         # ... (初期化部分は元のコードと同じ) ...
         self.model = model
         self.train_x = train_x
@@ -87,6 +87,9 @@ class GABCOptimizer:
         self.best_params = None
         self.best_loss = float('inf')
 
+        self.l1_lambda = 0.01 # L1正則化の強さ
+        self.l2_lambda = 0.01 # L2正則化の強さ
+
     def _set_model_params(self, flat_params):
         """1次元ベクトルからモデルの各層にパラメータを戻す"""
         idx = 0
@@ -114,10 +117,22 @@ class GABCOptimizer:
             for task_id in data_y.keys():
                 target = data_y[task_id].to(self.device)
                 total_loss += self.loss_fns[task_id](outputs[task_id], target)
+            
+            # 2. 制約項（ペナルティ）の計算
+            l1_penalty = 0
+            l2_penalty = 0
+            
+            for param in self.model.parameters():
+                if param.requires_grad:
+                    l1_penalty += torch.norm(param, 1) # L1: 重みの絶対値の和
+                    l2_penalty += torch.norm(param, 2) # L2: 重みの平方和のルート
+            
+            # 3. 最終的な評価値（損失）の統合
+            total_loss = total_loss + (self.l1_lambda * l1_penalty) + (self.l2_lambda * l2_penalty)
                 
         return total_loss
 
-    def optimize(self, T=0.01):
+    def optimize(self, T=1.0):
         # 1. 初期評価
         for i in range(self.n_bees):
             self.fitness[i] = self._calculate_loss(self.population[i], mode='train')
