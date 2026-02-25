@@ -6,6 +6,7 @@ from sklearn.preprocessing import LabelEncoder
 import matplotlib.pyplot as plt
 import copy
 import platform
+from sklearn.preprocessing import StandardScaler
 
 import os
 import yaml
@@ -15,6 +16,7 @@ with open(yaml_path, "r", encoding="utf-8") as file:
     config = yaml.safe_load(file)['dataset.py']
 
 def pretrain_foundation(model_name, device, out_dir, latent_dim, 
+                        normalize = False, 
                         reg_list = config['reg_list2'], exclude_ids = config['exclude_ids2'],
                         ):
     
@@ -44,6 +46,12 @@ def pretrain_foundation(model_name, device, out_dir, latent_dim,
             label_encoders[reg] = le
 
     x_train,x_val,y_train,y_val = train_test_split(X, Y ,test_size = 0.3,random_state=0)
+
+    if normalize:
+        fp = StandardScaler()
+        x_train = pd.DataFrame(fp.fit_transform(x_train), columns=x_train.columns, index=x_train.index)
+        #x_val = fp.transform(x_val)
+        x_val = pd.DataFrame(fp.fit_transform(x_val), columns=x_val.columns, index=x_val.index)
 
     train_indices = y_train['index'].to_numpy()
     val_indices = y_val['index'].to_numpy()

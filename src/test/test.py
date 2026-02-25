@@ -1461,8 +1461,9 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         from src.test.test_FiLM import test_FiLM
         predicts, true, scores = test_FiLM(X_test,Y_test, labels_test,
                                            X_train, Y_train, labels_train, 
-                                                          model_trained,reg_list,scalers,output_dir=vis_dir,
+                                                          model_trained,reg_list,scalers, output_dir=vis_dir,
                                                           device = device, test_ids = test_ids, 
+                                                          feature_names = features, 
                                                           eval_reg= eval_reg, eval_class = eval_class,
                                                           label_encoders = reg_encoders, 
                                                           )

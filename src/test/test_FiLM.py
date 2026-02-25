@@ -159,7 +159,7 @@ def test_FiLM(x_te, y_te, label_te,
     
     # --- 3. タスクごとに結果を処理 ---
     for reg in reg_list:
-        save_shap_force_plots(model, reg, label_tr, x_train, x_te, feature_names=feature_names, test_ids=test_ids, output_dir=output_dir)
+        #save_shap_force_plots(model, reg, label_tr, x_train, x_te, feature_names=feature_names, test_ids=test_ids, output_dir=output_dir)
 
         scores[reg] = {}
         # 分類タスクの処理 (省略)

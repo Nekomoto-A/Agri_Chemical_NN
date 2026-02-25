@@ -343,18 +343,19 @@ import platform
 
 def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer, 
                           all_x, all_y, 
-                          feature_selection,num_selected_features, data_name, data_inte,
+                          feature_selection, num_selected_features, data_name, data_inte, 
                           labels, 
-                          val_size = config['val_size'],
+                          normalize = False, 
+                          val_size = config['val_size'], 
                           #transformer = config['transformer'],
                           #augmentation = config['augmentation'],
-                          data_augumentation = config['data_augumentation'],
-                          num_augumentation = config['num_augumentation'],
-                          data_vis = config['data_vis'],
-                          num_epochs = config['num_epochs'],
-                          batch_size = config['batch_size'],
-                          n_trials = config['n_trials'],
-                          hist = config['hist'],
+                          data_augumentation = config['data_augumentation'], 
+                          num_augumentation = config['num_augumentation'], 
+                          data_vis = config['data_vis'], 
+                          num_epochs = config['num_epochs'], 
+                          batch_size = config['batch_size'], 
+                          n_trials = config['n_trials'], 
+                          hist = config['hist'], 
                           clustering = config['clustering'],
                           marginal_hist_train = config['marginal_hist_train'],
 
@@ -375,6 +376,17 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
         y_train_split = y_train
     #print(x_train_split)
     #print(y_train_split)
+    #特徴量を正規化
+
+    if normalize:
+        fp = StandardScaler()
+        #x_train_split = fp.fit_transform(x_train_split)
+        x_train_split = pd.DataFrame(fp.fit_transform(x_train_split), columns=x_train_split.columns, index=x_train_split.index)
+        if isinstance(val_size, (int, float)):
+            #x_val = fp.transform(x_val)
+            x_val = pd.DataFrame(fp.fit_transform(x_val), columns=x_val.columns, index=x_val.index)
+        #x_test = fp.transform(x_test)
+        x_test = pd.DataFrame(fp.fit_transform(x_test), columns=x_test.columns, index=x_test.index)
 
     if data_inte:
         os_name = platform.system()

@@ -20,7 +20,7 @@ def apply_adabn(model, x_new, device, batch_size=32):
 
     # データをバッチ処理するためのDataLoader準備
     dataset = TensorDataset(x_new)
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=True)
 
     print("AdaBNによる適応を開始します...")
 
@@ -69,8 +69,8 @@ def train_adapted_model(
     model = AdaptedAutoencoder(pretrained_ae).to(device)
     
     # データの準備
-    train_loader = DataLoader(TensorDataset(x_train), batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(TensorDataset(x_val), batch_size=batch_size)
+    train_loader = DataLoader(TensorDataset(x_train), batch_size=batch_size, shuffle=True, drop_last=True)
+    val_loader = DataLoader(TensorDataset(x_val), batch_size=batch_size, shuffle=True, drop_last=True)
     
     # 最適化対象の設定（アダプターとデコーダー）
     optimizer = optim.Adam([
@@ -160,8 +160,8 @@ def train_adapted_model_cae(
     model = AdaptedConvolutionalAutoencoder(pretrained_ae).to(device)
     
     # 2. データの準備
-    train_loader = DataLoader(TensorDataset(x_train), batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(TensorDataset(x_val), batch_size=batch_size)
+    train_loader = DataLoader(TensorDataset(x_train), batch_size=batch_size, shuffle=True, drop_last=True)
+    val_loader = DataLoader(TensorDataset(x_val), batch_size=batch_size, drop_last=True)
     
     # 3. 最適化対象のパラメータを設定
     # CAEのデコーダーは複数のモジュールに分かれているため、
@@ -263,8 +263,8 @@ def retrain_model_cae(
     model = pretrained_ae
     
     # 2. データの準備
-    train_loader = DataLoader(TensorDataset(x_train), batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(TensorDataset(x_val), batch_size=batch_size)
+    train_loader = DataLoader(TensorDataset(x_train), batch_size=batch_size, shuffle=True, drop_last=True)
+    val_loader = DataLoader(TensorDataset(x_val), batch_size=batch_size, shuffle=True, drop_last=True)
 
     optimizer = optim.Adam(model.parameters(), lr=lr)
     criterion = nn.MSELoss()
@@ -286,6 +286,7 @@ def retrain_model_cae(
             
             optimizer.zero_grad()
             # CAEの出力 (reconstructed_x, encoded_features)
+            #print(inputs.shape)
             outputs, _ = model(inputs)
             
             # 入力と出力のサイズを合わせる (Ensure3Dの効果で outputs が (N, L) になっている想定)

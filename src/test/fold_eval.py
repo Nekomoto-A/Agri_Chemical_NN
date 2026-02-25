@@ -280,7 +280,8 @@ def fold_evaluate(reg_list, output_dir, device,
                   latent_dim = config['latent_dim'], 
                   embedding_size = config['embedding_size'], 
                   eval_reg = config['eval_reg'], 
-                  eval_class = config['eval_class'],
+                  eval_class = config['eval_class'], 
+                  normalize = config['feature_normalize'],
                   ):
     #if feature_selection_all:
     #   output_dir = os.path.join(fsdir, output_dir)
@@ -311,7 +312,7 @@ def fold_evaluate(reg_list, output_dir, device,
 
     if 'AE' in model_name:
         from src.training.training_foundation import pretrain_foundation
-        features_list, ae_dir = pretrain_foundation(model_name = model_name, device = device, out_dir = sub_dir, latent_dim = latent_dim)
+        features_list, ae_dir = pretrain_foundation(model_name = model_name, device = device, out_dir = sub_dir, latent_dim = latent_dim, normalize = normalize)
 
         if data_inte:
             X,Y,reg_encoders, _ = data_create(feature_path, target_path, reg_list, exclude_ids, feature_transformer='NON_TR',features_list=features_list)
@@ -394,7 +395,8 @@ def fold_evaluate(reg_list, output_dir, device,
                                                                                                                                                                                                                               num_selected_features = num_features_to_select,
                                                                                                                                                                                                                               data_name = feature_path,
                                                                                                                                                                                                                               data_inte=data_inte,
-                                                                                                                                                                                                                              labels = labels
+                                                                                                                                                                                                                              labels = labels, 
+                                                                                                                                                                                                                              normalize = normalize
                                                                                                                                                                                                                               )
         
         ids.append(test_ids)
