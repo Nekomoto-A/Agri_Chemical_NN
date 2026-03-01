@@ -944,6 +944,16 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                            n_labels = number_of_classes, 
                                            task_names =reg_list, 
                                            device = device)
+    
+    elif model_name == 'TabPFN':
+        from tabpfn_client import TabPFNClassifier
+        from tabpfn_client import TabPFNRegressor
+        model = {}
+        for reg in reg_list:
+            if torch.is_floating_point(Y_train[reg]):
+                model[reg] = TabPFNRegressor()
+            else:
+                model[reg] = TabPFNClassifier()
 
     elif 'AE' in model_name:
         if 'GMVAE' in model_name:
@@ -1241,6 +1251,15 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
 
         from src.test.test_BNN import test_BNN_MT
         predicts, true, scores = test_BNN_MT(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir)
+
+    elif model_name == 'TabPFN':
+        from src.training.train_TabPFN import training_TabPFN
+        model_trained = training_TabPFN(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val,
+                                        models = model, reg_list = reg_list, output_dir = vis_dir)
+        from src.test.test_TabPFN import test_TabPFN
+        predicts, true, scores = test_TabPFN(x_te = X_test,y_te_tensor = Y_test, x_train = X_train, y_train = Y_train, 
+                                             models = model_trained, reg_list = reg_list, scalers = scalers, output_dir = vis_dir,
+                                              test_ids = test_ids, eval_reg = eval_reg, eval_class = eval_class)
 
     elif model_name == 'HBM':
         from src.training.train_HBM import training_HBM

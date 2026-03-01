@@ -144,7 +144,7 @@ fold_eval.py:
   marginal_hist: False
   k_fold: 5
   feature_normalize: False
-  model_name: 'DCAE'
+  model_name: 'TabPFN'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
@@ -168,9 +168,9 @@ fold_eval.py:
     #'122_20_Miyz_Spin', #'228_21_Miyz_Edam'
 
     #'163_21_Miyz_Spin', '171_21_Miyz_Spin',
-    '141_21_Miyz_Spin', '146_21_Miyz_Spin',
-    '166_21_Miyz_Spin', '150_21_Miyz_Spin', 
-    '170_21_Miyz_Spin', #'156_21_Miyz_Spin', 
+    # '141_21_Miyz_Spin', '146_21_Miyz_Spin',
+    # '166_21_Miyz_Spin', '150_21_Miyz_Spin', 
+    # '170_21_Miyz_Spin', #'156_21_Miyz_Spin', 
     # '167_21_Miyz_Spin', 
     # '327_22_Niig_Pear', 
     # '330_22_Niig_Pear',
@@ -197,7 +197,7 @@ fold_eval.py:
   embedding_size: 8
   latent_dim: 64
 main.py:
-  result_dir: 'result_DCAE_Normal'
+  result_dir: 'result_TabPFN'
   reg_list: [
             # ['pref'], 
             # ['crop'], 
