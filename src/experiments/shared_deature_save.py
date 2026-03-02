@@ -116,6 +116,7 @@ def save_features(model, x_data, y_data_dict, output_dir, features, batch_size, 
         plt.ylabel('Frequency')
         plt.grid(axis='y', linestyle='--', alpha=0.7)
         hist_path = os.path.join(hist_dir, f'feature_{i}_histogram.png')
+        plt.tight_layout()
         plt.savefig(hist_path)
         plt.close()
 

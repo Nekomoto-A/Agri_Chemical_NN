@@ -59,6 +59,7 @@ def save_loss_plot(train_loss, val_loss, path):
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.legend()
+    plt.tight_layout()
     plt.savefig(path)
     plt.close()
     print(f"Loss plot saved to {path}")
@@ -841,6 +842,7 @@ def plot_tsne(
             plt.grid(True)
             
             save_path = os.path.join(output_dir, f'AE_tSNE_epoch_{epoch_str}_color_{label_name}.png')
+            plt.tight_layout()
             plt.savefig(save_path)
             plt.close()
             
@@ -866,6 +868,7 @@ def plot_tsne(
         plt.grid(True)
         
         save_path = os.path.join(output_dir, f'AE_tSNE_epoch_{epoch_str}_TrainVal.png')
+        plt.tight_layout()
         plt.savefig(save_path)
         plt.close()
         

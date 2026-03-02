@@ -476,6 +476,7 @@ def visualize_and_save_tsne(model, dataloader, device, output_dir, perplexity=30
         
         # 保存
         save_path = os.path.join(output_dir, f'middle_tsne_{key}.png')
+        plt.tight_layout()
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         plt.close()
         print(f"Saved: {save_path}")

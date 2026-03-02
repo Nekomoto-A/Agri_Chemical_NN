@@ -193,6 +193,7 @@ def evaluate_and_save_errors(model, data_tensor, indices, device, out_dir, filen
     plt.grid(axis='y', linestyle='--', alpha=0.7)
     
     hist_path = os.path.join(out_dir, f"{filename_prefix}_histogram.png")
+    plt.tight_layout()
     plt.savefig(hist_path)
     plt.close() # メモリ解放
     print(f"ヒストグラムを保存しました: {hist_path}")

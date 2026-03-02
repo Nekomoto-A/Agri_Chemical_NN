@@ -123,6 +123,7 @@ def save_shap_force_plots(model, task_name, label_emb, bg_tensor, test, feature_
         
         # ファイル名の設定と保存
         file_path = os.path.join(shap_path, f"force_plot_{task_name}_{sample_id}.png")
+        plt.tight_layout()
         plt.savefig(file_path, bbox_inches='tight', dpi=150)
         plt.close() # メモリ解放
 
@@ -269,7 +270,7 @@ def test_FiLM(x_te, y_te, label_te,
             plt.title(f'True vs Predicted for {reg}')
             plt.legend()
             plt.grid(True)
-
+            plt.tight_layout()
             plt.savefig(os.path.join(result_dir, 'true_predict.png'))
             plt.close()
             
@@ -280,6 +281,7 @@ def test_FiLM(x_te, y_te, label_te,
             plt.xlabel("True - Predicted")
             plt.ylabel("Frequency")
             plt.grid(True)
+            plt.tight_layout()
             plt.savefig(os.path.join(result_dir, 'loss_hist.png'))
             plt.close()
 

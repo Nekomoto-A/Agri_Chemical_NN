@@ -86,7 +86,7 @@ def training_HBM(x_tr, y_tr, label_tr,#output_dim,
         plt.title(f'True vs Predicted for {reg}')
         plt.legend()
         plt.grid(True)
-
+        plt.tight_layout()
         plt.savefig(train_true_dir)
         plt.close()
 
@@ -99,6 +99,7 @@ def training_HBM(x_tr, y_tr, label_tr,#output_dim,
     plt.xlabel("Iteration")
     plt.ylabel("Loss (Negative ELBO / N)")
     plt.grid(True)
+    plt.tight_layout()
     plt.savefig(train_dir)
     plt.close()
 

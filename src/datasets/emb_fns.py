@@ -71,16 +71,22 @@ def onehot_encode_and_split(train_labels, val_labels, test_labels):
     for key in keys:
         # 各データの取得
         t_tensor = train_labels[key]
-        v_tensor = val_labels[key]
+        if val_labels[key] is not None:
+            v_tensor = val_labels[key]
+        else:
+            v_tensor = None
         te_tensor = test_labels[key]
         
         # 元の長さを記録（あとで分割するため）
         len_t = len(t_tensor)
-        len_v = len(v_tensor)
+        len_v = len(v_tensor) if v_tensor is not None else 0
         len_te = len(te_tensor)
         
         # 1. データを結合する (次元0で結合)
-        combined = torch.cat([t_tensor, v_tensor, te_tensor], dim=0)
+        if v_tensor is not None:
+            combined = torch.cat([t_tensor, v_tensor, te_tensor], dim=0)
+        else:
+            combined = torch.cat([t_tensor, te_tensor], dim=0)
         
         # 型をLong(整数)に変換（one_hotは整数入力を求めるため）
         combined = combined.to(torch.int64)
@@ -91,15 +97,22 @@ def onehot_encode_and_split(train_labels, val_labels, test_labels):
         
         # 3. 元のデータセットごとに再分割
         out_train[key] = combined_onehot[:len_t]
-        out_val[key]   = combined_onehot[len_t : len_t + len_v]
+        if v_tensor is not None:
+            out_val[key]   = combined_onehot[len_t : len_t + len_v]
         out_test[key]  = combined_onehot[len_t + len_v :]
 
     # 4. 出力形式の調整（ラベルが1種類のみか、複数か）
     if len(keys) == 1:
         single_key = keys[0]
-        return out_train[single_key], out_val[single_key], out_test[single_key]
+        if v_tensor is not None:
+            return out_train[single_key], out_val[single_key], out_test[single_key]
+        else:
+            return out_train[single_key], None, out_test[single_key]
     else:
-        return out_train, out_val, out_test
+        if v_tensor is not None:
+            return out_train, out_val, out_test
+        else:
+            return out_train, None, out_test
 
 import torch
 import numpy as np
@@ -174,11 +187,17 @@ def w2v_encode_and_split(train_labels, val_labels, test_labels, label_encoders, 
     for key in keys:
         # 1. データの取得と結合
         t_tensor = train_labels[key]
-        v_tensor = val_labels[key]
+        if val_labels[key] is not None:
+            v_tensor = val_labels[key]
+        else:
+            v_tensor = None
         te_tensor = test_labels[key]
         
-        len_t, len_v, len_te = len(t_tensor), len(v_tensor), len(te_tensor)
-        combined = torch.cat([t_tensor, v_tensor, te_tensor], dim=0)
+        len_t, len_v, len_te = len(t_tensor), len(v_tensor) if v_tensor is not None else 0, len(te_tensor)
+        if v_tensor is not None:
+            combined = torch.cat([t_tensor, v_tensor, te_tensor], dim=0)
+        else:
+            combined = torch.cat([t_tensor, te_tensor], dim=0)
         
         # 2. LabelEncoderを使って数値から元の文字列ラベルに逆変換
         # sklearnはnumpy配列を期待するため一旦変換します
@@ -209,9 +228,15 @@ def w2v_encode_and_split(train_labels, val_labels, test_labels, label_encoders, 
     # 5. 出力形式の調整
     if len(keys) == 1:
         single_key = keys[0]
-        return out_train[single_key], out_val[single_key], out_test[single_key]
+        if v_tensor is not None:
+            return out_train[single_key], out_val[single_key], out_test[single_key]
+        else:
+            return out_train[single_key], None, out_test[single_key]
     else:
-        return out_train, out_val, out_test
+        if v_tensor is not None:
+            return out_train, out_val, out_test
+        else:
+            return out_train, None, out_test
     
 def concat_encode_and_split(train_labels, val_labels, test_labels,):
     """
@@ -235,9 +260,12 @@ def concat_encode_and_split(train_labels, val_labels, test_labels,):
     train_list_2d = [t.unsqueeze(-1) for t in train_list]
     out_train = torch.cat(train_list_2d, dim=1)
     
-    val_list = list(val_labels.values())
-    val_list_2d = [t.unsqueeze(-1) for t in val_list]
-    out_val = torch.cat(val_list_2d, dim=1)
+    if val_labels is not None:
+        val_list = list(val_labels.values())
+        val_list_2d = [t.unsqueeze(-1) for t in val_list]
+        out_val = torch.cat(val_list_2d, dim=1)
+    else:
+        out_val = None
     
     test_list = list(test_labels.values())
     test_list_2d = [t.unsqueeze(-1) for t in test_list]

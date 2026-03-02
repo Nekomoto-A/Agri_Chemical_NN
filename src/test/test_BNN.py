@@ -193,6 +193,7 @@ def test_BNN_MT(
             plt.title(f'True vs Predicted (BNN) for {reg}')
             plt.legend()
             plt.grid(True)
+            plt.tight_layout()
             plt.savefig(os.path.join(result_dir, 'true_predict_with_ci_bnn.png'))
             plt.close()
             
@@ -203,6 +204,7 @@ def test_BNN_MT(
             plt.xlabel("True - Predicted (Mean)")
             plt.ylabel("Frequency")
             plt.grid(True)
+            plt.tight_layout()
             plt.savefig(os.path.join(result_dir, 'loss_hist_bnn.png'))
             plt.close()
 

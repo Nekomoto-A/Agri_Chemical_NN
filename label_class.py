@@ -54,6 +54,7 @@ def save_overall_analysis(df, output_dir, file_prefix='overall'):
     plt.xlabel('Predicted Label')
     
     img_path = os.path.join(output_dir, f'{file_prefix}_heatmap.png')
+    plt.tight_layout()
     plt.savefig(img_path)
     plt.close() # メモリ解放
 

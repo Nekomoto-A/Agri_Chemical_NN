@@ -356,6 +356,7 @@ class NUTSGPRunner:
         # 3. 事後分布のプロット
         print("\nPlotting Posterior Distributions...")
         az.plot_posterior(data, var_names=target_vars)
+        plt.tight_layout()
         plt.save(os.path.join(output_dir, "posterior_distributions.png"))
         #plt.show()
 

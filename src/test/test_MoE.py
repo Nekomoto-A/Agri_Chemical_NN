@@ -70,6 +70,7 @@ def test_shap(x_tr, x_te,model,reg_list, features, output_dir):
         # x_te の代わりに変換した x_te_numpy を渡す
         #shap.summary_plot(shap_values, x_te_numpy, feature_names=features, plot_type="bar", show=False)
         shap.summary_plot(shap_values[0], x_te_numpy, feature_names=features, plot_type="bar", show=False)
+        plt.tight_layout()
         plt.savefig(save_path_bar, bbox_inches='tight')
         plt.close()
         print(f"  - サマリープロット（バー）を {save_path_bar} に保存しました。")
@@ -311,6 +312,7 @@ def test_MoE(x_te, y_te, model, reg_list, scalers, output_dir, device, n_samples
             plt.title(f'True vs Predicted for {reg}')
             plt.legend()
             plt.grid(True)
+            plt.tight_layout()
             plt.savefig(os.path.join(result_dir, 'true_predict_with_ci.png'))
             plt.close()
             
@@ -321,6 +323,7 @@ def test_MoE(x_te, y_te, model, reg_list, scalers, output_dir, device, n_samples
             plt.xlabel("True - Predicted")
             plt.ylabel("Frequency")
             plt.grid(True)
+            plt.tight_layout()
             plt.savefig(os.path.join(result_dir, 'loss_hist.png'))
             plt.close()
 

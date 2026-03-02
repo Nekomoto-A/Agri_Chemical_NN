@@ -39,7 +39,7 @@ def save_cluster_histograms_plt(data, features, cluster_col, output_dir, save_di
         ax.legend(title='Cluster')
         ax.grid(axis='y', linestyle='--', alpha=0.7)
         save_path = os.path.join(hist_dir, f'{feature}.png')
-        
+        plt.tight_layout()
         plt.savefig(save_path)
         plt.close(fig)
     print(f"ヒストグラムを '{save_dir}' ディレクトリに保存しました。")
@@ -83,7 +83,7 @@ def find_optimal_clusters(data, features, output_dir,save_dir, max_clusters = 10
     out_dir = os.path.join(output_dir, save_dir)
     os.makedirs(out_dir,exist_ok=True)
     sil_dir = os.path.join(output_dir, "silhouette_scores.png")
-
+    plt.tight_layout()
     plt.savefig(sil_dir)
     plt.close()
     print(f"\nシルエット係数の推移グラフを{sil_dir}に保存しました。")

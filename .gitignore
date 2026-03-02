@@ -5,3 +5,7 @@ lasso_*
 datas*
 runs
 output_*
+tabpfn_key.yaml
+__pycache__/
+*.pyc
+.env

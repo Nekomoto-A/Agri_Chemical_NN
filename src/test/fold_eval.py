@@ -255,6 +255,7 @@ def save_tsne_plots(X, Y, target_columns, save_dir="tsne_results"):
         # 4. 図の保存
         filename = f"tsne_{col}.png"
         filepath = os.path.join(save_dir, filename)
+        plt.tight_layout()
         plt.savefig(filepath)
         plt.close()
         print(f"保存完了: {filepath}")
@@ -315,14 +316,14 @@ def fold_evaluate(reg_list, output_dir, device,
         features_list, ae_dir = pretrain_foundation(model_name = model_name, device = device, out_dir = sub_dir, latent_dim = latent_dim, normalize = normalize)
 
         if data_inte:
-            X,Y,reg_encoders, _ = data_create(feature_path, target_path, reg_list, exclude_ids, feature_transformer='NON_TR',features_list=features_list)
+            X,Y,reg_encoders, _ = data_create(feature_path, target_path, reg_list, exclude_ids, output_dir=output_dir, feature_transformer='NON_TR',features_list=features_list)
         else:
-            X,Y,reg_encoders, _ = data_create(feature_path, target_path, reg_list, exclude_ids,features_list=features_list)
+            X,Y,reg_encoders, _ = data_create(feature_path, target_path, reg_list, exclude_ids, output_dir=output_dir, features_list=features_list)
     else:
         if data_inte:
-            X,Y,reg_encoders, _ = data_create(feature_path, target_path, reg_list, exclude_ids, feature_transformer='NON_TR',)
+            X,Y,reg_encoders, _ = data_create(feature_path, target_path, reg_list, exclude_ids, output_dir=output_dir, feature_transformer='NON_TR',)
         else:
-            X,Y,reg_encoders, _ = data_create(feature_path, target_path, reg_list, exclude_ids)
+            X,Y,reg_encoders, _ = data_create(feature_path, target_path, reg_list, exclude_ids, output_dir=output_dir)
         
         ae_dir = None
     
@@ -342,6 +343,7 @@ def fold_evaluate(reg_list, output_dir, device,
             plt.title('Histogram of Data')
             plt.xlabel('Value')
             plt.ylabel('Frequency')
+            plt.tight_layout()
             #plt.grid(True)
             plt.savefig(hist_dir)
             plt.close()
@@ -663,6 +665,7 @@ def fold_evaluate(reg_list, output_dir, device,
                 plt.ylabel('Frequency')
                 #plt.grid(True)
                 plt.legend()
+                plt.tight_layout()
                 plt.savefig(all_hist_path)
                 plt.close()
 
@@ -863,6 +866,7 @@ def loop_evaluate(reg_list, output_dir, device,
             
             # ファイルとして保存
             save_path = os.path.join(fsdir, f'performance_{target}_{start_features}~{end_features}.png')
+            plt.tight_layout()
             plt.savefig(save_path)
             plt.close(fig)  # メモリを解放するために図を閉じる
 

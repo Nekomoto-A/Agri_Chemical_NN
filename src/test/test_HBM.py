@@ -119,7 +119,7 @@ def test_HBM(x_te, y_te, label_te,
             plt.title(f'True vs Predicted for {reg}')
             plt.legend()
             plt.grid(True)
-
+            plt.tight_layout()
             plt.savefig(os.path.join(result_dir, 'true_predict_with_ci.png'))
             plt.close()
             
@@ -130,6 +130,7 @@ def test_HBM(x_te, y_te, label_te,
             plt.xlabel("True - Predicted")
             plt.ylabel("Frequency")
             plt.grid(True)
+            plt.tight_layout()
             plt.savefig(os.path.join(result_dir, 'loss_hist.png'))
             plt.close()
 

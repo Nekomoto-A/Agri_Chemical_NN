@@ -54,6 +54,7 @@ def test_pls_sem(x_te,y_te,model,reg_list,features, scalers,output_dir, ):
         plt.scatter(true,output)
         plt.xlabel('true_data')
         plt.ylabel('predicted_data')
+        plt.tight_layout()
         plt.savefig(TP_dir)
         plt.close()
 
@@ -64,6 +65,7 @@ def test_pls_sem(x_te,y_te,model,reg_list,features, scalers,output_dir, ):
         plt.ylabel("Frequency")
         plt.grid(True)
         #plt.show()
+        plt.tight_layout()
         plt.savefig(hist_dir)
         plt.close()
 

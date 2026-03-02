@@ -12,6 +12,7 @@ def plot_gradients_histogram(model, step, save_path=None):
     plt.ylabel('Frequency')
     plt.legend()
     plt.grid(True)
+    plt.tight_layout()
     if save_path:
         plt.savefig(save_path)
         plt.close()

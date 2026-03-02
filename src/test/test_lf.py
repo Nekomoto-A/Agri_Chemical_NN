@@ -92,6 +92,7 @@ def test_stacking(x_te, y_te, final_models,meta_model, reg_list, scalers, output
 
         plt.xlabel('true_data')
         plt.ylabel('predicted_data')
+        plt.tight_layout()
         plt.savefig(TP_dir)
         plt.close()
 
@@ -102,6 +103,7 @@ def test_stacking(x_te, y_te, final_models,meta_model, reg_list, scalers, output
         plt.ylabel("Frequency")
         plt.grid(True)
         #plt.show()
+        plt.tight_layout()
         plt.savefig(hist_dir)
         plt.close()
 

@@ -318,6 +318,7 @@ def training_MT_PNN_gamma(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir, mod
             plt.title(f"Train/Validation Loss for {reg}")
             plt.legend()
             plt.grid(True)
+            plt.tight_layout()
             plt.savefig(train_loss_history_dir)
             plt.close()
 

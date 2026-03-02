@@ -131,7 +131,7 @@ def test_GP_NUTS(x_te, y_te, x_tr, y_tr, runner, reg_list,
             plt.title(f'True vs Predicted with Uncertainty for {reg}')
             plt.legend()
             plt.grid(True, linestyle='--', alpha=0.7)
-
+            plt.tight_layout()
             plt.savefig(os.path.join(result_dir, 'true_predict_with_uncertainty.png'))
             plt.close()
             

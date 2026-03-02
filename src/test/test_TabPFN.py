@@ -12,6 +12,7 @@ import mpld3
 import yaml
 import os
 
+
 def normalized_medae_iqr(y_true, y_pred):
     """
     中央絶対誤差（MedAE）を四分位範囲（IQR）で正規化した、
@@ -123,6 +124,7 @@ def save_shap_force_plots(model, task_name, label_emb, bg_tensor, test, feature_
         
         # ファイル名の設定と保存
         file_path = os.path.join(shap_path, f"force_plot_{task_name}_{sample_id}.png")
+        plt.tight_layout()
         plt.savefig(file_path, bbox_inches='tight', dpi=150)
         plt.close() # メモリ解放
 
@@ -138,16 +140,14 @@ from sklearn.metrics import confusion_matrix, classification_report
 def test_TabPFN(x_te, y_te_tensor, 
               x_train, y_train, 
               models, reg_list, scalers, output_dir, 
-              test_ids,
+              test_ids, feature_names, 
               eval_reg, eval_class,
               label_encoders = None
               ):
     x_te = x_te.cpu().detach().numpy()
-    
     y_te = {reg: y.cpu().detach().numpy() for reg, y in y_te_tensor.items()}
 
     x_train = x_train.cpu().detach().numpy()
-    
     y_train = {reg: y.cpu().detach().numpy() for reg, y in y_train.items()}
 
     predicts, trues = {}, {}
@@ -156,7 +156,39 @@ def test_TabPFN(x_te, y_te_tensor,
     # --- 3. タスクごとに結果を処理 ---
     for reg in reg_list:
         output = models[reg].predict(x_te)
-        #save_shap_force_plots(model, reg, label_tr, x_train, x_te, feature_names=feature_names, test_ids=test_ids, output_dir=output_dir)
+
+        # # 1. バッチ処理を行うためのラッパー関数を定義
+        # def batched_predict(data):
+        #     batch_size = 100  # メモリ状況に応じて調整（小さくするとメモリ消費が減ります）
+        #     predictions = []
+        #     for i in range(0, len(data), batch_size):
+        #         batch = data[i:i + batch_size]
+        #         # TabPFNで予測を実行
+        #         pred = models[reg].predict(batch)
+        #         predictions.append(pred)
+        #     return np.concatenate(predictions)
+        # explainer = shap.KernelExplainer(batched_predict, shap.sample(x_train, 50))
+        
+        # shap_values = explainer.shap_values(x_te) # 計算時間を考慮し20件のみ
+        # shap_dir = os.path.join(output_dir, 'shap_results')
+        # os.makedirs(shap_dir, exist_ok=True)
+        # # 3. 描画の設定
+        # plt.figure(figsize=(12, 8)) # 図のサイズを調整
+        # # 4. Summary Plotの作成
+        # # show=False にすることで、即座に表示せずファイル保存を優先する
+        # shap.summary_plot(
+        #     shap_values, 
+        #     x_te, 
+        #     feature_names=feature_names, 
+        #     show=False
+        # )
+        # # 5. タイトルの追加（任意）
+        # plt.title(f"SHAP Summary Plot - {reg}")
+        # # 6. 保存とクローズ
+        # save_path = os.path.join(shap_dir, f"shap_summary_{reg}.png")
+        # plt.tight_layout()
+        # plt.savefig(save_path, bbox_inches='tight', dpi=300)
+        # plt.close() # メモリ解放のために閉じる
 
         scores[reg] = {}
         # 分類タスクの処理 (省略)
@@ -207,12 +239,12 @@ def test_TabPFN(x_te, y_te_tensor,
                     pred, coff = apply_smearing_yeo_johnson(scaler,y_train_log1p, y_train_pred_log1p, pred_log)
                 else:
                     # --- 通常のスケーリング解除 ---
-                    pred = scaler.inverse_transform(pred_tensor_for_eval.cpu().detach().numpy())
+                    pred = scaler.inverse_transform(pred_tensor_for_eval.reshape(-1, 1))
                 #pred = scaler.inverse_transform(pred_tensor_for_eval.cpu().detach().numpy())
             else:
                 # スケーラーなし
                 pred = pred_tensor_for_eval
-                true = true_tensor        
+                true = true_tensor
 
             # --- 3-3. (★) MC Dropout 結果のCSV保存 ---
             # ( ... 元のコードと同じ ... )
@@ -221,7 +253,7 @@ def test_TabPFN(x_te, y_te_tensor,
             true_flat = true.flatten()
             pred_flat = pred.flatten()
             
-            predicts[reg], trues[reg] = pred, true
+            predicts[reg], trues[reg] = pred.reshape(-1,1), true.reshape(-1,1)
             
             # --- 4. 結果のプロット（エラーバー付き） ---
             # ( ... 元のコードと同じ ... )
@@ -254,7 +286,7 @@ def test_TabPFN(x_te, y_te_tensor,
             plt.title(f'True vs Predicted for {reg}')
             plt.legend()
             plt.grid(True)
-
+            plt.tight_layout()
             plt.savefig(os.path.join(result_dir, 'true_predict.png'))
             plt.close()
             
@@ -265,6 +297,7 @@ def test_TabPFN(x_te, y_te_tensor,
             plt.xlabel("True - Predicted")
             plt.ylabel("Frequency")
             plt.grid(True)
+            plt.tight_layout()
             plt.savefig(os.path.join(result_dir, 'loss_hist.png'))
             plt.close()
 

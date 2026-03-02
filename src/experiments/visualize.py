@@ -280,6 +280,7 @@ def visualize_tsne_film(model, X, L, Y, reg_list, output_dir, file_name, batch_s
     
     plt.title(f"t-SNE clustered by Input Labels\n{file_name}")
     plt.legend()
+    plt.tight_layout()
     plt.savefig(os.path.join(output_dir, f"tsne_by_label_{file_name}.png"))
     plt.close()
 
@@ -321,5 +322,6 @@ def visualize_tsne_film(model, X, L, Y, reg_list, output_dir, file_name, batch_s
             plt.colorbar(scatter, label=reg)
 
         plt.title(f"t-SNE colored by {reg}\n{file_name}")
+        plt.tight_layout()
         plt.savefig(os.path.join(reg_dir, f"tsne_by_target_{file_name}.png"))
         plt.close()

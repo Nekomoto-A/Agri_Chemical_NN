@@ -166,6 +166,7 @@ def plot_t_distribution_pdf(model, x_sample, y_true_sample, reg_name, device, ou
     plt.fill_between(y_range_log.cpu().numpy(), pdf_values, alpha=0.2) # 塗りつぶし
 
     # グラフを保存
+    plt.tight_layout()
     plt.savefig(output_path)
     print(f"予測t分布のPDFグラフを {output_path} に保存しました。")
     plt.close()
@@ -387,6 +388,7 @@ def training_MT_PNN_t(x_tr,x_val,y_tr,y_val,model, reg_list, output_dir, model_n
             plt.title(f"Loss History for Task: {reg}")
             plt.legend()
             plt.grid(True)
+            plt.tight_layout()
             plt.savefig(train_loss_history_dir)
             plt.close()
 

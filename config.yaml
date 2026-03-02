@@ -4,7 +4,7 @@ MT_CNN_Attention.py:
   shared_layers: [(64,3,1,1)]
 dataset.py:
   non_outlier: None
-  val_size: 0.3
+  val_size: None
   level: 7
   feature_transformer: 'ILR'
   softlabel: True
@@ -27,8 +27,8 @@ dataset.py:
   exclude_ids2: []
   combat: False
   stats_features: ['crop', 'pref', 'lati', 'long']
-  sparce_drop: False
-  drop_threshold: 0.01
+  sparce_drop: True
+  drop_threshold: 0.05
 train.py:
   early_stopping: True
   patience: 20
@@ -123,6 +123,9 @@ train_GP_NUTS.py:
   num_samples: 200
   warmup_steps: 300
   num_chains: 1
+train_TabPFN.py:
+  optune: False
+  n_trials: 50
 test.py:
   loss_sum: 'WeightedSUM' #'SUM' #
   num_predictive_samples: 100
@@ -188,7 +191,7 @@ fold_eval.py:
   feature_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\taxon_data\lv6.csv' #C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\lv6.csv #
   target_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\chem_data.xlsx' #C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\chem_data.xlsx #
   data_inte: False
-  transformer: ['YJ', None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
+  transformer: ['RS', None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
   reg_loss_fanction: ['mse', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
   eval_reg: ['R2', 'MedAE', 'MAE', 'RMSLE', 'RMSE']
   eval_class: ['Accuracy', 'F1score']
@@ -197,7 +200,7 @@ fold_eval.py:
   embedding_size: 8
   latent_dim: 64
 main.py:
-  result_dir: 'result_TabPFN'
+  result_dir: 'result_TabPFN_notop'
   reg_list: [
             # ['pref'], 
             # ['crop'], 
@@ -220,14 +223,14 @@ main.py:
             # ['APCP_Feb_me'],
             # ['APCP_Jan_me'],
 
-            #[NH4.N], 
+            [NH4.N], 
             ['Available.P'], 
-            #['pH'],
-            #['NO3.N'], 
-            #['EC'], 
-            #['Humus'], 
-            #['Exchangeable.K'], 
-            #['CEC'], 
+            ['pH'], 
+            ['NO3.N'], 
+            ['EC'], 
+            ['Humus'], 
+            ['Exchangeable.K'], 
+            ['CEC'], 
             # ['pH_dry_soil', 'available_P', 'EC_electric_conductivity', 'Total_C', 'Total_N']
             #['pH', 'Available.P'] 
   ]

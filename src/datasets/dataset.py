@@ -82,7 +82,8 @@ def drop_sparse_columns(df, threshold=0.1):
     return df[keep_columns]
 
 class data_create:
-    def __init__(self,path_asv,path_chem,reg_list,exclude_ids, label_list = None, feature_transformer = config['feature_transformer'], 
+    def __init__(self,path_asv,path_chem,reg_list,exclude_ids, output_dir, 
+                 label_list = None, feature_transformer = config['feature_transformer'], 
                  #label_data = config['labels'], 
                  unknown_drop  = config['unknown_drop'], non_outlier = config['non_outlier'], 
                  sparce_drop = config['sparce_drop'], drop_threshold = config['drop_threshold'], 
@@ -104,6 +105,8 @@ class data_create:
 
         self.sparce_drop = sparce_drop
         self.drop_threshold = drop_threshold
+
+        self.output_dir = output_dir
 
     def __iter__(self):
         if self.features_list is not None:
@@ -165,6 +168,15 @@ class data_create:
                 tax_sorted = tax_split.sort_values(by=tax_levels)
                 # 並び替えた分類名で元のデータフレームの列順を並び替え
                 asv_data = asv_data[tax_sorted.index]
+                non_zero_ratio = (asv_data != 0).apply(lambda x: x.dropna().sum()) / len(asv_data)
+
+                # 3. 結果をDataFrameに変換して整形
+                result_df = non_zero_ratio.to_frame(name='non_zero_percentage')
+
+                # 4. CSVファイルとして保存
+                output_filename = 'features_non_zero_ratios.csv'
+                columns_to_drop_dir = os.path.join(self.output_dir, output_filename)
+                result_df.to_csv(columns_to_drop_dir, index=True)
 
                 if self.sparce_drop:
                     asv_data = drop_sparse_columns(asv_data, threshold = self.drop_threshold)
@@ -842,18 +854,23 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
             
         if label == 'experimental_purpose':
             filler_series_train = y_train_split['pref'].astype(str) + '_' + y_train_split['crop'].astype(str)
-            y_val[label] = y_val['pref'].astype(str) + '_' + y_val['crop'].astype(str)
+            if isinstance(val_size, (int, float)):
+                y_val[label] = y_val['pref'].astype(str) + '_' + y_val['crop'].astype(str)
             y_test[label] = y_test['pref'].astype(str) + '_' + y_test['crop'].astype(str)
             y_train_split['experimental_purpose'].fillna(filler_series_train, inplace=True)
 
         y_train_split['data_type'] = 'train'
         y_test['data_type'] = 'test'
-        y_val['data_type'] = 'valid'
+        if isinstance(val_size, (int, float)):
+            y_val['data_type'] = 'valid'
 
         #visualize_tsne_with_missing_values(X = X_train_tensor, Y = y_train_split[label].values, save_dir = fold, filename = f"tsne_{label}.png")
         visualize_tsne_with_categorical_labels(X = X_train_tensor, Y_series = y_train_split[label], save_dir = fold, filename = f"tsne_{label}.png")
 
-        all_df = pd.concat([y_train_split, y_test, y_val], ignore_index=True)
+        if isinstance(val_size, (int, float)):
+            all_df = pd.concat([y_train_split, y_test, y_val], ignore_index=True)
+        else:
+            all_df = pd.concat([y_train_split, y_test], ignore_index=True)
         le = LabelEncoder()
         
         #print(all_df[label])
@@ -863,11 +880,17 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
 
         y_train_split = all_df[all_df['data_type'] == 'train'].reset_index(drop=True)
         y_test = all_df[all_df['data_type'] == 'test'].reset_index(drop=True)
-        y_val = all_df[all_df['data_type'] == 'valid'].reset_index(drop=True)
+        if isinstance(val_size, (int, float)):
+            y_val = all_df[all_df['data_type'] == 'valid'].reset_index(drop=True)
+        else:
+            y_val = None
 
         label_train_tensor[label] = torch.tensor(y_train_split[label].values.reshape(-1), dtype=torch.int64)
         label_test_tensor[label] = torch.tensor(y_test[label].values.reshape(-1), dtype=torch.int64)
-        label_val_tensor[label] = torch.tensor(y_val[label].values.reshape(-1), dtype=torch.int64)
+        if y_val is not None:
+            label_val_tensor[label] = torch.tensor(y_val[label].values.reshape(-1), dtype=torch.int64)
+        else:
+            label_val_tensor[label] = None
 
         #print(f'{label}:{label_train_tensor}')
 

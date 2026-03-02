@@ -429,6 +429,7 @@ def save_individual_shap_plots(explainer, shap_df, test_data_tensor, ids, task_n
         # plt.close()
         fig1 = plt.figure(figsize=(10, 6)) # インスタンスを変数に入れる
         shap.plots.waterfall(exp, show=False)
+        plt.tight_layout()
         plt.savefig(os.path.join(waterfall_dir, f"waterfall_{sample_id}.png"), bbox_inches='tight')
         plt.clf()   # 現在のフィギュアの内容をクリア
         plt.close(fig1) # 特定のフィギュアを確実に閉じる
@@ -477,6 +478,7 @@ def save_individual_shap_plots(explainer, shap_df, test_data_tensor, ids, task_n
         )
         
         # 保存処理
+        plt.tight_layout()
         plt.savefig(os.path.join(force_dir, f"force_{sample_id}.png"), bbox_inches='tight')
         plt.clf()
         plt.close(fig2)
@@ -634,7 +636,7 @@ def test_MT(x_te, y_te, x_train, y_train, model, reg_list, scalers, output_dir, 
             plt.title(f'True vs Predicted for {reg}')
             plt.legend()
             plt.grid(True)
-
+            plt.tight_layout()
             plt.savefig(os.path.join(result_dir, 'true_predict_with_ci.png'))
             plt.close()
             
@@ -645,6 +647,7 @@ def test_MT(x_te, y_te, x_train, y_train, model, reg_list, scalers, output_dir, 
             plt.xlabel("True - Predicted")
             plt.ylabel("Frequency")
             plt.grid(True)
+            plt.tight_layout()
             plt.savefig(os.path.join(result_dir, 'loss_hist.png'))
             plt.close()
 
@@ -851,6 +854,7 @@ def save_reconstruction_plots(model, dataloader, device, feature_names, save_dir
         clean_name = re.sub(r'[\\/:*?"<>|;\[\]]', '_', genus_name)
         
         filename = os.path.join(save_dir, f"dim{i}_{clean_name}.png")
+        plt.tight_layout()
         #print(filename)
         plt.savefig(filename)
         plt.close() # メモリ解放のために閉じる
@@ -946,14 +950,34 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                            device = device)
     
     elif model_name == 'TabPFN':
-        from tabpfn_client import TabPFNClassifier
-        from tabpfn_client import TabPFNRegressor
+        os.environ["SCIPY_ARRAY_API"] = "1"
+        yaml_path = 'tabpfn_key.yaml'
+        with open(yaml_path, "r", encoding="utf-8") as file:
+            config_key = yaml.safe_load(file)
+        os.environ["HF_TOKEN"] = config_key['HF_TOKEN']
+        
+        device_name = (
+            "cuda"
+            if torch.cuda.is_available()
+            else "mps"
+            if torch.backends.mps.is_available()
+            else "cpu"
+        )
+        # from tabpfn_client import TabPFNClassifier
+        # from tabpfn_client import TabPFNRegressor
+        from tabpfn import TabPFNClassifier, TabPFNRegressor
         model = {}
         for reg in reg_list:
             if torch.is_floating_point(Y_train[reg]):
-                model[reg] = TabPFNRegressor()
+                model[reg] = TabPFNRegressor(
+                    device=device_name
+                    #device='cpu'
+                    )
             else:
-                model[reg] = TabPFNClassifier()
+                model[reg] = TabPFNClassifier(
+                    device=device_name
+                    #device='cpu'
+                    )
 
     elif 'AE' in model_name:
         if 'GMVAE' in model_name:
@@ -1259,7 +1283,8 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         from src.test.test_TabPFN import test_TabPFN
         predicts, true, scores = test_TabPFN(x_te = X_test,y_te_tensor = Y_test, x_train = X_train, y_train = Y_train, 
                                              models = model_trained, reg_list = reg_list, scalers = scalers, output_dir = vis_dir,
-                                              test_ids = test_ids, eval_reg = eval_reg, eval_class = eval_class)
+                                              test_ids = test_ids, feature_names=features, 
+                                              eval_reg = eval_reg, eval_class = eval_class)
 
     elif model_name == 'HBM':
         from src.training.train_HBM import training_HBM
@@ -1690,11 +1715,6 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
     if len(reg_list) > 1:
         #out_csv = os.path.join(vis_dir, 'loss.csv')
         for reg, ax in zip(reg_list, axes):
-            #predictions.setdefault(method, {}).setdefault(reg, []).append(predicts[reg])
-            #trues.setdefault(method, {}).setdefault(reg, []).append(true[reg])
-
-            #if 'CNN' in model_name:
-            #print(f'test_ids = {test_ids.to_numpy().ravel()}')
             loss = np.abs(predicts[reg]-true[reg])
             ax.bar(
                 x_positions, loss.ravel(), 
@@ -1718,7 +1738,9 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
 
     else:
         if np.issubdtype(true[reg_list[0]].dtype, np.floating):
-            #out_csv = os.path.join(vis_dir, f'loss_{reg_list[0]}.csv')        
+            #out_csv = os.path.join(vis_dir, f'loss_{reg_list[0]}.csv')
+            # print(predicts[reg_list[0]].shape)
+            # print(true[reg_list[0]].shape)
             loss = np.abs(predicts[reg_list[0]]-true[reg_list[0]])
             axes.bar(
                 x_positions, loss.ravel(), 
@@ -1892,6 +1914,7 @@ def save_tsne_and_csv(encoder, features, targets_dict, output_dir):
         scatter = plt.scatter(tsne_results[:, 0], tsne_results[:, 1], c=label_values, cmap='viridis', alpha=0.6)
         plt.colorbar(scatter, label=f'{task_name} value')
         plt.title(f't-SNE Visualization: {task_name}')
+        plt.tight_layout()
         plt.savefig(os.path.join(output_dir, f'tsne_{task_name}.png'), dpi=300)
         plt.close()
 

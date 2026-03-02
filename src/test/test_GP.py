@@ -122,7 +122,7 @@ def test_MT_DKL(x_te, y_te, model, reg_list, scalers, output_dir, device, test_i
             plt.title(f'True vs Predicted with Uncertainty for {reg}')
             plt.legend()
             plt.grid(True, linestyle='--', alpha=0.7)
-
+            plt.tight_layout()
             plt.savefig(os.path.join(result_dir, 'true_predict_with_uncertainty.png'))
             plt.close()
             

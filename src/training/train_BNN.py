@@ -285,6 +285,7 @@ def training_BNN_MT(
     plt.grid()
     plt.tight_layout()
     # plt.ylim(0, SUM_train_lim) # ELBOは通常 負の値なので、ylimは調整が必要
+    plt.tight_layout()
     plt.savefig(train_loss_history_dir)
     print(f"ELBO損失履歴を {train_loss_history_dir} に保存しました。")
     plt.close()

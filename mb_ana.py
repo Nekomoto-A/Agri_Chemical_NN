@@ -36,6 +36,7 @@ def save_label_histograms(df, target_col, label_col, output_dir='output_dir'):
 
     # 5. 保存
     file_path = os.path.join(output_dir, f'hist_{target_col}_by_{label_col}.png')
+    plt.tight_layout()
     plt.savefig(file_path)
     plt.close() # メモリ解放のために閉じる
     

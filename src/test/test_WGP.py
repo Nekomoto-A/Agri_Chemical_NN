@@ -124,7 +124,7 @@ def test_MT_WGP(x_te, y_te, model, reg_list, output_dir, device, y_tr, test_ids,
             plt.plot([min_val, max_val], [min_val, max_val], 'r--', label = 'x=y')
 
             #plt.grid(True, linestyle='--', alpha=0.7)
-
+            plt.tight_layout()
             plt.savefig(os.path.join(result_dir, 'true_predict_with_uncertainty.png'))
             plt.close()
             
