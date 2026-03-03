@@ -155,8 +155,6 @@ def test_TabPFN(x_te, y_te_tensor,
     
     # --- 3. タスクごとに結果を処理 ---
     for reg in reg_list:
-        output = models[reg].predict(x_te)
-
         # # 1. バッチ処理を行うためのラッパー関数を定義
         # def batched_predict(data):
         #     batch_size = 100  # メモリ状況に応じて調整（小さくするとメモリ消費が減ります）
@@ -193,6 +191,7 @@ def test_TabPFN(x_te, y_te_tensor,
         scores[reg] = {}
         # 分類タスクの処理 (省略)
         if '_rank' in reg or not torch.is_floating_point(y_te_tensor[reg]):
+            output = models[reg].predict(x_te)
             true = y_te[reg]
             pred = output
 
@@ -215,36 +214,38 @@ def test_TabPFN(x_te, y_te_tensor,
 
         # 回帰タスクの処理
         elif torch.is_floating_point(y_te_tensor[reg]):
+            output = models[reg].predict(x_te)
+            #print(output)
             true_tensor = y_te[reg]
             pred_tensor_for_eval = output
 
             if reg in scalers:
                 scaler = scalers[reg]
-                true = scaler.inverse_transform(true_tensor)
-                if is_log1p_transformer(scaler):
-                    train_out = models[reg].predict(x_train)
-                    y_train_pred_log1p = train_out
-                    y_train_log1p = y_train[reg]
+                true = scaler.inverse_transform(true_tensor.reshape(-1, 1))
+                # if is_log1p_transformer(scaler):
+                #     train_out = models[reg].predict(x_train)
+                #     y_train_pred_log1p = train_out
+                #     y_train_log1p = y_train[reg]
 
-                    pred_log = pred_tensor_for_eval
-                    from src.test.test import apply_smearing_log1p
-                    pred, coff = apply_smearing_log1p(y_train_log1p, y_train_pred_log1p, pred_log)
-                    print(f'対数変換のためスメアリング推定による補正を行います(係数：{coff})')
-                elif isinstance(scaler, PowerTransformer):
-                    train_out = models[reg].predict(x_train)
-                    y_train_pred_log1p = train_out
-                    y_train_log1p = y_train[reg]
-                    pred_log = pred_tensor_for_eval
-                    from src.test.test import apply_smearing_yeo_johnson
-                    pred, coff = apply_smearing_yeo_johnson(scaler,y_train_log1p, y_train_pred_log1p, pred_log)
-                else:
-                    # --- 通常のスケーリング解除 ---
-                    pred = scaler.inverse_transform(pred_tensor_for_eval.reshape(-1, 1))
-                #pred = scaler.inverse_transform(pred_tensor_for_eval.cpu().detach().numpy())
+                #     pred_log = pred_tensor_for_eval
+                #     from src.test.test import apply_smearing_log1p
+                #     pred, coff = apply_smearing_log1p(y_train_log1p, y_train_pred_log1p, pred_log)
+                #     print(f'対数変換のためスメアリング推定による補正を行います(係数：{coff})')
+                # elif isinstance(scaler, PowerTransformer):
+                #     train_out = models[reg].predict(x_train)
+                #     y_train_pred_log1p = train_out
+                #     y_train_log1p = y_train[reg]
+                #     pred_log = pred_tensor_for_eval
+                #     from src.test.test import apply_smearing_yeo_johnson
+                #     pred, coff = apply_smearing_yeo_johnson(scaler,y_train_log1p, y_train_pred_log1p, pred_log)
+                # else:
+                #     # --- 通常のスケーリング解除 ---
+                #     pred = scaler.inverse_transform(pred_tensor_for_eval.reshape(-1, 1))
+                pred = scaler.inverse_transform(pred_tensor_for_eval.reshape(-1, 1))
             else:
                 # スケーラーなし
-                pred = pred_tensor_for_eval
-                true = true_tensor
+                pred = pred_tensor_for_eval.reshape(-1, 1)
+                true = true_tensor.reshape(-1, 1)
 
             # --- 3-3. (★) MC Dropout 結果のCSV保存 ---
             # ( ... 元のコードと同じ ... )
@@ -253,7 +254,7 @@ def test_TabPFN(x_te, y_te_tensor,
             true_flat = true.flatten()
             pred_flat = pred.flatten()
             
-            predicts[reg], trues[reg] = pred.reshape(-1,1), true.reshape(-1,1)
+            predicts[reg], trues[reg] = pred, true
             
             # --- 4. 結果のプロット（エラーバー付き） ---
             # ( ... 元のコードと同じ ... )
@@ -262,6 +263,14 @@ def test_TabPFN(x_te, y_te_tensor,
             
             plt.figure(figsize=(12, 12))
             plt.scatter(true_flat, pred_flat, color='royalblue', alpha=0.7)
+            # yerr = np.array([
+            #     pred - y_low_unscaled, 
+            #     y_high_unscaled - pred
+            # ]).reshape(2, -1)
+            # plt.errorbar(true_flat, pred_flat, yerr=yerr, 
+            #     fmt='o', color='royalblue', ecolor='lightgray', 
+            #     elinewidth=1, capsize=3, alpha=0.7, label='Predicted (Median) w/ 90% CI')
+            
             # IDのアノテーション
             if len(ids_flat) == len(true_flat):
                 # (★注意) データが多いと重なるため、件数が多い場合はコメントアウトを推奨
