@@ -1278,13 +1278,14 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
 
     elif model_name == 'TabPFN':
         from src.training.train_TabPFN import training_TabPFN
-        model_trained = training_TabPFN(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val,
-                                        models = model, reg_list = reg_list, output_dir = vis_dir)
+        model_trained, selected_indices = training_TabPFN(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, 
+                                        models = model, reg_list = reg_list, scalers = scalers, 
+                                        output_dir = vis_dir)
         from src.test.test_TabPFN import test_TabPFN
         predicts, true, scores = test_TabPFN(x_te = X_test,y_te_tensor = Y_test, x_train = X_train, y_train = Y_train, 
                                              models = model_trained, reg_list = reg_list, scalers = scalers, output_dir = vis_dir,
                                               test_ids = test_ids, feature_names=features, 
-                                              eval_reg = eval_reg, eval_class = eval_class)
+                                              eval_reg = eval_reg, eval_class = eval_class, selected_indices = selected_indices)
 
     elif model_name == 'HBM':
         from src.training.train_HBM import training_HBM

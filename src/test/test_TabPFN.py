@@ -142,12 +142,16 @@ def test_TabPFN(x_te, y_te_tensor,
               models, reg_list, scalers, output_dir, 
               test_ids, feature_names, 
               eval_reg, eval_class,
-              label_encoders = None
+              label_encoders = None, 
+              selected_indices = None
               ):
     x_te = x_te.cpu().detach().numpy()
-    y_te = {reg: y.cpu().detach().numpy() for reg, y in y_te_tensor.items()}
-
     x_train = x_train.cpu().detach().numpy()
+    if selected_indices is not None:
+        x_te = x_te[:, selected_indices]
+        x_train = x_train[:, selected_indices]
+
+    y_te = {reg: y.cpu().detach().numpy() for reg, y in y_te_tensor.items()}
     y_train = {reg: y.cpu().detach().numpy() for reg, y in y_train.items()}
 
     predicts, trues = {}, {}

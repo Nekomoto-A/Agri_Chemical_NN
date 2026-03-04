@@ -81,6 +81,37 @@ def drop_sparse_columns(df, threshold=0.1):
     # 5. 指定したカラムのみを抽出して返す
     return df[keep_columns]
 
+from sklearn.feature_selection import mutual_info_regression
+
+def save_mutual_info_matrix(df1, df2, file_name="mutual_info_matrix.csv"):
+    """
+    2つのDataFrame間の全カラム組み合わせで相互情報量を計算し、CSVに保存する
+    """
+    # 1. 結果を格納するための空のDataFrameを作成
+    # index = df1の列名, columns = df2の列名
+    mi_matrix = pd.DataFrame(index=df1.columns, columns=df2.columns)
+
+    print(f"計算を開始します: {df1.shape[1]} x {df2.shape[1]} の組み合わせ")
+
+    # 2. 各カラムの組み合わせに対して相互情報量を計算
+    for col1 in df1.columns:
+        for col2 in df2.columns:
+            # 相互情報量の計算 (ここではdf1のカラムをターゲット、df2のカラムを特徴量として扱います)
+            # mutual_info_regressionは2次元配列を期待するため、reshapeが必要
+            X = df2[[col2]] 
+            y = df1[col1]
+            
+            # 相互情報量の算出
+            mi_value = mutual_info_regression(X, y)[0]
+            
+            # マトリックスに代入
+            mi_matrix.loc[col1, col2] = mi_value
+
+    # 3. CSVファイルとして保存
+    mi_matrix.to_csv(file_name)
+    print(f"保存が完了しました: {file_name}")
+    return mi_matrix
+
 class data_create:
     def __init__(self,path_asv,path_chem,reg_list,exclude_ids, output_dir, 
                  label_list = None, feature_transformer = config['feature_transformer'], 
@@ -106,7 +137,7 @@ class data_create:
         self.sparce_drop = sparce_drop
         self.drop_threshold = drop_threshold
 
-        self.output_dir = output_dir
+        self.output_dir = os.path.join(output_dir, f'{reg_list}')
 
     def __iter__(self):
         if self.features_list is not None:
@@ -296,6 +327,8 @@ class data_create:
             asv_array = asv_data.where(asv_data != 0, asv_data + 1e-100).values
             asv_feature = pd.DataFrame(asv_array, columns=asv_data.columns, index=asv_data.index)
         
+        mi_matrix = save_mutual_info_matrix(asv_feature, chem_data[self.reg_list], file_name=os.path.join(self.output_dir, 'mutual_info_matrix.csv'))
+
         # if self.label_data is not None:
         #     for l in self.label_data:
         #         if ('riken' in self.path_asv) and (l == 'experimental_purpose'):
