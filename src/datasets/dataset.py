@@ -113,7 +113,8 @@ def save_mutual_info_matrix(df1, df2, file_name="mutual_info_matrix.csv"):
     return mi_matrix
 
 class data_create:
-    def __init__(self,path_asv,path_chem,reg_list,exclude_ids, output_dir, 
+    def __init__(self,path_asv,path_chem,reg_list,exclude_ids, 
+                 output_dir = None, 
                  label_list = None, feature_transformer = config['feature_transformer'], 
                  #label_data = config['labels'], 
                  unknown_drop  = config['unknown_drop'], non_outlier = config['non_outlier'], 
@@ -136,8 +137,8 @@ class data_create:
 
         self.sparce_drop = sparce_drop
         self.drop_threshold = drop_threshold
-
-        self.output_dir = os.path.join(output_dir, f'{reg_list}')
+        
+        self.output_dir = os.path.join(output_dir, f'{reg_list}') if output_dir is not None else None
 
     def __iter__(self):
         if self.features_list is not None:
@@ -205,9 +206,10 @@ class data_create:
                 result_df = non_zero_ratio.to_frame(name='non_zero_percentage')
 
                 # 4. CSVファイルとして保存
-                output_filename = 'features_non_zero_ratios.csv'
-                columns_to_drop_dir = os.path.join(self.output_dir, output_filename)
-                result_df.to_csv(columns_to_drop_dir, index=True)
+                if self.output_dir is not None:
+                    output_filename = 'features_non_zero_ratios.csv'
+                    columns_to_drop_dir = os.path.join(self.output_dir, output_filename)
+                    result_df.to_csv(columns_to_drop_dir, index=True)
 
                 if self.sparce_drop:
                     asv_data = drop_sparse_columns(asv_data, threshold = self.drop_threshold)
@@ -327,8 +329,7 @@ class data_create:
             asv_array = asv_data.where(asv_data != 0, asv_data + 1e-100).values
             asv_feature = pd.DataFrame(asv_array, columns=asv_data.columns, index=asv_data.index)
         
-        mi_matrix = save_mutual_info_matrix(asv_feature, chem_data[self.reg_list], file_name=os.path.join(self.output_dir, 'mutual_info_matrix.csv'))
-
+        
         # if self.label_data is not None:
         #     for l in self.label_data:
         #         if ('riken' in self.path_asv) and (l == 'experimental_purpose'):
@@ -644,15 +645,15 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
     Y_train_tensor, Y_val_tensor, Y_test_tensor = {}, {}, {}
     label_train_tensor, label_val_tensor, label_test_tensor = {}, {}, {}
 
-    _ = full_analysis_pipeline(
-        train_df=y_train_split,
-        test_df=y_test,
-        all_df = all_y, 
-        target_col=reg_list,
-        feature_cols=stats_features,
-        id_col = 'crop-id',
-        output_dir=fold
-    )
+    # _ = full_analysis_pipeline(
+    #     train_df=y_train_split,
+    #     test_df=y_test,
+    #     all_df = all_y, 
+    #     target_col=reg_list,
+    #     feature_cols=stats_features,
+    #     id_col = 'crop-id',
+    #     output_dir=fold
+    # )
 
     # _ = features_label_analysis_pipeline(
     #             features_train = x_train_split, 
@@ -883,14 +884,13 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
     for label in labels:
         if label not in y_train_split.columns:
             #print(f"'{target_col_1}' が存在しないため、NaN列を追加します。")
-            y_train_split[label] = np.nan
-            
-        if label == 'experimental_purpose':
-            filler_series_train = y_train_split['pref'].astype(str) + '_' + y_train_split['crop'].astype(str)
-            if isinstance(val_size, (int, float)):
-                y_val[label] = y_val['pref'].astype(str) + '_' + y_val['crop'].astype(str)
-            y_test[label] = y_test['pref'].astype(str) + '_' + y_test['crop'].astype(str)
-            y_train_split['experimental_purpose'].fillna(filler_series_train, inplace=True)
+            y_train_split[label] = np.nan    
+            if label == 'experimental_purpose': 
+                filler_series_train = y_train_split['pref'].astype(str) + '_' + y_train_split['crop'].astype(str)
+                if isinstance(val_size, (int, float)):
+                    y_val[label] = y_val['pref'].astype(str) + '_' + y_val['crop'].astype(str)
+                y_test[label] = y_test['pref'].astype(str) + '_' + y_test['crop'].astype(str)
+                y_train_split['experimental_purpose'].fillna(filler_series_train, inplace=True)
 
         y_train_split['data_type'] = 'train'
         y_test['data_type'] = 'test'

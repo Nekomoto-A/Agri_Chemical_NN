@@ -137,11 +137,47 @@ from sklearn.preprocessing import PowerTransformer
 
 from sklearn.metrics import confusion_matrix, classification_report
 
+import matplotlib.pyplot as plt
+
+from lime import lime_tabular
+
+def plot_single_instance_explanation(model, train_data, test_instance, feature_names, output_dir, data_id):
+    """
+    1つのデータポイントに対して、寄与度の高い上位10件の特徴量を表示します。
+    """
+    # 1. エクスプレイナーの初期化
+    explainer = lime_tabular.LimeTabularExplainer(
+        training_data=train_data,
+        feature_names=feature_names,
+        mode="regression",
+        discretize_continuous=True # 連続値をカテゴリ化すると解釈しやすくなります
+    )
+    
+    # 2. 上位10件に絞って説明を生成
+    # num_features=10 とすることで、寄与度の大きい順に抽出されます
+    exp = explainer.explain_instance(
+        data_row=test_instance,
+        predict_fn=model.predict,
+        num_features=10
+    )
+    
+    # 3. グラフの表示
+    # as_pyplot_figure() も num_features の設定を引き継ぎます
+    fig = exp.as_pyplot_figure()
+    plt.title("Top 10 Feature Contributions")
+    plt.tight_layout() # ラベルの重なりを防ぐ
+    lime_dir = os.path.join(output_dir, f'lime_results')
+    os.makedirs(lime_dir, exist_ok=True)
+    save_path = os.path.join(lime_dir, f"lime_explanation_{data_id}.png")
+    plt.savefig(save_path, bbox_inches='tight', dpi=150)
+    plt.close()
+
 def test_TabPFN(x_te, y_te_tensor, 
               x_train, y_train, 
               models, reg_list, scalers, output_dir, 
               test_ids, feature_names, 
               eval_reg, eval_class,
+              lime_local = False,
               label_encoders = None, 
               selected_indices = None
               ):
@@ -159,6 +195,13 @@ def test_TabPFN(x_te, y_te_tensor,
     
     # --- 3. タスクごとに結果を処理 ---
     for reg in reg_list:
+        result_dir = os.path.join(output_dir, reg)
+        os.makedirs(result_dir, exist_ok=True)
+        #print(test_ids)
+        if lime_local:
+            for i, test_instance in enumerate(x_te): # 最初の5件に対してLIMEの説明を生成
+                plot_single_instance_explanation(model = models[reg], train_data = x_train, test_instance = test_instance, 
+                                                feature_names = feature_names, output_dir = result_dir, data_id = test_ids.to_list()[i])
         # # 1. バッチ処理を行うためのラッパー関数を定義
         # def batched_predict(data):
         #     batch_size = 100  # メモリ状況に応じて調整（小さくするとメモリ消費が減ります）
@@ -213,7 +256,7 @@ def test_TabPFN(x_te, y_te_tensor,
                 index=[f"True:{c}" for c in classes], 
                 columns=[f"Pred:{c}" for c in classes]
             )
-            cm_path = os.path.join(output_dir, f"{reg}_confusion_matrix.csv")
+            cm_path = os.path.join(result_dir, f"{reg}_confusion_matrix.csv")
             cm_df.to_csv(cm_path)
 
         # 回帰タスクの処理
@@ -262,8 +305,6 @@ def test_TabPFN(x_te, y_te_tensor,
             
             # --- 4. 結果のプロット（エラーバー付き） ---
             # ( ... 元のコードと同じ ... )
-            result_dir = os.path.join(output_dir, reg)
-            os.makedirs(result_dir, exist_ok=True)
             
             plt.figure(figsize=(12, 12))
             plt.scatter(true_flat, pred_flat, color='royalblue', alpha=0.7)

@@ -15,12 +15,12 @@ script_name = os.path.basename(__file__)
 with open(yaml_path, "r", encoding="utf-8") as file:
     config = yaml.safe_load(file)['dataset.py']
 
-def pretrain_foundation(model_name, device, out_dir, latent_dim, 
+def pretrain_foundation(model_name, device, output_dir, latent_dim, 
                         normalize = False, 
                         reg_list = config['reg_list2'], exclude_ids = config['exclude_ids2'],
                         ):
     
-    pre_dir = os.path.join(out_dir, 'pretrain')
+    pre_dir = os.path.join(output_dir, 'pretrain')
     os.makedirs(pre_dir, exist_ok=True)
 
     os_name = platform.system()
@@ -31,7 +31,7 @@ def pretrain_foundation(model_name, device, out_dir, latent_dim,
         feature_path = config['asv_path_windows']
         target_path = config['chem_path_windows']
 
-    X, Y, _ , features_list = data_create(feature_path, target_path, reg_list, exclude_ids)
+    X, Y, _ , features_list = data_create(feature_path, target_path, reg_list, exclude_ids, output_dir=None)
 
     #features_list = X.columns.to_list()
 

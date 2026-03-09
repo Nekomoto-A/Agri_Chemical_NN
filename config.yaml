@@ -4,7 +4,7 @@ MT_CNN_Attention.py:
   shared_layers: [(64,3,1,1)]
 dataset.py:
   non_outlier: None
-  val_size: None
+  val_size: 0.2
   level: 7
   feature_transformer: 'ILR'
   softlabel: True
@@ -126,15 +126,17 @@ train_GP_NUTS.py:
 train_TabPFN.py:
   optune: False
   n_trials: 50
+  filter_mi: False
 test.py:
   loss_sum: 'WeightedSUM' #'SUM' #
   num_predictive_samples: 100
   shap_eval: False
   save_feature: False
   batch_size: 256
-  Adapte: 'Adapter' #retrain #'retrain' #'AdaBN' #'retrain' #None #'retrain' #
+  Adapte: None #'Adapter' #retrain #'retrain' #'AdaBN' #'retrain' #None #'retrain' #
   reconstruction_plots: False #False #True
-  shared_learn: False #True #False
+  shared_learn: True #True #False
+  lime_eval: False #True
 fold_eval.py:
   feature_selection: None
   num_selected_features: 15
@@ -147,7 +149,7 @@ fold_eval.py:
   marginal_hist: False
   k_fold: 5
   feature_normalize: False
-  model_name: 'TabPFN'
+  model_name: 'DCAE'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
@@ -170,15 +172,14 @@ fold_eval.py:
 
     #'239_21_Aomo_Appl', '241_21_Aomo_Appl', '347_22_Yama_Rice', '243_21_Aomo_Appl', 
     #'122_20_Miyz_Spin', #'228_21_Miyz_Edam'
-
-    #'163_21_Miyz_Spin', '171_21_Miyz_Spin',
-    # '141_21_Miyz_Spin', '146_21_Miyz_Spin',
+    '145_21_Miyz_Spin',
+    '163_21_Miyz_Spin', #'171_21_Miyz_Spin',
+    '141_21_Miyz_Spin', #'146_21_Miyz_Spin',
     # '166_21_Miyz_Spin', '150_21_Miyz_Spin', 
     # '170_21_Miyz_Spin', #'156_21_Miyz_Spin', 
     # '167_21_Miyz_Spin', 
     # '327_22_Niig_Pear', 
     # '330_22_Niig_Pear',
-    
 
     #'137_21_Akit_Soyb', '231_21_Miyz_Edam',
     #'167_21_Miyz_Spin', #'244_21_Aomo_Appl'
@@ -189,19 +190,19 @@ fold_eval.py:
   ]
   feature_path_linux: 'data/raw/riken/taxon_data/lv6.csv' #'/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/lv6.csv' # # #
   target_path_linux:  'data/raw/riken/chem_data.xlsx' #'/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/chem_data.xlsx' # # #
-  feature_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\taxon_data\lv6.csv' #C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\lv6.csv #
-  target_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\chem_data.xlsx' #C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\chem_data.xlsx #
+  feature_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\lv6.csv' #'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\taxon_data\lv6.csv' #
+  target_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\chem_data.xlsx' #'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\chem_data.xlsx' #
   data_inte: False
   transformer: ['YJ', None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
   reg_loss_fanction: ['mse', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
   eval_reg: ['R2', 'MedAE', 'MAE', 'RMSLE', 'RMSE']
   eval_class: ['Accuracy', 'F1score']
-  labels: ['crop'] #['crop', 'pref', 'lati', 'long'] #['experimental_purpose'] #
+  labels: ['experimental_purpose'] #['experimental_purpose'] #['crop'] #['crop', 'pref', 'lati', 'long'] # #
   embedding: 'Word2Vec' #'Onehot' # #"concat" #
   embedding_size: 8
   latent_dim: 64
 main.py:
-  result_dir: 'result_TabPFN_fs'
+  result_dir: 'result_0309_dra_DCAE'
   reg_list: [
             # ['pref'], 
             # ['crop'], 
@@ -225,13 +226,15 @@ main.py:
             # ['APCP_Jan_me'],
 
             #[NH4.N], 
-            ['Available.P'], 
-            ['pH'], 
-            ['NO3.N'], 
-            ['EC'], 
-            ['Humus'], 
-            ['Exchangeable.K'], 
-            ['CEC'], 
+            #['Available.P'], 
+            #['pH'], 
+            #['NO3.N'], 
+            # ['EC'], 
+            # ['Humus'], 
+            # ['Exchangeable.K'], 
+            # ['CEC'], 
             # ['pH_dry_soil', 'available_P', 'EC_electric_conductivity', 'Total_C', 'Total_N']
             #['pH', 'Available.P'] 
+
+            ['pH_dry_soil'], ['available_P'], ['EC_electric_conductivity'], ['Total_C'], #['Total_N']
   ]

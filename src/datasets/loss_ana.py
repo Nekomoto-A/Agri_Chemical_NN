@@ -312,7 +312,7 @@ def plot_boxplot_by_category(df, category_column, value_column, output_dir):
         safe_cat_col = re.sub(r'[\\/*?:"<>|]', '_', category_column)
         safe_val_col = re.sub(r'[\\/*?:"<>|]', '_', value_column)
         
-        filename = f'boxplot_{safe_val_col}_by_{safe_cat_col}_noFiLM.png'
+        filename = f'boxplot_{safe_val_col}_by_{safe_cat_col}.png'
         save_path = os.path.join(output_dir, filename)
 
         plt.savefig(save_path)
@@ -443,7 +443,7 @@ def plot_grouped_boxplot(df, category_column, output_dir, t):
         # --- ステップ7: 保存 ---
         safe_cat_col = re.sub(r'[\\/*?:"<>|]', '_', category_column)
         
-        filename = f'grouped_boxplot_TruePred_by_{safe_cat_col}_{t}_noFiLM.png'
+        filename = f'grouped_boxplot_TruePred_by_{safe_cat_col}_{t}.png'
         save_path = os.path.join(output_dir, filename)
 
         plt.savefig(save_path)
@@ -459,17 +459,17 @@ def plot_grouped_boxplot(df, category_column, output_dir, t):
         print(f"エラー: 処理中に予期せぬ問題が発生しました: {e}")
 
 if __name__ == '__main__':
-    target = 'Available_P'
+    target = 'Exchangeable_K'
     
     #path = f"/home/nomura/Agri_Chemical_NN/result_AE_nocombat/['{target}']/loss.csv"
-    path = f"C:\\Users\\asahi\\Agri_Chemical_NN\\result_noFiLM\\['{target}']\\loss.csv"
+    path = f"C:\\Users\\asahi\\Agri_Chemical_NN\\result_TabPFN_notr\\['{target}']\\loss.csv"
 
     df = pd.read_csv(path, index_col=0)
 
     print(df)
 
     #output_dir = '/home/nomura/Agri_Chemical_NN/datas/losses'
-    output_dir = 'C:\\Users\\asahi\\Agri_Chemical_NN\\datas\\losses'
+    output_dir = f'C:\\Users\\asahi\\Agri_Chemical_NN\\datas\\losses\\{target}'
 
     loss_data = create_features_and_save_csv(df, None, output_dir, output_filename = f'{target}_loss.csv')
 

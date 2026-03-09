@@ -499,6 +499,7 @@ def save_individual_shap_plots(explainer, shap_df, test_data_tensor, ids, task_n
 
 def test_MT(x_te, y_te, x_train, y_train, model, reg_list, scalers, output_dir, device, test_ids, feature_names, 
             eval_reg, eval_class, 
+            shap_eval = False, 
             label_encoders = None, 
             n_samples_mc=100):
     
@@ -516,13 +517,14 @@ def test_MT(x_te, y_te, x_train, y_train, model, reg_list, scalers, output_dir, 
     
     # --- 3. タスクごとに結果を処理 ---
     for reg in reg_list:
-        df_shap, explainer = calculate_shap_values(model = model, background_data = x_train, test_data = x_te, feature_names = feature_names, task_name = reg)
-        # 要約プロット (全サンプルでの特徴量重要度)
+        if shap_eval:
+            df_shap, explainer = calculate_shap_values(model = model, background_data = x_train, test_data = x_te, feature_names = feature_names, task_name = reg)
+            # 要約プロット (全サンプルでの特徴量重要度)
 
-        shap_dir = os.path.join(output_dir, 'shap_results')
-        os.makedirs(shap_dir, exist_ok=True)
-        save_shap_summary_plot(shap_values = df_shap.values, test_data_tensor = x_te, feature_names = feature_names, task_name = reg, save_dir = shap_dir)
-        save_individual_shap_plots(explainer = explainer, shap_df = df_shap, test_data_tensor = x_te, ids = test_ids, task_name = reg, base_dir = shap_dir)
+            shap_dir = os.path.join(output_dir, 'shap_results')
+            os.makedirs(shap_dir, exist_ok=True)
+            save_shap_summary_plot(shap_values = df_shap.values, test_data_tensor = x_te, feature_names = feature_names, task_name = reg, save_dir = shap_dir)
+            save_individual_shap_plots(explainer = explainer, shap_df = df_shap, test_data_tensor = x_te, ids = test_ids, task_name = reg, base_dir = shap_dir)
 
         scores[reg] = {}
         # 分類タスクの処理 (省略)
@@ -882,7 +884,8 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                   ae_dir = None, 
                   adapte = config['Adapte'], 
                   reconstruction_plots = config['reconstruction_plots'],
-                  shared_learn = config['shared_learn']
+                  shared_learn = config['shared_learn'], 
+                  lime_eval = config['lime_eval']
                   ):
 
     # 2. ユニークなラベルを抽出
@@ -1284,7 +1287,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         from src.test.test_TabPFN import test_TabPFN
         predicts, true, scores = test_TabPFN(x_te = X_test,y_te_tensor = Y_test, x_train = X_train, y_train = Y_train, 
                                              models = model_trained, reg_list = reg_list, scalers = scalers, output_dir = vis_dir,
-                                              test_ids = test_ids, feature_names=features, 
+                                              test_ids = test_ids, feature_names=features, lime_local = lime_eval,  #save_feature = save_feature,
                                               eval_reg = eval_reg, eval_class = eval_class, selected_indices = selected_indices)
 
     elif model_name == 'HBM':
@@ -1674,6 +1677,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                                           model_trained,reg_list,scalers,output_dir=vis_dir,
                                                           device = device, test_ids = test_ids, feature_names = features,
                                                           eval_reg= eval_reg, eval_class = eval_class, 
+                                                          shap_eval = shap_eval, 
                                                           label_encoders = reg_encoders,
                                                           )
         

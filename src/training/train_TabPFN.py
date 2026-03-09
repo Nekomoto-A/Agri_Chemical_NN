@@ -128,7 +128,7 @@ def filter_low_mi_features(X_train, Y_train, threshold=0.1):
 
 
 def training_TabPFN(x_tr,x_val,y_tr,y_val,models, reg_list, scalers, output_dir, 
-                    optune = config['optune'], n_trials = config['n_trials']
+                    optune = config['optune'], n_trials = config['n_trials'],filter_mi = config['filter_mi']
                 ):
     train_dir = os.path.join(output_dir, 'train')
     os.makedirs(train_dir, exist_ok=True)
@@ -145,7 +145,10 @@ def training_TabPFN(x_tr,x_val,y_tr,y_val,models, reg_list, scalers, output_dir,
     for reg in reg_list:
         # score, indices = backward_selection(models[reg], x_tr, y_tr[reg], cv=5)
         # print(f'最終スコア:{score:.4f}, 選択された特徴量のインデックス: {indices}')
-        x_tr, selected_indices = filter_low_mi_features(x_tr, y_tr[reg], threshold=0.1)
+        if filter_mi:
+            x_tr, selected_indices = filter_low_mi_features(x_tr, y_tr[reg], threshold=0.1)
+        else:
+            selected_indices = np.arange(x_tr.shape[1])
         # x_tr = x_tr[:, indices]
         
         if optune:
