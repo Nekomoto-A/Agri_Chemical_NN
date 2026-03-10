@@ -9,3 +9,4 @@ tabpfn_key.yaml
 __pycache__/
 *.pyc
 .env
+data/raw/riken/data_detail

@@ -172,6 +172,58 @@ def plot_single_instance_explanation(model, train_data, test_instance, feature_n
     plt.savefig(save_path, bbox_inches='tight', dpi=150)
     plt.close()
 
+import numpy as np
+from scipy.special import roots_hermite
+
+def tabpfn_corrected_inverse(mu, sigma, pp_transformer):
+    """
+    mu: TabPFNが予測した変換後スケールの平均
+    sigma: TabPFNが予測した変換後スケールの標準偏差
+    pp_transformer: 学習済みの PowerTransformer (Yeo-Johnson)
+    """
+    # 1. 求積のための点(nodes)と重み(weights)を取得
+    # 5点〜10点程度で実用上十分な精度になります
+    nodes, weights = roots_hermite(10)
+    
+    # 2. 標準正規分布の点を、モデルの予測分布(mu, sigma)へ変換
+    # Formula: x = mu + sqrt(2) * sigma * nodes
+    scaled_nodes = mu + np.sqrt(2) * sigma * nodes.reshape(-1, 1)
+    
+    # 3. 各点を Yeo-Johnson で逆変換
+    # points_original_scale の形状は (nodes数, サンプル数)
+    points_original_scale = np.array([
+        pp_transformer.inverse_transform(p.reshape(-1, 1)).flatten()
+        for p in scaled_nodes
+    ])
+    
+    # 4. 重み付き平均を計算して「元のスケールでの期待値」を算出
+    # 期待値 E[y] = (1/√π) * Σ (w_i * f_inv(x_i))
+    corrected_mean = np.dot(weights, points_original_scale) / np.sqrt(np.pi)
+    
+    return corrected_mean
+
+def log1p_corrected_inverse(model, X_test):
+    """
+    Log1p変換に対する不確実性を利用した逆変換補正
+    """
+    # 1. 必要な分位点を取得 (15.87%, 50%, 84.13%)
+    qs = [0.1587, 0.5, 0.8413]
+    quant_results = model.predict(X_test, output_type="quantiles", quantiles=qs)
+    
+    q_low = quant_results[0]    # 約 mu' - sigma'
+    mu_log = quant_results[1]   # 中央値 (対数スケールでの平均 mu')
+    q_high = quant_results[2]   # 約 mu' + sigma'
+    
+    # 2. 対数スケールでの標準偏差 sigma' を算出
+    sigma_log = (q_high - q_low) / 2.0
+    
+    # 3. 解析的な補正公式の適用
+    # E[y] = exp(mu' + 0.5 * sigma'^2) - 1
+    # np.expm1(x) は exp(x) - 1 を精度良く計算する関数
+    corrected_pred = np.expm1(mu_log + 0.5 * (sigma_log**2))
+    
+    return corrected_pred
+
 def test_TabPFN(x_te, y_te_tensor, 
               x_train, y_train, 
               models, reg_list, scalers, output_dir, 
@@ -269,26 +321,26 @@ def test_TabPFN(x_te, y_te_tensor,
             if reg in scalers:
                 scaler = scalers[reg]
                 true = scaler.inverse_transform(true_tensor.reshape(-1, 1))
-                # if is_log1p_transformer(scaler):
-                #     train_out = models[reg].predict(x_train)
-                #     y_train_pred_log1p = train_out
-                #     y_train_log1p = y_train[reg]
+                if is_log1p_transformer(scaler):
+                    pred = log1p_corrected_inverse(models[reg], x_te).reshape(-1,1)
+                elif isinstance(scaler, PowerTransformer):
+                    # 1. 必要な分位点を指定して取得
+                    qs = [0.1587, 0.5, 0.8413] 
+                    quantiles_out = models[reg].predict(x_te, output_type='quantiles', quantiles=qs)
 
-                #     pred_log = pred_tensor_for_eval
-                #     from src.test.test import apply_smearing_log1p
-                #     pred, coff = apply_smearing_log1p(y_train_log1p, y_train_pred_log1p, pred_log)
-                #     print(f'対数変換のためスメアリング推定による補正を行います(係数：{coff})')
-                # elif isinstance(scaler, PowerTransformer):
-                #     train_out = models[reg].predict(x_train)
-                #     y_train_pred_log1p = train_out
-                #     y_train_log1p = y_train[reg]
-                #     pred_log = pred_tensor_for_eval
-                #     from src.test.test import apply_smearing_yeo_johnson
-                #     pred, coff = apply_smearing_yeo_johnson(scaler,y_train_log1p, y_train_pred_log1p, pred_log)
-                # else:
-                #     # --- 通常のスケーリング解除 ---
-                #     pred = scaler.inverse_transform(pred_tensor_for_eval.reshape(-1, 1))
-                pred = scaler.inverse_transform(pred_tensor_for_eval.reshape(-1, 1))
+                    # 2. 各分位点を取り出す
+                    q_low = quantiles_out[0]   # 15.87%
+                    y_pred_mu = quantiles_out[1] # 50% (Median) または別途 'mean' を取得
+                    q_high = quantiles_out[2]  # 84.13%
+
+                    # 3. 標準偏差を近似
+                    output_sigma = (q_high - q_low) / 2.0
+                    #output_sigma = models[reg].predict(x_te, output_type='std')
+                    pred = tabpfn_corrected_inverse(y_pred_mu, output_sigma, scaler).reshape(-1,1)
+                else:
+                    # --- 通常のスケーリング解除 ---
+                    pred = scaler.inverse_transform(pred_tensor_for_eval.reshape(-1, 1))
+                #pred = scaler.inverse_transform(pred_tensor_for_eval.reshape(-1, 1))
             else:
                 # スケーラーなし
                 pred = pred_tensor_for_eval.reshape(-1, 1)
