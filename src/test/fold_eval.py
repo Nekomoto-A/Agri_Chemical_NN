@@ -550,6 +550,42 @@ def fold_evaluate(reg_list, output_dir, device,
                 for metrics, value in dict.items():
                     scores.setdefault(metrics, {}).setdefault(method_st, {}).setdefault(reg_name, []).append(value)
 
+            if model_name == 'TabPFN_ME':
+                model_name_nome = model_name.replace("_ME", "")
+                method_nome = 'ST_nome'
+                
+                vis_dir_nome = os.path.join(fold_dir, method_nome)
+                os.makedirs(vis_dir_nome, exist_ok=True)
+
+                predictions, trues, result_scores_nome, model_trained_nolabel = train_and_test(
+                X_train = X_train_tensor, X_val = X_val_tensor, X_test = X_test_tensor, Y_train = Y_train_single, Y_val = Y_val_single, Y_test = Y_test_single, 
+                scalers = scalers, predictions = predictions, trues = trues, input_dim = input_dim, 
+                method = method_nome, 
+                index = index , reg_list = reg, csv_dir = csv_dir, 
+                vis_dir = vis_dir_nome, 
+                model_name = model_name_nome, 
+                train_ids = train_ids, test_ids = test_ids, features = features,
+                device = device,
+                reg_loss_fanction = loss_fanction, 
+                latent_dim = latent_dim, 
+                reg_encoders = reg_encoders, 
+                eval_reg = eval_reg, eval_class = eval_class, 
+                labels_train=label_train_embedded,
+                labels_val=label_val_embedded,
+                labels_test=label_test_embedded,
+                label_encoders = label_encoders,
+                labels_train_original = label_train_tensor,
+                labels_val_original = label_val_tensor,
+                labels_test_original = label_test_tensor,
+                ae_dir = ae_dir
+                )
+                
+                # scores.setdefault('R', {}).setdefault(method_nolabel, {}).setdefault(r, []).append(r2_result_nolabel[0])
+                # scores.setdefault('MAE', {}).setdefault(method_nolabel, {}).setdefault(r, []).append(mse_result_nolabel[0])
+                for reg_name, dict in result_scores_nome.items():
+                    for metrics, value in dict.items():
+                        scores.setdefault(metrics, {}).setdefault(method_nome, {}).setdefault(reg_name, []).append(value)
+
             #FiLMなし
             if 'FiLM' in model_name:
                 model_name_nolabel = model_name.replace("_FiLM", "")

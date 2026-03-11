@@ -667,6 +667,54 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
     #             output_dir=fold
     #             )
 
+    label_encoders = {}
+    label_train_tensor = {}
+    label_test_tensor = {}
+    label_val_tensor = {}
+    for label in labels:
+        if label not in y_train_split.columns:
+            #print(f"'{target_col_1}' が存在しないため、NaN列を追加します。")
+            y_train_split[label] = np.nan    
+            if label == 'experimental_purpose': 
+                filler_series_train = y_train_split['pref'].astype(str) + '_' + y_train_split['crop'].astype(str)
+                if isinstance(val_size, (int, float)):
+                    y_val[label] = y_val['pref'].astype(str) + '_' + y_val['crop'].astype(str)
+                y_test[label] = y_test['pref'].astype(str) + '_' + y_test['crop'].astype(str)
+                y_train_split['experimental_purpose'].fillna(filler_series_train, inplace=True)
+
+        y_train_split['data_type'] = 'train'
+        y_test['data_type'] = 'test'
+        if isinstance(val_size, (int, float)):
+            y_val['data_type'] = 'valid'
+
+        #visualize_tsne_with_missing_values(X = X_train_tensor, Y = y_train_split[label].values, save_dir = fold, filename = f"tsne_{label}.png")
+        visualize_tsne_with_categorical_labels(X = X_train_tensor, Y_series = y_train_split[label], save_dir = fold, filename = f"tsne_{label}.png")
+
+        if isinstance(val_size, (int, float)):
+            all_df = pd.concat([y_train_split, y_test, y_val], ignore_index=True)
+        else:
+            all_df = pd.concat([y_train_split, y_test], ignore_index=True)
+        le = LabelEncoder()
+        
+        #print(all_df[label])
+
+        all_df[label] = le.fit_transform(all_df[label])
+        label_encoders[label] = le
+
+        y_train_split = all_df[all_df['data_type'] == 'train'].reset_index(drop=True)
+        y_test = all_df[all_df['data_type'] == 'test'].reset_index(drop=True)
+        if isinstance(val_size, (int, float)):
+            y_val = all_df[all_df['data_type'] == 'valid'].reset_index(drop=True)
+        else:
+            y_val = None
+
+        label_train_tensor[label] = torch.tensor(y_train_split[label].values.reshape(-1), dtype=torch.int64)
+        label_test_tensor[label] = torch.tensor(y_test[label].values.reshape(-1), dtype=torch.int64)
+        if y_val is not None:
+            label_val_tensor[label] = torch.tensor(y_val[label].values.reshape(-1), dtype=torch.int64)
+        else:
+            label_val_tensor[label] = None
+
     for reg, tr in zip(reg_list,transformer):
         if '_rank' in reg:
             #print(reg)
@@ -676,15 +724,6 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
             if isinstance(val_size, (int, float)):
                 y_val_pp = y_val[d].values.reshape(-1, 1)
             y_test_pp = y_test[d].values.reshape(-1, 1)
-            #print(y_train_split[reg])
-            #Y_train_tensor.append(torch.tensor(y_train_split[reg].values, dtype=torch.int64))
-            #Y_val_tensor.append(torch.tensor(y_val[reg].values, dtype=torch.int64))
-            #Y_test_tensor.append(torch.tensor(y_test[reg].values, dtype=torch.int64))
-
-            #print(y_test_pp)
-            #Y_train_tensor[reg] = torch.tensor(y_train_split_pp, dtype=torch.float64)
-            #Y_val_tensor[reg] = torch.tensor(y_val_pp, dtype=torch.float64)
-            #Y_test_tensor[reg] = torch.tensor(y_test_pp, dtype=torch.float64)
 
             Y_tr = torch.tensor(y_train_split_pp).ravel()
             if isinstance(val_size, (int, float)):
@@ -760,6 +799,8 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
                     y_val_pp = pp.transform(y_val[reg].values.reshape(-1, 1))
                 y_test_pp = pp.transform(y_test[reg].values.reshape(-1, 1))
                 scalers[reg] = pp  # スケーラーを保存
+            elif tr == 'GS':
+                pp = G
             else:
                 #pp = pp.fit(y_train_split[reg].values.reshape(-1, 1))
                 y_train_split_pp = y_train_split[reg].values.reshape(-1, 1)
@@ -768,6 +809,7 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
                 y_test_pp = y_test[reg].values.reshape(-1, 1)
                 #print(y_train_split_pp)
                 #scalers[reg] = pp  # スケーラーを保存
+            
 
             plt.figure(figsize=(10, 6))
             # ヒストグラムを描画
@@ -818,19 +860,6 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
             if isinstance(val_size, (int, float)):
                 Y_val_tensor[reg] = torch.tensor(y_val_pp, dtype=torch.int64)
             Y_test_tensor[reg] = torch.tensor(y_test_pp, dtype=torch.int64)
-
-    
-    # if labels is not None:
-    #     for l in labels:
-
-    #         label_train_tensor[l] = torch.tensor(y_train_split[l].values.reshape(-1), dtype=torch.int64)
-    #         label_test_tensor[l] = torch.tensor(y_test[l].values.reshape(-1), dtype=torch.int64)
-    #         if isinstance(val_size, (int, float)):
-    #             label_val_tensor[l] = torch.tensor(y_val[l].values.reshape(-1), dtype=torch.int64)
-            #print(label_train_tensor)
-
-    #print(Y_train_tensor)
-    #print(Y_test_tensor)
     
     data = []
     
@@ -876,56 +905,6 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
             plt.close()
     
     plot_tsne_by_targets(X_tensor = X_train_tensor, targets_dict = Y_train_tensor, save_dir = fold)
-
-    label_encoders = {}
-    label_train_tensor = {}
-    label_test_tensor = {}
-    label_val_tensor = {}
-    for label in labels:
-        if label not in y_train_split.columns:
-            #print(f"'{target_col_1}' が存在しないため、NaN列を追加します。")
-            y_train_split[label] = np.nan    
-            if label == 'experimental_purpose': 
-                filler_series_train = y_train_split['pref'].astype(str) + '_' + y_train_split['crop'].astype(str)
-                if isinstance(val_size, (int, float)):
-                    y_val[label] = y_val['pref'].astype(str) + '_' + y_val['crop'].astype(str)
-                y_test[label] = y_test['pref'].astype(str) + '_' + y_test['crop'].astype(str)
-                y_train_split['experimental_purpose'].fillna(filler_series_train, inplace=True)
-
-        y_train_split['data_type'] = 'train'
-        y_test['data_type'] = 'test'
-        if isinstance(val_size, (int, float)):
-            y_val['data_type'] = 'valid'
-
-        #visualize_tsne_with_missing_values(X = X_train_tensor, Y = y_train_split[label].values, save_dir = fold, filename = f"tsne_{label}.png")
-        visualize_tsne_with_categorical_labels(X = X_train_tensor, Y_series = y_train_split[label], save_dir = fold, filename = f"tsne_{label}.png")
-
-        if isinstance(val_size, (int, float)):
-            all_df = pd.concat([y_train_split, y_test, y_val], ignore_index=True)
-        else:
-            all_df = pd.concat([y_train_split, y_test], ignore_index=True)
-        le = LabelEncoder()
-        
-        #print(all_df[label])
-
-        all_df[label] = le.fit_transform(all_df[label])
-        label_encoders[label] = le
-
-        y_train_split = all_df[all_df['data_type'] == 'train'].reset_index(drop=True)
-        y_test = all_df[all_df['data_type'] == 'test'].reset_index(drop=True)
-        if isinstance(val_size, (int, float)):
-            y_val = all_df[all_df['data_type'] == 'valid'].reset_index(drop=True)
-        else:
-            y_val = None
-
-        label_train_tensor[label] = torch.tensor(y_train_split[label].values.reshape(-1), dtype=torch.int64)
-        label_test_tensor[label] = torch.tensor(y_test[label].values.reshape(-1), dtype=torch.int64)
-        if y_val is not None:
-            label_val_tensor[label] = torch.tensor(y_val[label].values.reshape(-1), dtype=torch.int64)
-        else:
-            label_val_tensor[label] = None
-
-        #print(f'{label}:{label_train_tensor}')
 
     return X_train_tensor, X_val_tensor, X_test_tensor,selected_features, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids,label_train_tensor,label_test_tensor,label_val_tensor, label_encoders
 
