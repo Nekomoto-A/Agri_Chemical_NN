@@ -895,7 +895,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         number_of_classes = unique_labels.numel()
 
     output_dims = []
-    #    print(labels_train)
+    print(labels_train)
     if labels_train != {}:
         label_dim = labels_train.shape[1]
 
@@ -1290,6 +1290,18 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         from src.test.test_TabPFN_ME import test_TabPFN_ME
         predicts, true, scores = test_TabPFN_ME(x_te = X_test,y_te_tensor = Y_test, labels_test = labels_test_original,
                                              x_train = X_train, y_train = Y_train, labels_train = labels_train_original,
+                                             models = model_trained, reg_list = reg_list, scalers = scalers, output_dir = vis_dir,
+                                              test_ids = test_ids, feature_names=features, lime_local = lime_eval,  #save_feature = save_feature,
+                                              eval_reg = eval_reg, eval_class = eval_class, selected_indices = selected_indices)
+    elif model_name == 'TabPFN_concat':
+        from src.training.train_TabPFN_concat_emb import training_TabPFN_concat
+        model_trained, selected_indices = training_TabPFN_concat(x_tr = X_train, x_val = X_val, y_tr = Y_train, y_val = Y_val, 
+                                                                 labels_train_emb = labels_train, labels_val_emb = labels_val_original,
+                                        models = model, reg_list = reg_list, scalers = scalers, 
+                                        output_dir = vis_dir)
+        from src.test.test_TabPFN_concat_emb import test_TabPFN_concat
+        predicts, true, scores = test_TabPFN_concat(x_te = X_test,y_te_tensor = Y_test, labels_test_emb = labels_test,
+                                             x_train = X_train, y_train = Y_train, labels_train_emb = labels_train,
                                              models = model_trained, reg_list = reg_list, scalers = scalers, output_dir = vis_dir,
                                               test_ids = test_ids, feature_names=features, lime_local = lime_eval,  #save_feature = save_feature,
                                               eval_reg = eval_reg, eval_class = eval_class, selected_indices = selected_indices)

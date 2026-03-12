@@ -24,8 +24,15 @@ def save_combined_data_to_csv(filepath, original_labels, embedded_tensor, output
     # 2. 埋め込みベクトル (Tensor) をNumPyに変換して列として展開
     # 例: (1000, 64) のデータを 64個の列に分ける
     #print(embedded_tensor.cpu().numpy().shape)
-    emb_np = embedded_tensor.cpu().numpy()
+    if isinstance(embedded_tensor, dict):
+        emb_np = torch.cat(list(embedded_tensor.values()), dim=1).numpy()
+    else:
+        emb_np = embedded_tensor.cpu().numpy()
+    
+    #print(emb_np)
+    
     emb_cols = [f'emb_{i}' for i in range(emb_np.shape[1])]
+    print(emb_cols)
     df_emb = pd.DataFrame(emb_np, columns=emb_cols)
     
     # dfにベクトルの列を結合
@@ -100,20 +107,26 @@ def onehot_encode_and_split(train_labels, val_labels, test_labels):
         if v_tensor is not None:
             out_val[key]   = combined_onehot[len_t : len_t + len_v]
         out_test[key]  = combined_onehot[len_t + len_v :]
-
-    # 4. 出力形式の調整（ラベルが1種類のみか、複数か）
     if len(keys) == 1:
-        single_key = keys[0]
+        out_train = torch.cat(list(out_train.values()), dim=1)
+        out_test = torch.cat(list(out_test.values()), dim=1)
         if v_tensor is not None:
-            return out_train[single_key], out_val[single_key], out_test[single_key]
+            out_val = torch.cat(list(out_val.values()), dim=1) if v_tensor is not None else None
         else:
-            return out_train[single_key], None, out_test[single_key]
-    else:
-        if v_tensor is not None:
-            return out_train, out_val, out_test
-        else:
-            return out_train, None, out_test
-
+            out_val = None
+    # 4. 出力形式の調整（ラベルが1種類のみか、複数か）
+    # if len(keys) == 1:
+    #     single_key = keys[0]
+    #     if v_tensor is not None:
+    #         return out_train[single_key], out_val[single_key], out_test[single_key]
+    #     else:
+    #         return out_train[single_key], None, out_test[single_key]
+    # else:
+    #     if v_tensor is not None:
+    #         return out_train, out_val, out_test
+    #     else:
+    #         return out_train, None, out_test
+    return out_train, out_val, out_test
 import torch
 import numpy as np
 
@@ -225,18 +238,33 @@ def w2v_encode_and_split(train_labels, val_labels, test_labels, label_encoders, 
         out_val[key]   = combined_w2v[len_t : len_t + len_v]
         out_test[key]  = combined_w2v[len_t + len_v :]
 
-    # 5. 出力形式の調整
-    if len(keys) == 1:
-        single_key = keys[0]
+    if len(keys) != 1:
+        out_train = torch.cat(list(out_train.values()), dim=1)
+        out_test = torch.cat(list(out_test.values()), dim=1)
         if v_tensor is not None:
-            return out_train[single_key], out_val[single_key], out_test[single_key]
+            out_val = torch.cat(list(out_val.values()), dim=1) if v_tensor is not None else None
         else:
-            return out_train[single_key], None, out_test[single_key]
+            out_val = None
     else:
+        out_train = out_train[keys[0]]
+        out_test = out_test[keys[0]] 
         if v_tensor is not None:
-            return out_train, out_val, out_test
+            out_val = out_val[keys[0]]
         else:
-            return out_train, None, out_test
+            out_val = None
+    # # 5. 出力形式の調整
+    # if len(keys) == 1:
+    #     single_key = keys[0]
+    #     if v_tensor is not None:
+    #         return out_train[single_key], out_val[single_key], out_test[single_key]
+    #     else:
+    #         return out_train[single_key], None, out_test[single_key]
+    # else:
+    #     if v_tensor is not None:
+    #         return out_train, out_val, out_test
+    #     else:
+    #         return out_train, None, out_test
+    return out_train, out_val, out_test
     
 def concat_encode_and_split(train_labels, val_labels, test_labels,):
     """

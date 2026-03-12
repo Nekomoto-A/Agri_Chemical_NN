@@ -550,8 +550,9 @@ def fold_evaluate(reg_list, output_dir, device,
                 for metrics, value in dict.items():
                     scores.setdefault(metrics, {}).setdefault(method_st, {}).setdefault(reg_name, []).append(value)
 
-            if model_name == 'TabPFN_ME':
-                model_name_nome = model_name.replace("_ME", "")
+            if 'TabPFN_' in model_name:
+                #model_name_nome = model_name.replace("_ME", "")
+                model_name_nome = 'TabPFN'
                 method_nome = 'ST_nome'
                 
                 vis_dir_nome = os.path.join(fold_dir, method_nome)

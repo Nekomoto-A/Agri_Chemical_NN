@@ -149,7 +149,7 @@ fold_eval.py:
   marginal_hist: False
   k_fold: 5
   feature_normalize: False
-  model_name: 'TabPFN_ME'
+  model_name: 'TabPFN_concat'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
@@ -175,13 +175,16 @@ fold_eval.py:
     '145_21_Miyz_Spin',
     '163_21_Miyz_Spin', #'171_21_Miyz_Spin',
     '141_21_Miyz_Spin', #'146_21_Miyz_Spin',
+
+    '161_21_Miyz_Spin',
+
     # '166_21_Miyz_Spin', '150_21_Miyz_Spin', 
     # '170_21_Miyz_Spin', #'156_21_Miyz_Spin', 
     # '167_21_Miyz_Spin', 
     # '327_22_Niig_Pear', 
     # '330_22_Niig_Pear',
 
-    #'137_21_Akit_Soyb', '231_21_Miyz_Edam',
+    '137_21_Akit_Soyb', #'231_21_Miyz_Edam',
     #'167_21_Miyz_Spin', #'244_21_Aomo_Appl'
     #'261_21_Naga_Appl'
 
@@ -193,16 +196,16 @@ fold_eval.py:
   feature_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\taxon_data\lv6.csv' #'C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\lv6.csv' #
   target_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\chem_data.xlsx' #'C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\chem_data.xlsx' #
   data_inte: False
-  transformer: ['log', None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
+  transformer: [None, None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
   reg_loss_fanction: ['mse', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
   eval_reg: ['R2', 'MedAE', 'MAE', 'RMSLE', 'RMSE']
   eval_class: ['Accuracy', 'F1score']
-  labels: ['crop'] #['experimental_purpose'] #['crop'] #['crop', 'pref', 'lati', 'long'] # #
+  labels: ['crop', 'pref'] #['experimental_purpose'] #['crop'] #['crop', 'pref', 'lati', 'long'] # #
   embedding: 'Word2Vec' #'Onehot' # #"concat" #
   embedding_size: 8
   latent_dim: 64
 main.py:
-  result_dir: 'result_TabPFN_ME'
+  result_dir: 'result_TabPFN_concat'
   reg_list: [
             # ['pref'], 
             # ['crop'], 
@@ -227,8 +230,8 @@ main.py:
 
             #[NH4.N], 
             ['Available.P'], 
-            #['pH'], 
-            #['NO3.N'], 
+            ['pH'], 
+            ['NO3.N'], 
             # ['EC'], 
             # ['Humus'], 
             # ['Exchangeable.K'], 
