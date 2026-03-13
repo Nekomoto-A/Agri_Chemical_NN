@@ -1,10 +1,10 @@
-
 from pyexpat import model
 
 import matplotlib.pyplot as plt
 import numpy as np
 
 import os
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import make_scorer, mean_squared_log_error
 from tabpfn import TabPFNClassifier, TabPFNRegressor
 import yaml
@@ -12,7 +12,8 @@ import yaml
 yaml_path = 'config.yaml'
 script_name = os.path.basename(__file__)
 with open(yaml_path, "r", encoding="utf-8") as file:
-    config = yaml.safe_load(file)[script_name]
+    #config = yaml.safe_load(file)[script_name]
+    config = yaml.safe_load(file)['train_TabPFN.py']
 
 import optuna
 from optuna.visualization import plot_optimization_history, plot_param_importances, plot_parallel_coordinate
@@ -126,87 +127,63 @@ def filter_low_mi_features(X_train, Y_train, threshold=0.1):
 
     return X_filtered, selected_indices
 
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C
 
-def training_TabPFN(x_tr,x_val,y_tr,y_val,models, reg_list, scalers, output_dir, train_ids, train_column, 
+def training_TabPFN_lf(x_tr,x_val,y_tr,y_val,models, labels_train_emb, labels_val_emb, reg_list, scalers, output_dir, 
                     optune = config['optune'], n_trials = config['n_trials'],filter_mi = config['filter_mi']
                 ):
+    
+    # if len(labels_train.keys()) == 1:
+    #     labels_train = labels_train[list(labels_train.keys())[0]]
+    #     labels_val = labels_val[list(labels_val.keys())[0]]
+
     train_dir = os.path.join(output_dir, 'train')
     os.makedirs(train_dir, exist_ok=True)
     
     x_tr = x_tr.cpu().detach().numpy()
-    x_val = x_val.cpu().detach().numpy()
+    
+    labels_train_emb = labels_train_emb.cpu().detach().numpy()
+
+    #x_val = x_val.cpu().detach().numpy()
+    #labels_val = labels_val.cpu().detach().numpy()
     
     y_tr = {reg: y.cpu().detach().numpy() for reg, y in y_tr.items()}
-    y_val = {reg: y.cpu().detach().numpy() for reg, y in y_val.items()}
+    #y_val = {reg: y.cpu().detach().numpy() for reg, y in y_val.items()}
 
     true = {}
     pred = {}
 
-    analyze_and_save_clusters(x_tr, train_ids, train_column, n_clusters=3, output_dir=train_dir)
+    res_models = {}
 
     for reg in reg_list:
         # score, indices = backward_selection(models[reg], x_tr, y_tr[reg], cv=5)
         # print(f'最終スコア:{score:.4f}, 選択された特徴量のインデックス: {indices}')
         if filter_mi:
-            x_tr, selected_indices = filter_low_mi_features(x_tr, y_tr[reg], threshold=0.3)
+            x_tr, selected_indices = filter_low_mi_features(x_tr, y_tr[reg], threshold=0.1)
         else:
             selected_indices = np.arange(x_tr.shape[1])
-        # x_tr = x_tr[:, indices]
-        
-        if optune:
-            def objective(trial):
-                try:
-                    params = {
-                        "n_estimators": trial.suggest_int("n_estimators", 4, 32),
-                        "softmax_temperature": trial.suggest_float("softmax_temperature", 0.8, 1.0),
-                    }
-                    # スコア計算（NaNが発生しやすい箇所）
-                    # 回帰の場合は R2 や negative RMSE を使用 [cite: 417, 958]
-                    model = models[reg].set_params(**params)
-                    #score = cross_val_score(model, x_tr, y_tr[reg], cv=5, scoring='r2').mean()
-                    if isinstance(model, TabPFNClassifier):
-                        scoring = 'roc_auc_ovr'
-                        score = cross_val_score(model, x_tr, y_tr[reg], cv=5, scoring=scoring).mean()
-                    else:
-                        #scoring = 'r2'
-                        # --- 回帰（MSLE）の場合の処理 ---
-                        # 負の値を防ぐため、値をクリップ（0以上に固定）するカスタムスコアラーを作成
-                        def capped_msle(y_true, y_pred):
-                            # MSLEは負の値でエラーになるため、0以下の値を微小な正の値に置き換える
-                            y_true_safe = np.maximum(y_true, 0)
-                            y_pred_safe = np.maximum(y_pred, 0)
-                            return mean_squared_log_error(y_true_safe, y_pred_safe)
 
-                        msle_scorer = make_scorer(capped_msle, greater_is_better=False) # 最小化のためFalse
-                        score = cross_val_score(model, x_tr, y_tr[reg], cv=5, scoring=msle_scorer).mean()
-                    
-                    if np.isnan(score):
-                        return 99999.0  # NaNの場合には非常に低いスコアを返す
-                    return score
-               
-                except Exception:
-                    return 99999.0
-            #study = optuna.create_study(direction="maximize")
-            study = optuna.create_study(
-                direction="minimize", 
-                #pruner=optuna.pruners.MedianPruner() # 必要に応じて追加
-            )
-            study.optimize(objective, n_trials=n_trials)
-            best_params = study.best_params
-            models[reg].set_params(**best_params)
+        # models[reg].fit(x_tr, y_tr[reg], labels_train)
+        # output = models[reg].predict(x_tr, labels_train)
 
-            fig1 = plot_optimization_history(study)
-            fig2 = plot_param_importances(study)
-            fig3 = plot_parallel_coordinate(study)
+        # X_train = np.concatenate([x_tr, labels_train_emb], axis=1)
+        # print(f"結合後の特徴量数: {X_train.shape[1]}")  
 
-            fig1.write_image(os.path.join(train_dir, f'opt_history_{reg}.png'))
-            fig2.write_image(os.path.join(train_dir, f'param_importance_{reg}.png'))
-            fig3.write_image(os.path.join(train_dir, f'parallel_coordinate_{reg}.png')) 
-        else:
-            pass
-
+        #models[reg].fit(X_train, y_tr[reg])
         models[reg].fit(x_tr, y_tr[reg])
         output = models[reg].predict(x_tr)
+        #print(f"予測値の形状: {output.shape}, 実際の値の形状: {y_tr[reg].shape}")
+        # 残差の計算
+        residuals = y_tr[reg].reshape(-1) - output
+        #print(residuals.shape)
+        # kernel = C(1.0) * RBF(length_scale=1.0)
+        # gpr = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=10)
+        # gpr.fit(X_train, residuals)
+        model = RandomForestRegressor()
+        model.fit(labels_train_emb, residuals)
+
+        res_models[reg] = model
 
         if reg in scalers:
             scaler = scalers[reg]
@@ -250,65 +227,4 @@ def training_TabPFN(x_tr,x_val,y_tr,y_val,models, reg_list, scalers, output_dir,
         print(f"学習データに対する予測値を {save_path} に保存しました。")
         plt.close() # メモリ解放のためにプロットを閉じる
 
-    return models, selected_indices
-
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.cluster import KMeans
-from sklearn.manifold import TSNE
-import os
-
-def analyze_and_save_clusters(features, ids, column_names, n_clusters=3, output_dir="output"):
-    """
-    KMeansクラスタリング、CSV保存、t-SNEによる可視化を行う関数
-    """
-    # 1. 保存先フォルダの作成
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-
-    # 2. KMeansによるクラスタリング
-    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
-    clusters = kmeans.fit_predict(features)
-
-    # 3. データの統合とCSV保存
-    # ID、特徴量、クラスタラベルを結合
-    df = pd.DataFrame(features, columns=column_names)
-    df.insert(0, 'ID', ids)
-    df['Cluster'] = clusters
-    
-    csv_path = os.path.join(output_dir, "clustering_results.csv")
-    df.to_csv(csv_path, index=False, encoding='utf-8-sig')
-    print(f"CSV saved to: {csv_path}")
-
-    # 4. t-SNEによる次元削減
-    print("Running t-SNE... (this may take a moment)")
-    tsne = TSNE(n_components=2, random_state=42)
-    tsne_results = tsne.fit_transform(features)
-
-    # 5. 散布図の作成と保存
-    plt.figure(figsize=(10, 7))
-    sns.scatterplot(
-        x=tsne_results[:, 0], 
-        y=tsne_results[:, 1],
-        hue=clusters,            # クラスタで色分け
-        palette='viridis',       # 色のスキーム
-        legend='full',
-        alpha=0.7
-    )
-    plt.title(f"t-SNE visualization of KMeans Clusters (k={n_clusters})")
-    plt.xlabel("t-SNE 1")
-    plt.ylabel("t-SNE 2")
-    
-    img_path = os.path.join(output_dir, "cluster_visualization.png")
-    plt.tight_layout()
-    plt.savefig(img_path)
-    plt.close() # メモリ解放
-    print(f"Plot saved to: {img_path}")
-
-# --- 実行例 ---
-# sample_features = np.random.rand(100, 10) # 100データ、10特徴量
-# sample_ids = [f"ID_{i}" for i in range(100)]
-# sample_cols = [f"Feature_{i}" for i in range(10)]
-# analyze_and_save_clusters(sample_features, sample_ids, sample_cols, n_clusters=3)
+    return models, selected_indices, res_models

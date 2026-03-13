@@ -107,13 +107,21 @@ def onehot_encode_and_split(train_labels, val_labels, test_labels):
         if v_tensor is not None:
             out_val[key]   = combined_onehot[len_t : len_t + len_v]
         out_test[key]  = combined_onehot[len_t + len_v :]
-    if len(keys) == 1:
+    if len(keys) != 1:
         out_train = torch.cat(list(out_train.values()), dim=1)
         out_test = torch.cat(list(out_test.values()), dim=1)
         if v_tensor is not None:
             out_val = torch.cat(list(out_val.values()), dim=1) if v_tensor is not None else None
         else:
             out_val = None
+    else:
+        out_train = out_train[keys[0]]
+        out_test = out_test[keys[0]] 
+        if v_tensor is not None:
+            out_val = out_val[keys[0]]
+        else:
+            out_val = None
+    
     # 4. 出力形式の調整（ラベルが1種類のみか、複数か）
     # if len(keys) == 1:
     #     single_key = keys[0]
@@ -176,7 +184,7 @@ def create_w2v_models(label_encoders, vector_size=100):
 # 既存のlabel_encoders（辞書型）がある前提です
 # w2v_models = create_w2v_models(label_encoders, vector_size=64)
 
-def w2v_encode_and_split(train_labels, val_labels, test_labels, label_encoders, w2v_models):
+def w2v_encode_and_split(train_labels, val_labels, test_labels, label_encoders, w2v_models, output_dir):
     """
     数値を元のラベルに戻し、Word2Vecで埋め込み（Embedding）を行って分割する関数。
 
@@ -186,6 +194,7 @@ def w2v_encode_and_split(train_labels, val_labels, test_labels, label_encoders, 
         test_labels (dict): テスト用ラベル
         label_encoders (dict): 各ラベル用の学習済み LabelEncoder {'label_name': encoder, ...}
         w2v_models (dict): 各ラベル用の学習済み Word2Vecモデル {'label_name': model, ...}
+        output_dir (str): 画像の保存ディレクトリ
 
     Returns:
         tuple: (train_out, val_out, test_out)
@@ -196,6 +205,8 @@ def w2v_encode_and_split(train_labels, val_labels, test_labels, label_encoders, 
     out_test = {}
     
     keys = list(train_labels.keys())
+
+    originals = {}
     
     for key in keys:
         # 1. データの取得と結合
@@ -217,6 +228,8 @@ def w2v_encode_and_split(train_labels, val_labels, test_labels, label_encoders, 
         combined_np = combined.cpu().numpy().astype(int)
         le = label_encoders[key]
         original_labels = le.inverse_transform(combined_np)
+
+        originals[key] = original_labels
         
         # 3. Word2Vecによるベクトル化
         w2v_model = w2v_models[key]
@@ -252,6 +265,11 @@ def w2v_encode_and_split(train_labels, val_labels, test_labels, label_encoders, 
             out_val = out_val[keys[0]]
         else:
             out_val = None
+    
+    for key, original in originals.items():
+         save_tsne_plot(out_train, original[:len_t], output_dir = output_dir, save_path=f"embedding_{key}.png")
+        
+
     # # 5. 出力形式の調整
     # if len(keys) == 1:
     #     single_key = keys[0]
@@ -266,7 +284,7 @@ def w2v_encode_and_split(train_labels, val_labels, test_labels, label_encoders, 
     #         return out_train, None, out_test
     return out_train, out_val, out_test
     
-def concat_encode_and_split(train_labels, val_labels, test_labels,):
+def concat_encode_and_split(train_labels, test_labels, val_labels):
     """
     数値を元のラベルに戻し、Word2Vecで埋め込み（Embedding）を行って分割する関数。
 
@@ -288,15 +306,64 @@ def concat_encode_and_split(train_labels, val_labels, test_labels,):
     train_list_2d = [t.unsqueeze(-1) for t in train_list]
     out_train = torch.cat(train_list_2d, dim=1)
     
-    if val_labels is not None:
+    if all(value is None for value in val_labels.values()):
+        out_val = None
+    else:
         val_list = list(val_labels.values())
         val_list_2d = [t.unsqueeze(-1) for t in val_list]
         out_val = torch.cat(val_list_2d, dim=1)
-    else:
-        out_val = None
     
     test_list = list(test_labels.values())
     test_list_2d = [t.unsqueeze(-1) for t in test_list]
     out_test = torch.cat(test_list_2d, dim=1)
     
     return out_train, out_val, out_test
+
+import torch
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
+
+def save_tsne_plot(X, labels, output_dir, save_path="tsne_result.png"):
+    """
+    X: torch.Tensor型 (n_samples, n_features)
+    labels: numpy.ndarray型 (n_samples,)
+    output_dir: 画像の保存ディレクトリ
+    save_path: 画像の保存パス
+    """
+    
+    # 1. PyTorchテンソルをNumPy配列に変換
+    # GPUに乗っている場合や勾配計算が残っている場合に備えて detach().cpu() を挟みます
+    if isinstance(X, torch.Tensor):
+        X_np = X.detach().cpu().numpy()
+    else:
+        X_np = X
+
+    # 2. t-SNEの実行
+    # n_components=2 で2次元に削減します
+    tsne = TSNE(n_components=2, random_state=42)
+    X_embedded = tsne.fit_transform(X_np)
+
+    # 3. 描画の設定
+    plt.figure(figsize=(10, 8))
+    unique_labels = np.unique(labels)
+    
+    # ラベルごとに色を変えてプロット
+    for label in unique_labels:
+        indices = np.where(labels == label)
+        plt.scatter(
+            X_embedded[indices, 0], 
+            X_embedded[indices, 1], 
+            label=f"{label}",
+            alpha=0.6 # 重なりが見えやすいよう少し透明にします
+        )
+
+    # 4. 仕上げと保存
+    plt.legend()
+    #plt.title("t-SNE Visualization")
+    plt.xlabel("Dimension 1")
+    plt.ylabel("Dimension 2")
+    save_dir = os.path.join(output_dir, save_path)
+    plt.savefig(save_dir)
+    plt.close() # メモリ節約のためグラフを閉じます
+    print(f"図を {save_dir} に保存しました。")

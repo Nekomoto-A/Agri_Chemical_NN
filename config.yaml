@@ -130,7 +130,7 @@ train_TabPFN.py:
 test.py:
   loss_sum: 'WeightedSUM' #'SUM' #
   num_predictive_samples: 100
-  shap_eval: False
+  shap_eval: True
   save_feature: False
   batch_size: 256
   Adapte: None #'Adapter' #retrain #'retrain' #'AdaBN' #'retrain' #None #'retrain' #
@@ -149,7 +149,7 @@ fold_eval.py:
   marginal_hist: False
   k_fold: 5
   feature_normalize: False
-  model_name: 'TabPFN_concat'
+  model_name: 'TabPFN_ensemble'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
@@ -201,11 +201,11 @@ fold_eval.py:
   eval_reg: ['R2', 'MedAE', 'MAE', 'RMSLE', 'RMSE']
   eval_class: ['Accuracy', 'F1score']
   labels: ['crop', 'pref'] #['experimental_purpose'] #['crop'] #['crop', 'pref', 'lati', 'long'] # #
-  embedding: 'Word2Vec' #'Onehot' # #"concat" #
+  embedding: 'Onehot' #'Word2Vec' #'Onehot' # #"concat" #
   embedding_size: 8
   latent_dim: 64
 main.py:
-  result_dir: 'result_TabPFN_concat'
+  result_dir: 'result_TabPFN_cluster_ensemble'
   reg_list: [
             # ['pref'], 
             # ['crop'], 

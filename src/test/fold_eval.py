@@ -407,6 +407,9 @@ def fold_evaluate(reg_list, output_dir, device,
         
         #test_df = pd.DataFrame(index=test_ids)
 
+        emb_dir = os.path.join(fold_dir, 'embedding')
+        os.makedirs(emb_dir, exist_ok=True)
+
         if embedding == 'Onehot':
             from src.datasets.emb_fns import onehot_encode_and_split
             label_train_embedded, label_val_embedded, label_test_embedded = onehot_encode_and_split(label_train_tensor, label_val_tensor, label_test_tensor,)
@@ -419,20 +422,22 @@ def fold_evaluate(reg_list, output_dir, device,
                                                                                                  label_test_tensor, 
                                                                                                  label_encoders, 
                                                                                                  emb_models,
+                                                                                                output_dir = emb_dir
                                                                                                 )
-        elif embedding == 'concat':
+        else:
+            #print(label_val_tensor)
             from src.datasets.emb_fns import concat_encode_and_split
-            label_train_embedded, label_val_embedded, label_test_embedded = concat_encode_and_split(label_train_tensor, 
-                                                                                                 label_val_tensor, 
+            label_train_embedded, label_val_embedded, label_test_embedded = concat_encode_and_split(label_train_tensor,  
                                                                                                  label_test_tensor, 
+                                                                                                 label_val_tensor,
                                                                                                 )
-
+            #print(label_train_embedded)
         if labels != []:
             from src.datasets.emb_fns import save_combined_data_to_csv
             save_combined_data_to_csv(filepath = 'emb_labels.csv', 
                                     original_labels = label_train_tensor, 
                                     embedded_tensor = label_train_embedded, 
-                                    output_dir = fold_dir, 
+                                    output_dir = emb_dir, 
                                     target_vars_dict = Y_train_tensor, 
                                     label_encoders = label_encoders
                                     )

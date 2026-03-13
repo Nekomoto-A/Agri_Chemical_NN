@@ -895,7 +895,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         number_of_classes = unique_labels.numel()
 
     output_dims = []
-    print(labels_train)
+    #print(labels_train)
     if labels_train != {}:
         label_dim = labels_train.shape[1]
 
@@ -979,11 +979,23 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                 if 'ME' in model_name:
                     from src.models.ME import MixedEffectSklearn
                     model[reg] = MixedEffectSklearn(fixed_model=model[reg])
+                elif 'ensemble' in model_name:
+                    from src.models.TabPFN_ensemble import TabPFNClusterRegressor
+                    model[reg] = TabPFNClusterRegressor(model=model[reg], 
+                                                        #n_clusters=5, 
+                                                        #sigma=1.0
+                                                        )
             else:
                 model[reg] = TabPFNClassifier(
                     device=device_name
                     #device='cpu'
                     )
+                if 'ensemble' in model_name:
+                    from src.models.TabPFN_ensemble import TabPFNClusterClassifier
+                    model[reg] = TabPFNClusterClassifier(model=model[reg], 
+                                                        #n_clusters=5, 
+                                                        #sigma=1.0
+                                                        )
 
     elif 'AE' in model_name:
         if 'GMVAE' in model_name:
@@ -1305,11 +1317,35 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                              models = model_trained, reg_list = reg_list, scalers = scalers, output_dir = vis_dir,
                                               test_ids = test_ids, feature_names=features, lime_local = lime_eval,  #save_feature = save_feature,
                                               eval_reg = eval_reg, eval_class = eval_class, selected_indices = selected_indices)
-    elif model_name == 'TabPFN':
+    elif model_name == 'TabPFN_lf':
+        from src.training.train_TabPFN_lf import training_TabPFN_lf
+        model_trained, selected_indices, res_models = training_TabPFN_lf(x_tr = X_train, x_val = X_val, y_tr = Y_train, y_val = Y_val, 
+                                                                         labels_train_emb = labels_train, labels_val_emb = labels_val_original,
+                                        models = model, reg_list = reg_list, scalers = scalers, 
+                                        output_dir = vis_dir)
+        from src.test.test_TabPFN_lf import test_TabPFN_lf
+        predicts, true, scores = test_TabPFN_lf(x_te = X_test,y_te_tensor = Y_test, labels_test_emb = labels_test, res_models = res_models,
+                                             x_train = X_train, y_train = Y_train, labels_train_emb = labels_train,
+                                             models = model_trained, reg_list = reg_list, scalers = scalers, output_dir = vis_dir,
+                                              test_ids = test_ids, feature_names=features, lime_local = lime_eval,  #save_feature = save_feature,
+                                              eval_reg = eval_reg, eval_class = eval_class, selected_indices = selected_indices)
+    elif model_name == 'TabPFN_cca':
+        from src.training.train_TabPFN_cca import training_TabPFN_cca
+        model_trained, selected_indices, cca= training_TabPFN_cca(x_tr = X_train, x_val = X_val, y_tr = Y_train, y_val = Y_val, 
+                                                                         labels_train_emb = labels_train, labels_val_emb = labels_val_original,
+                                        models = model, reg_list = reg_list, scalers = scalers, 
+                                        output_dir = vis_dir)
+        from src.test.test_TabPFN_cca import test_TabPFN_cca
+        predicts, true, scores = test_TabPFN_cca(x_te = X_test,y_te_tensor = Y_test, labels_test_emb = labels_test, cca = cca,
+                                             x_train = X_train, y_train = Y_train, labels_train_emb = labels_train,
+                                             models = model_trained, reg_list = reg_list, scalers = scalers, output_dir = vis_dir,
+                                              test_ids = test_ids, feature_names=features, lime_local = lime_eval,  #save_feature = save_feature,
+                                              eval_reg = eval_reg, eval_class = eval_class, selected_indices = selected_indices)
+    elif 'TabPFN' in model_name:
         from src.training.train_TabPFN import training_TabPFN
         model_trained, selected_indices = training_TabPFN(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, 
                                         models = model, reg_list = reg_list, scalers = scalers, 
-                                        output_dir = vis_dir)
+                                        output_dir = vis_dir, train_ids = train_ids, train_column = features,)
         from src.test.test_TabPFN import test_TabPFN
         predicts, true, scores = test_TabPFN(x_te = X_test,y_te_tensor = Y_test, x_train = X_train, y_train = Y_train, 
                                              models = model_trained, reg_list = reg_list, scalers = scalers, output_dir = vis_dir,

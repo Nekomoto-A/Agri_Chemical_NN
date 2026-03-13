@@ -484,6 +484,18 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
             x_val = x_val[selected_features]
         print(f"選択された特徴量数: {len(selected_features)}")
         #print(f"学習データ:{x_train_split}")
+    elif feature_selection == 'vif':
+        print(f'特徴選択前：{x_train_split.shape}')
+        # SHAPを用いた特徴選択
+        #for reg in reg_list:
+        from src.datasets.feature_selection import select_features_with_vif_report
+        x_train_split, selected_features = select_features_with_vif_report(x_train_split, output_dir = fold, thresh=10.0, csv_dir="original_vif_report.csv")
+        #x_train_split = x_train_split[selected_features]
+        x_test = x_test[selected_features]
+        if isinstance(val_size, (int, float)):
+            x_val = x_val[selected_features]
+        print(f"選択された特徴量数: {len(selected_features)}")
+        #print(f"学習データ:{x_train_split}")
     elif feature_selection == 'mi':
         print(f'特徴選択前：{x_train_split.shape}')
         # SHAPを用いた特徴選択

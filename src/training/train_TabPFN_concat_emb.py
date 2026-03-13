@@ -142,9 +142,6 @@ def training_TabPFN_concat(x_tr,x_val,y_tr,y_val,models, labels_train_emb, label
     
     labels_train_emb = labels_train_emb.cpu().detach().numpy()
 
-    X_train = np.concatenate([x_tr, labels_train_emb], axis=1)
-    print(f"結合後の特徴量数: {X_train.shape[1]}")
-
     #x_val = x_val.cpu().detach().numpy()
     #labels_val = labels_val.cpu().detach().numpy()
     
@@ -164,6 +161,10 @@ def training_TabPFN_concat(x_tr,x_val,y_tr,y_val,models, labels_train_emb, label
 
         # models[reg].fit(x_tr, y_tr[reg], labels_train)
         # output = models[reg].predict(x_tr, labels_train)
+
+        X_train = np.concatenate([x_tr, labels_train_emb], axis=1)
+        print(f"結合後の特徴量数: {X_train.shape[1]}")  
+
         models[reg].fit(X_train, y_tr[reg])
         output = models[reg].predict(X_train)
 
