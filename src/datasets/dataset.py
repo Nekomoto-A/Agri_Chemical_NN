@@ -112,6 +112,66 @@ def save_mutual_info_matrix(df1, df2, file_name="mutual_info_matrix.csv"):
     print(f"保存が完了しました: {file_name}")
     return mi_matrix
 
+def save_variance_report(df_cont, labels, file_name="variance_report.csv"):
+    """
+    連続値データの全体およびラベル別分散を計算し、CSVに保存する関数
+    
+    Args:
+        df_cont (pd.DataFrame): 連続値のみのデータ
+        labels (pd.Series or list): 各行に対応するラベル
+        file_name (str): 保存するCSVのファイル名
+    """
+    
+    # 1. 計算用にラベルを結合した一時的なDataFrameを作成
+    temp_df = df_cont.copy()
+    temp_df['__label__'] = labels
+    
+    # 2. 全体の分散を計算 (転置してSeriesにする)
+    overall_var = df_cont.var()
+    
+    # 3. ラベルごとの分散を計算
+    # groupbyでラベルごとに分け、分散を計算。その後、扱いやすいように転置(T)する
+    grouped_var = temp_df.groupby('__label__').var().T
+    
+    # 4. 全体分散とラベル別分散を結合
+    # axis=1 で横方向に結合。列名を分かりやすく設定
+    result = pd.concat([overall_var.rename('Overall_Variance'), grouped_var], axis=1)
+    
+    # 5. CSVファイルとして保存
+    result.to_csv(file_name)
+    print(f"分散レポートを '{file_name}' として保存しました。")
+    
+    return result
+import pandas as pd
+
+def calculate_nonzero_ratios_safe(df, labels):
+    """
+    ラベルに欠損値がある場合、その行を除外して非ゼロ割合を算出する関数
+    """
+    # 1. labelsをSeriesに変換（リストなどの場合に対応）
+    labels_series = pd.Series(labels, index=df.index)
+    
+    # 2. ラベルが欠損（NaN）しているインデックスを特定して除外
+    valid_mask = labels_series.notna()
+    df_clean = df[valid_mask]
+    labels_clean = labels_series[valid_mask]
+    
+    # --- 以降は元のロジック ---
+    
+    # 0でない要素を真偽値に変換
+    is_nonzero = df_clean != 0
+    
+    # 全体の非ゼロ割合
+    overall_ratio = is_nonzero.mean().to_frame(name='Overall')
+    
+    # ラベルごとの非ゼロ割合（転置して結合しやすくする）
+    grouped_ratio = is_nonzero.groupby(labels_clean).mean().T
+    
+    # 結合して結果を返す
+    result = pd.concat([overall_ratio, grouped_ratio], axis=1)
+    
+    return result
+
 class data_create:
     def __init__(self,path_asv,path_chem,reg_list,exclude_ids, 
                  output_dir = None, 
@@ -196,20 +256,35 @@ class data_create:
                     index=taxa
                 )
 
-                # 階層順にソート
-                tax_sorted = tax_split.sort_values(by=tax_levels)
-                # 並び替えた分類名で元のデータフレームの列順を並び替え
-                asv_data = asv_data[tax_sorted.index]
-                non_zero_ratio = (asv_data != 0).apply(lambda x: x.dropna().sum()) / len(asv_data)
+                # # 階層順にソート
+                # tax_sorted = tax_split.sort_values(by=tax_levels)
+                # # 並び替えた分類名で元のデータフレームの列順を並び替え
+                # asv_data = asv_data[tax_sorted.index]
+                # non_zero_ratio = (asv_data != 0).apply(lambda x: x.dropna().sum()) / len(asv_data)
 
-                # 3. 結果をDataFrameに変換して整形
-                result_df = non_zero_ratio.to_frame(name='non_zero_percentage')
-
-                # 4. CSVファイルとして保存
-                if self.output_dir is not None:
-                    output_filename = 'features_non_zero_ratios.csv'
+                # # 3. 結果をDataFrameに変換して整形
+                # result_df = non_zero_ratio.to_frame(name='non_zero_percentage')
+                if 'crop' in self.chem_data.columns:
+                    result_df = calculate_nonzero_ratios_safe(asv_data, self.chem_data['crop'])
+                    output_filename = 'features_non_zero_ratios_crop.csv'
                     columns_to_drop_dir = os.path.join(self.output_dir, output_filename)
                     result_df.to_csv(columns_to_drop_dir, index=True)
+                if 'pref' in self.chem_data.columns:
+                    result_df = calculate_nonzero_ratios_safe(asv_data, self.chem_data['pref'])
+                    output_filename = 'features_non_zero_ratios_pref.csv'
+                    columns_to_drop_dir = os.path.join(self.output_dir, output_filename)
+                    result_df.to_csv(columns_to_drop_dir, index=True)
+                if 'experimental_purpose' in self.chem_data.columns:
+                    result_df = calculate_nonzero_ratios_safe(asv_data, self.chem_data['experimental_purpose'])
+                    output_filename = 'features_non_zero_ratios_experimental_purpose.csv'
+                    columns_to_drop_dir = os.path.join(self.output_dir, output_filename)
+                    result_df.to_csv(columns_to_drop_dir, index=True)
+                
+                # 4. CSVファイルとして保存
+                # if self.output_dir is not None:
+                #     output_filename = 'features_non_zero_ratios.csv'
+                #     columns_to_drop_dir = os.path.join(self.output_dir, output_filename)
+                #     result_df.to_csv(columns_to_drop_dir, index=True)
 
                 if self.sparce_drop:
                     asv_data = drop_sparse_columns(asv_data, threshold = self.drop_threshold)
@@ -221,11 +296,11 @@ class data_create:
         chem_data = self.chem_data
         #print(asv_data)
         #print(chem_data)
+        asv_original = asv_data.copy()
         if 'riken' in self.path_asv:
             if self.exclude_ids != None:
                 mask = ~chem_data['crop-id'].isin(self.exclude_ids)
                 asv_data,chem_data = asv_data[mask], chem_data[mask]
-        
         label_encoders = {}
         
         for r in self.reg_list:
@@ -329,7 +404,15 @@ class data_create:
             asv_array = asv_data.where(asv_data != 0, asv_data + 1e-100).values
             asv_feature = pd.DataFrame(asv_array, columns=asv_data.columns, index=asv_data.index)
         
-        
+        if 'crop' in chem_data.columns:
+            std_dir = os.path.join(self.output_dir, 'variance_report_crop.csv')
+            save_variance_report(asv_feature, chem_data['crop'], file_name=std_dir)
+        if 'pref' in chem_data.columns:
+            std_dir = os.path.join(self.output_dir, 'variance_report_pref.csv')
+            save_variance_report(asv_feature, chem_data['pref'], file_name=std_dir)
+        if 'experimental_purpose' in chem_data.columns:
+            std_dir = os.path.join(self.output_dir, 'variance_report_experimental_purpose.csv')
+            save_variance_report(asv_feature, chem_data['experimental_purpose'], file_name=std_dir)
         # if self.label_data is not None:
         #     for l in self.label_data:
         #         if ('riken' in self.path_asv) and (l == 'experimental_purpose'):

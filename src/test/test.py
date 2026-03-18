@@ -979,12 +979,19 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                 if 'ME' in model_name:
                     from src.models.ME import MixedEffectSklearn
                     model[reg] = MixedEffectSklearn(fixed_model=model[reg])
+                elif 'ensemble_meta' in model_name:
+                    from src.models.TabPFN_ensemble import TabPFNMetaEnsemble
+                    model[reg] = TabPFNMetaEnsemble(device=device_name
+                                                        )
                 elif 'ensemble' in model_name:
                     from src.models.TabPFN_ensemble import TabPFNClusterRegressor
                     model[reg] = TabPFNClusterRegressor(model=model[reg], 
                                                         #n_clusters=5, 
                                                         #sigma=1.0
                                                         )
+                elif 'domein' in model_name:
+                    from src.models.TabPFN_ensemble import DomainInformedTabPFN
+                    model[reg] = DomainInformedTabPFN(model=model[reg])
             else:
                 model[reg] = TabPFNClassifier(
                     device=device_name
@@ -1293,7 +1300,19 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
 
         from src.test.test_BNN import test_BNN_MT
         predicts, true, scores = test_BNN_MT(X_test,Y_test,model_trained,reg_list,scalers,output_dir=vis_dir)
-    elif model_name == 'TabPFN_ME':
+    elif model_name == 'TabPFN_ensemble_meta':
+        from src.training.train_TabPFN_meta import training_TabPFN_META
+        model_trained, selected_indices = training_TabPFN_META(x_tr = X_train, x_val = X_val, y_tr = Y_train, y_val = Y_val, 
+                                                             labels_train = labels_train_original, labels_val = labels_val_original,
+                                        models = model, reg_list = reg_list, scalers = scalers, 
+                                        output_dir = vis_dir)
+        from src.test.test_TabPFN_meta import test_TabPFN_META
+        predicts, true, scores = test_TabPFN_META(x_te = X_test,y_te_tensor = Y_test, labels_test = labels_test_original,
+                                             x_train = X_train, y_train = Y_train, labels_train = labels_train_original,
+                                             models = model_trained, reg_list = reg_list, scalers = scalers, output_dir = vis_dir,
+                                              test_ids = test_ids, feature_names=features, lime_local = lime_eval,  #save_feature = save_feature,
+                                              eval_reg = eval_reg, eval_class = eval_class, selected_indices = selected_indices)
+    elif (model_name == 'TabPFN_ME') or (model_name == 'TabPFN_domein'):
         from src.training.train_TabPFN_ME import training_TabPFN_ME
         model_trained, selected_indices = training_TabPFN_ME(x_tr = X_train, x_val = X_val, y_tr = Y_train, y_val = Y_val, 
                                                              labels_train = labels_train_original, labels_val = labels_val_original,

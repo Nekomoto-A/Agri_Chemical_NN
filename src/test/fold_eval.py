@@ -210,7 +210,7 @@ from umap.umap_ import UMAP
 import numpy as np
 import os
 
-def save_tsne_plots(X, Y, target_columns, save_dir="tsne_results"):
+def save_tsne_plots(X, Y, target_columns, id_column = 'crop-id',save_dir="tsne_results"):
     """
     Xのデータをt-SNEで2次元に削減し、Yの各カラムで色分けした図を保存する関数
     """
@@ -231,32 +231,41 @@ def save_tsne_plots(X, Y, target_columns, save_dir="tsne_results"):
     
     # 2. 指定された各カラムについてループ
     for col in target_columns:
-        plt.figure(figsize=(10, 7))
+        plt.figure(figsize=(12, 8)) # アノテーションが見やすいよう少し大きめに設定
         
         # Yから対象カラムをコピー
         df_plot[col] = Y[col].values
         
-        # 3. 連続値かカテゴリ値かによる条件分岐
+        # 3. 散布図の描画
         if pd.api.types.is_numeric_dtype(Y[col]):
-            # 連続値：散布図とカラーバー
             scatter = plt.scatter(df_plot['tsne_1'], df_plot['tsne_2'], 
-                                  c=df_plot[col], cmap='viridis', s=20)
+                                  c=df_plot[col], cmap='viridis', s=30)
             plt.colorbar(scatter, label=col)
-            plt.title(f't-SNE plot colored by {col} (Continuous)')
         else:
-            # ラベルデータ：seabornのscatterplotで凡例を表示
             sns.scatterplot(data=df_plot, x='tsne_1', y='tsne_2', 
-                            hue=col, palette='viridis', s=20)
+                            hue=col, palette='viridis', s=30)
             plt.legend(title=col, bbox_to_anchor=(1.05, 1), loc='upper left')
-            plt.title(f't-SNE plot colored by {col} (Categorical)')
 
+        # --- 追加機能: IDのアノテーション ---
+        if id_column is not None and id_column in Y.columns:
+            labels = Y[id_column].values
+            for i, label in enumerate(labels):
+                plt.annotate(label, 
+                             (df_plot['tsne_1'][i], df_plot['tsne_2'][i]),
+                             textcoords="offset points", # 点からの相対距離で指定
+                             xytext=(5, 5),               # 右上に5ポイントずつずらす
+                             ha='center',                # 水平方向の揃え
+                             fontsize=2,                 # フォントサイズ
+                             alpha=0.7)                  # 少し透過させて重なりを軽減
+        # ----------------------------------
+
+        #plt.title(f't-SNE plot colored by {col}')
         plt.tight_layout()
         
         # 4. 図の保存
         filename = f"tsne_{col}.png"
         filepath = os.path.join(save_dir, filename)
-        plt.tight_layout()
-        plt.savefig(filepath)
+        plt.savefig(filepath, dpi=300) # 解像度を高めに設定
         plt.close()
         print(f"保存完了: {filepath}")
 
