@@ -173,59 +173,52 @@ def plot_single_instance_explanation(model, train_data, test_instance, feature_n
     plt.close()
 
 import numpy as np
-from scipy.special import roots_hermite
+import matplotlib.pyplot as plt
+import os
 
-def tabpfn_corrected_inverse(mu, sigma, pp_transformer):
+def save_labeled_histograms(data, labels, save_path, bins=30, alpha=0.5):
     """
-    mu: TabPFNが予測した変換後スケールの平均
-    sigma: TabPFNが予測した変換後スケールの標準偏差
-    pp_transformer: 学習済みの PowerTransformer (Yeo-Johnson)
-    """
-    # 1. 求積のための点(nodes)と重み(weights)を取得
-    # 5点〜10点程度で実用上十分な精度になります
-    nodes, weights = roots_hermite(10)
-    
-    # 2. 標準正規分布の点を、モデルの予測分布(mu, sigma)へ変換
-    # Formula: x = mu + sqrt(2) * sigma * nodes
-    scaled_nodes = mu + np.sqrt(2) * sigma * nodes.reshape(-1, 1)
-    
-    # 3. 各点を Yeo-Johnson で逆変換
-    # points_original_scale の形状は (nodes数, サンプル数)
-    points_original_scale = np.array([
-        pp_transformer.inverse_transform(p.reshape(-1, 1)).flatten()
-        for p in scaled_nodes
-    ])
-    
-    # 4. 重み付き平均を計算して「元のスケールでの期待値」を算出
-    # 期待値 E[y] = (1/√π) * Σ (w_i * f_inv(x_i))
-    corrected_mean = np.dot(weights, points_original_scale) / np.sqrt(np.pi)
-    
-    return corrected_mean
+    ラベルごとにデータのヒストグラムを作成し、保存する関数。
 
-def log1p_corrected_inverse(model, X_test):
+    Parameters:
+    - data (np.ndarray): 1次元の数値データ
+    - labels (np.ndarray): データに対応するラベル
+    - save_path (str): 保存先のファイルパス (例: 'output/result.png')
+    - bins (int): ヒストグラムの棒の数
+    - alpha (float): グラフの透明度 (0.0 ～ 1.0)
     """
-    Log1p変換に対する不確実性を利用した逆変換補正
-    """
-    # 1. 必要な分位点を取得 (15.87%, 50%, 84.13%)
-    qs = [0.1587, 0.5, 0.8413]
-    quant_results = model.predict(X_test, output_type="quantiles", quantiles=qs)
     
-    q_low = quant_results[0]    # 約 mu' - sigma'
-    mu_log = quant_results[1]   # 中央値 (対数スケールでの平均 mu')
-    q_high = quant_results[2]   # 約 mu' + sigma'
-    
-    # 2. 対数スケールでの標準偏差 sigma' を算出
-    sigma_log = (q_high - q_low) / 2.0
-    
-    # 3. 解析的な補正公式の適用
-    # E[y] = exp(mu' + 0.5 * sigma'^2) - 1
-    # np.expm1(x) は exp(x) - 1 を精度良く計算する関数
-    corrected_pred = np.expm1(mu_log + 0.5 * (sigma_log**2))
-    
-    return corrected_pred
+    # 1. 保存先のディレクトリが存在しない場合は作成
+    directory = os.path.dirname(save_path)
+    if directory and not os.path.exists(directory):
+        os.makedirs(directory)
+        print(f"ディレクトリを作成しました: {directory}")
 
-def test_TabPFN(x_te, y_te_tensor, 
-              x_train, y_train, 
+    # 2. グラフの初期化
+    plt.figure(figsize=(10, 6))
+    
+    # 3. ユニークなラベルごとにループして描画
+    unique_labels = np.unique(labels)
+    for label in unique_labels:
+        # ラベルが一致するインデックスのデータを抽出
+        subset = data[labels == label]
+        plt.hist(subset, bins=bins, alpha=alpha, label=f'Label: {label}', edgecolor='black')
+
+    # 4. グラフの装飾
+    plt.title('Comparison of Distributions by Label')
+    plt.xlabel('Value')
+    plt.ylabel('Frequency')
+    plt.legend()  # 凡例を表示
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+
+    # 5. 保存と終了
+    plt.savefig(save_path)
+    plt.close()
+    print(f"グラフを保存しました: {save_path}")
+
+
+def test_TabPFN_shuffle(x_te, y_te_tensor, labels_test, 
+              x_train, y_train, labels_train, 
               models, reg_list, scalers, output_dir, 
               test_ids, feature_names, 
               eval_reg, eval_class,
@@ -233,8 +226,16 @@ def test_TabPFN(x_te, y_te_tensor,
               label_encoders = None, 
               selected_indices = None
               ):
+    
+    if len(labels_test.keys()) == 1:
+        labels_train = labels_train[list(labels_train.keys())[0]]
+        labels_test = labels_test[list(labels_test.keys())[0]]
+
     x_te = x_te.cpu().detach().numpy()
     x_train = x_train.cpu().detach().numpy()
+    labels_train = labels_train.cpu().detach().numpy()
+    labels_test = labels_test.cpu().detach().numpy()
+    
     if selected_indices is not None:
         x_te = x_te[:, selected_indices]
         x_train = x_train[:, selected_indices]
@@ -249,6 +250,7 @@ def test_TabPFN(x_te, y_te_tensor,
     for reg in reg_list:
         result_dir = os.path.join(output_dir, reg)
         os.makedirs(result_dir, exist_ok=True)
+
         #print(test_ids)
         if lime_local:
             for i, test_instance in enumerate(x_te): # 最初の5件に対してLIMEの説明を生成
@@ -256,7 +258,7 @@ def test_TabPFN(x_te, y_te_tensor,
                                                 feature_names = feature_names, output_dir = result_dir, data_id = test_ids.to_list()[i])
         # # 1. バッチ処理を行うためのラッパー関数を定義
         # def batched_predict(data):
-        #     batch_size = 5  # メモリ状況に応じて調整（小さくするとメモリ消費が減ります）
+        #     batch_size = 100  # メモリ状況に応じて調整（小さくするとメモリ消費が減ります）
         #     predictions = []
         #     for i in range(0, len(data), batch_size):
         #         batch = data[i:i + batch_size]
@@ -265,7 +267,6 @@ def test_TabPFN(x_te, y_te_tensor,
         #         predictions.append(pred)
         #     return np.concatenate(predictions)
         # explainer = shap.KernelExplainer(batched_predict, shap.sample(x_train, 50))
-        # explainer = shap.PermutationExplainer(models[reg].predict, x_train[:100])
         
         # shap_values = explainer.shap_values(x_te) # 計算時間を考慮し20件のみ
         # shap_dir = os.path.join(output_dir, 'shap_results')
@@ -314,6 +315,7 @@ def test_TabPFN(x_te, y_te_tensor,
 
         # 回帰タスクの処理
         elif torch.is_floating_point(y_te_tensor[reg]):
+            #output = models[reg].predict(x_te, labels_test)
             output = models[reg].predict(x_te)
             #print(output)
             true_tensor = y_te[reg]
@@ -323,21 +325,21 @@ def test_TabPFN(x_te, y_te_tensor,
                 scaler = scalers[reg]
                 true = scaler.inverse_transform(true_tensor.reshape(-1, 1))
                 # if is_log1p_transformer(scaler):
-                #     pred = log1p_corrected_inverse(models[reg], x_te).reshape(-1,1)
+                #     train_out = models[reg].predict(x_train)
+                #     y_train_pred_log1p = train_out
+                #     y_train_log1p = y_train[reg]
+
+                #     pred_log = pred_tensor_for_eval
+                #     from src.test.test import apply_smearing_log1p
+                #     pred, coff = apply_smearing_log1p(y_train_log1p, y_train_pred_log1p, pred_log)
+                #     print(f'対数変換のためスメアリング推定による補正を行います(係数：{coff})')
                 # elif isinstance(scaler, PowerTransformer):
-                #     # 1. 必要な分位点を指定して取得
-                #     qs = [0.1587, 0.5, 0.8413] 
-                #     quantiles_out = models[reg].predict(x_te, output_type='quantiles', quantiles=qs)
-
-                #     # 2. 各分位点を取り出す
-                #     q_low = quantiles_out[0]   # 15.87%
-                #     y_pred_mu = quantiles_out[1] # 50% (Median) または別途 'mean' を取得
-                #     q_high = quantiles_out[2]  # 84.13%
-
-                #     # 3. 標準偏差を近似
-                #     output_sigma = (q_high - q_low) / 2.0
-                #     #output_sigma = models[reg].predict(x_te, output_type='std')
-                #     pred = tabpfn_corrected_inverse(y_pred_mu, output_sigma, scaler).reshape(-1,1)
+                #     train_out = models[reg].predict(x_train)
+                #     y_train_pred_log1p = train_out
+                #     y_train_log1p = y_train[reg]
+                #     pred_log = pred_tensor_for_eval
+                #     from src.test.test import apply_smearing_yeo_johnson
+                #     pred, coff = apply_smearing_yeo_johnson(scaler,y_train_log1p, y_train_pred_log1p, pred_log)
                 # else:
                 #     # --- 通常のスケーリング解除 ---
                 #     pred = scaler.inverse_transform(pred_tensor_for_eval.reshape(-1, 1))
@@ -413,4 +415,26 @@ def test_TabPFN(x_te, y_te_tensor,
         for metrix, value in score.items():
             scores[reg][metrix] = value
 
+        result_detail = models[reg].predict_with_details(x_te)
+        result_detail['id'] = test_ids.to_list()
+        result_detail['True'] = y_te[reg] #.cpu().detach().numpy()
+        #result_detail['True_label'] = labels_test
+
+        #for v in range(len(result_detail['Predicted_Sigma'])):
+        #result_detail['gen_loss'] = np.abs(result_detail['True'] - result_detail['Generalist_Pred'])
+        #loss = []
+        # for i, label in enumerate(result_detail['Assigned_Cluster']):
+        #     #d = result_detail['True_label'][i]
+        #     l = np.abs(result_detail['True'][i] - result_detail[f'Cluster_{label}_Pred'][i])
+        #     loss.append(l)
+        # result_detail['spec_loss'] = loss
+
+        # hist_dir = os.path.join(result_dir, f'hist_test_{reg}.png')
+        # save_labeled_histograms(data = y_te[reg], labels = labels_test, save_path = hist_dir)
+
+        # hist_dir = os.path.join(result_dir, f'hist_test_{reg}_clusters.png')
+        # save_labeled_histograms(data = y_te[reg], labels = np.array(result_detail['Assigned_Cluster']), save_path = hist_dir)
+
+        result_detail.to_csv(os.path.join(result_dir, f'test_details_{reg}.csv'), index=False)
+    
     return predicts, trues, scores

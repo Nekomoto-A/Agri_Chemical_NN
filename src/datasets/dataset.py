@@ -508,7 +508,13 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
     #特徴量を正規化
 
     if normalize:
-        fp = StandardScaler()
+        #fp = StandardScaler()
+        from sklearn.preprocessing import QuantileTransformer
+        fp = QuantileTransformer(
+                n_quantiles=100, 
+                output_distribution='normal', 
+                random_state=42
+            )
         #x_train_split = fp.fit_transform(x_train_split)
         x_train_split = pd.DataFrame(fp.fit_transform(x_train_split), columns=x_train_split.columns, index=x_train_split.index)
         if isinstance(val_size, (int, float)):

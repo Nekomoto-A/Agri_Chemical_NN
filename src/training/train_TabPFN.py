@@ -126,9 +126,74 @@ def filter_low_mi_features(X_train, Y_train, threshold=0.1):
 
     return X_filtered, selected_indices
 
+import numpy as np
+import matplotlib.pyplot as plt
+import os
+
+def apply_mixup_and_save_histogram(X, y, alpha=0.2, save_dir='output_plots'):
+    """
+    Numpy形式のデータにmixupを適用し、目的変数のヒストグラムを保存する。
+    
+    Parameters:
+    X (np.ndarray): 特徴量データ
+    y (np.ndarray): 目的変数データ
+    alpha (float): ベータ分布のパラメータ (0.2〜0.4が一般的)
+    save_dir (str): ヒストグラムを保存するディレクトリ
+    """
+    
+    # 保存用ディレクトリの作成
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+        print(f"Directory created: {save_dir}")
+    
+    # yを確実に1次元（形状：(N,)）に変換しておく
+    y = np.array(y).flatten() 
+    
+    batch_size = X.shape[0]
+    index = np.random.permutation(batch_size)
+    
+    lam = np.random.beta(alpha, alpha, batch_size)
+    
+    # X用には (N, 1) の形状が必要
+    lam_x = lam.reshape(-1, 1) 
+    
+    # 修正ポイント: y_mixedの計算
+    X_mixed = lam_x * X + (1 - lam_x) * X[index]
+    # yは1次元同士の要素ごとの計算にする
+    y_mixed = lam * y + (1 - lam) * y[index]
+
+    # 2. ヒストグラムの作成と保存
+    plt.figure(figsize=(12, 5))
+
+    # 元の目的変数の分布
+    plt.subplot(1, 2, 1)
+    # y を flatten() して1次元にする
+    plt.hist(np.array(y).flatten(), bins=30, color='skyblue', edgecolor='black')
+    plt.title('Original Target Distribution')
+    plt.xlabel('Value')
+    plt.ylabel('Frequency')
+
+    # mixup後の目的変数の分布
+    plt.subplot(1, 2, 2)
+    # y_mixed を flatten() して1次元にする
+    plt.hist(y_mixed.flatten(), bins=30, color='salmon', edgecolor='black')
+    plt.title(f'Mixup Target Distribution (alpha={alpha})')
+    plt.xlabel('Value')
+    plt.ylabel('Frequency')
+
+    # 保存
+    save_path = os.path.join(save_dir, 'mixup_histogram.png')
+    plt.tight_layout()
+    plt.savefig(save_path)
+    plt.close()
+    
+    print(f"Histogram saved to: {save_path}")
+    
+    return X_mixed, y_mixed
 
 def training_TabPFN(x_tr,x_val,y_tr,y_val,models, reg_list, scalers, output_dir, train_ids, train_column, 
-                    optune = config['optune'], n_trials = config['n_trials'],filter_mi = config['filter_mi']
+                    optune = config['optune'], n_trials = config['n_trials'],filter_mi = config['filter_mi'],
+                    data_aug = config['data_aug']
                 ):
     train_dir = os.path.join(output_dir, 'train')
     os.makedirs(train_dir, exist_ok=True)
@@ -148,7 +213,7 @@ def training_TabPFN(x_tr,x_val,y_tr,y_val,models, reg_list, scalers, output_dir,
         # score, indices = backward_selection(models[reg], x_tr, y_tr[reg], cv=5)
         # print(f'最終スコア:{score:.4f}, 選択された特徴量のインデックス: {indices}')
         if filter_mi:
-            x_tr, selected_indices = filter_low_mi_features(x_tr, y_tr[reg], threshold=0.1)
+            x_tr, selected_indices = filter_low_mi_features(x_tr, y_tr[reg], threshold=0.2)
         else:
             selected_indices = np.arange(x_tr.shape[1])
         # x_tr = x_tr[:, indices]
@@ -204,8 +269,15 @@ def training_TabPFN(x_tr,x_val,y_tr,y_val,models, reg_list, scalers, output_dir,
             fig3.write_image(os.path.join(train_dir, f'parallel_coordinate_{reg}.png')) 
         else:
             pass
+        
+        if data_aug:
+            x_train, y_train = apply_mixup_and_save_histogram(x_tr, y_tr[reg], alpha=0.1, save_dir=train_dir)
+        else:
+            x_train = x_tr
+            y_train = y_tr[reg]
 
-        models[reg].fit(x_tr, y_tr[reg])
+        #models[reg].fit(x_tr, y_tr[reg])
+        models[reg].fit(x_train, y_train)
         output = models[reg].predict(x_tr)
 
         if reg in scalers:

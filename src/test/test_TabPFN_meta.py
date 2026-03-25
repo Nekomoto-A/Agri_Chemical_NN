@@ -172,6 +172,51 @@ def plot_single_instance_explanation(model, train_data, test_instance, feature_n
     plt.savefig(save_path, bbox_inches='tight', dpi=150)
     plt.close()
 
+import numpy as np
+import matplotlib.pyplot as plt
+import os
+
+def save_labeled_histograms(data, labels, save_path, bins=30, alpha=0.5):
+    """
+    ラベルごとにデータのヒストグラムを作成し、保存する関数。
+
+    Parameters:
+    - data (np.ndarray): 1次元の数値データ
+    - labels (np.ndarray): データに対応するラベル
+    - save_path (str): 保存先のファイルパス (例: 'output/result.png')
+    - bins (int): ヒストグラムの棒の数
+    - alpha (float): グラフの透明度 (0.0 ～ 1.0)
+    """
+    
+    # 1. 保存先のディレクトリが存在しない場合は作成
+    directory = os.path.dirname(save_path)
+    if directory and not os.path.exists(directory):
+        os.makedirs(directory)
+        print(f"ディレクトリを作成しました: {directory}")
+
+    # 2. グラフの初期化
+    plt.figure(figsize=(10, 6))
+    
+    # 3. ユニークなラベルごとにループして描画
+    unique_labels = np.unique(labels)
+    for label in unique_labels:
+        # ラベルが一致するインデックスのデータを抽出
+        subset = data[labels == label]
+        plt.hist(subset, bins=bins, alpha=alpha, label=f'Label: {label}', edgecolor='black')
+
+    # 4. グラフの装飾
+    plt.title('Comparison of Distributions by Label')
+    plt.xlabel('Value')
+    plt.ylabel('Frequency')
+    plt.legend()  # 凡例を表示
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+
+    # 5. 保存と終了
+    plt.savefig(save_path)
+    plt.close()
+    print(f"グラフを保存しました: {save_path}")
+
+
 def test_TabPFN_META(x_te, y_te_tensor, labels_test, 
               x_train, y_train, labels_train, 
               models, reg_list, scalers, output_dir, 
@@ -205,6 +250,12 @@ def test_TabPFN_META(x_te, y_te_tensor, labels_test,
     for reg in reg_list:
         result_dir = os.path.join(output_dir, reg)
         os.makedirs(result_dir, exist_ok=True)
+
+        hist_dir = os.path.join(result_dir, f'hist_train_{reg}.png')
+        save_labeled_histograms(data = y_train[reg], labels = labels_train, save_path = hist_dir)
+        hist_dir = os.path.join(result_dir, f'hist_test_{reg}.png')
+        save_labeled_histograms(data = y_te[reg], labels = labels_test, save_path = hist_dir)
+
         #print(test_ids)
         if lime_local:
             for i, test_instance in enumerate(x_te): # 最初の5件に対してLIMEの説明を生成
@@ -278,26 +329,28 @@ def test_TabPFN_META(x_te, y_te_tensor, labels_test,
             if reg in scalers:
                 scaler = scalers[reg]
                 true = scaler.inverse_transform(true_tensor.reshape(-1, 1))
-                # if is_log1p_transformer(scaler):
-                #     train_out = models[reg].predict(x_train)
-                #     y_train_pred_log1p = train_out
-                #     y_train_log1p = y_train[reg]
+                if is_log1p_transformer(scaler):
+                    train_out = models[reg].predict(x_train)
+                    y_train_pred_log1p = train_out
+                    y_train_log1p = y_train[reg]
 
-                #     pred_log = pred_tensor_for_eval
-                #     from src.test.test import apply_smearing_log1p
-                #     pred, coff = apply_smearing_log1p(y_train_log1p, y_train_pred_log1p, pred_log)
-                #     print(f'対数変換のためスメアリング推定による補正を行います(係数：{coff})')
-                # elif isinstance(scaler, PowerTransformer):
-                #     train_out = models[reg].predict(x_train)
-                #     y_train_pred_log1p = train_out
-                #     y_train_log1p = y_train[reg]
-                #     pred_log = pred_tensor_for_eval
-                #     from src.test.test import apply_smearing_yeo_johnson
-                #     pred, coff = apply_smearing_yeo_johnson(scaler,y_train_log1p, y_train_pred_log1p, pred_log)
-                # else:
-                #     # --- 通常のスケーリング解除 ---
-                #     pred = scaler.inverse_transform(pred_tensor_for_eval.reshape(-1, 1))
-                pred = scaler.inverse_transform(pred_tensor_for_eval.reshape(-1, 1))
+                    pred_log = pred_tensor_for_eval
+                    from src.test.test import apply_smearing_log1p
+                    pred, coff = apply_smearing_log1p(y_train_log1p, y_train_pred_log1p, pred_log)
+                    pred = pred.reshape(-1, 1)
+                    print(f'対数変換のためスメアリング推定による補正を行います(係数：{coff})')
+                elif isinstance(scaler, PowerTransformer):
+                    train_out = models[reg].predict(x_train)
+                    y_train_pred_log1p = train_out
+                    y_train_log1p = y_train[reg]
+                    pred_log = pred_tensor_for_eval
+                    from src.test.test import apply_smearing_yeo_johnson
+                    pred, coff = apply_smearing_yeo_johnson(scaler,y_train_log1p, y_train_pred_log1p, pred_log)
+                    pred = pred.reshape(-1, 1)
+                else:
+                    # --- 通常のスケーリング解除 ---
+                    pred = scaler.inverse_transform(pred_tensor_for_eval.reshape(-1, 1))
+                #pred = scaler.inverse_transform(pred_tensor_for_eval.reshape(-1, 1))
             else:
                 # スケーラーなし
                 pred = pred_tensor_for_eval.reshape(-1, 1)
@@ -376,12 +429,12 @@ def test_TabPFN_META(x_te, y_te_tensor, labels_test,
 
         #for v in range(len(result_detail['Predicted_Sigma'])):
         result_detail['gen_loss'] = np.abs(result_detail['True'] - result_detail['Generalist_Pred'])
-        loss = []
-        for i, label in enumerate(result_detail['True_label']):
-            #d = result_detail['True_label'][i]
-            l = np.abs(result_detail['True'][i] - result_detail[f'Domain_{label}_Pred'][i])
-            loss.append(l)
-        result_detail['spec_loss'] = loss
+        # loss = []
+        # for i, label in enumerate(result_detail['True_label']):
+        #     #d = result_detail['True_label'][i]
+        #     l = np.abs(result_detail['True'][i] - result_detail[f'Domain_{label}_Pred'][i])
+        #     loss.append(l)
+        # result_detail['spec_loss'] = loss
 
         result_detail.to_csv(os.path.join(result_dir, f'test_details_{reg}.csv'), index=False)
         

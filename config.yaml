@@ -27,7 +27,7 @@ dataset.py:
   exclude_ids2: []
   combat: False
   stats_features: ['crop', 'pref', 'lati', 'long']
-  sparce_drop: True
+  sparce_drop: False
   drop_threshold: 0.05
 train.py:
   early_stopping: True
@@ -99,7 +99,7 @@ train_FT.py:
   kl_anneal_epochs: 20
   kl_max_beta: 0.1
   sparse_lambda: 0.1
-  sparsity_target: 0.05
+  sparsity_target: 0.01
 train_FT_DAE.py:
   lr: 0.01
   batch_size: 256
@@ -127,6 +127,7 @@ train_TabPFN.py:
   optune: False
   n_trials: 50
   filter_mi: False
+  data_aug: False
 test.py:
   loss_sum: 'WeightedSUM' #'SUM' #
   num_predictive_samples: 100
@@ -149,7 +150,7 @@ fold_eval.py:
   marginal_hist: False
   k_fold: 5
   feature_normalize: False
-  model_name: 'TabPFN_ensemble_meta'
+  model_name: 'TabPFN_concat'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
@@ -196,16 +197,19 @@ fold_eval.py:
   feature_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\taxon_data\lv6.csv' #'C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\lv6.csv' #
   target_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\chem_data.xlsx' #'C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\chem_data.xlsx' #
   data_inte: False
-  transformer: ['log', None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
+  transformer: [None, None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
   reg_loss_fanction: ['mse', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
-  eval_reg: ['R2', 'MedAE', 'MAE', 'RMSLE', 'RMSE']
+  eval_reg: ['R', 'R2', 'MedAE', 'MAE', 'RMSLE', 'RMSE']
   eval_class: ['Accuracy', 'F1score']
-  labels: ['crop'] #['experimental_purpose'] #['crop'] #['crop', 'pref', 'lati', 'long'] # #
-  embedding: 'Onehot' #'Word2Vec' #'Onehot' # #"concat" #
+  labels: ['crop'] #['experimental_purpose'] # #['crop'] # #['crop'] #['crop', 'pref', 'lati', 'long'] # #
+  embedding: 'concat' #'Word2Vec' #'Onehot' # #"concat" #
   embedding_size: 8
   latent_dim: 64
 main.py:
-  result_dir: 'result_TabPFN_meta_resample_log'
+  result_dir: 'result_0327_concat_pref-crop'
+  Cross_val: True
+  LOGO: True
+  domains: 'pref-crop'
   reg_list: [
             # ['pref'], 
             # ['crop'], 
@@ -239,5 +243,5 @@ main.py:
             # ['pH_dry_soil', 'available_P', 'EC_electric_conductivity', 'Total_C', 'Total_N']
             #['pH', 'Available.P'] 
 
-            #['pH_dry_soil'], ['available_P'], ['EC_electric_conductivity'], ['Total_C'], #['Total_N']
+            #['available_P'], ['EC_electric_conductivity'], ['Total_C'], ['Total_N'], ['pH_dry_soil']
   ]

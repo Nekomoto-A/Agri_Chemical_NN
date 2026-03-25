@@ -1,5 +1,5 @@
-#from src.test.fold_eval import fold_evaluate
-from src.test.fold_eval import loop_evaluate
+from src.test.fold_eval import fold_evaluate, domain_evaluate
+#from src.test.fold_eval import loop_evaluate
 import yaml
 import os
 yaml_path = 'config.yaml'
@@ -40,7 +40,7 @@ import warnings
 warnings.filterwarnings('ignore', category=UserWarning)
 warnings.filterwarnings('ignore', category=FutureWarning)
 
-def main():
+def main(Cross_val = config['Cross_val'], LOGO = config['LOGO']):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
@@ -93,18 +93,31 @@ def main():
         print(f"  スレッド数: {torch.get_num_threads()}")
 
     print("-" * 30)
-        
+    
     reg_list = config['reg_list']
+    fold_dir = os.path.join(config['result_dir'], f'Cross-validation_results')
+    os.makedirs(fold_dir, exist_ok=True)
+
+    domain_dir = os.path.join(config['result_dir'], f'LOGO_results')
+    os.makedirs(domain_dir, exist_ok=True)
     if any(isinstance(i, list) for i in reg_list) == False:
         reg_list = [s.replace('.', '_') for s in reg_list]
-        #fold_evaluate(reg_list = reg_list)
+        #fold_evaluate(reg_list = reg_list, output_dir = config['result_dir'], device = device)
+        if Cross_val:
+            fold_evaluate(reg_list = reg_list, output_dir = fold_dir, device = device)
+        if LOGO:
+            domain_evaluate(reg_list = reg_list, output_dir = domain_dir, device = device, domains = config['domains'])
 
-        loop_evaluate(reg_list = reg_list, output_dir = config['result_dir'], device = device)
+        #loop_evaluate(reg_list = reg_list, output_dir = config['result_dir'], device = device)
     else:
         for reg in reg_list:
             reg = [s.replace('.', '_') for s in reg]
-            #fold_evaluate(reg_list = reg)
-            loop_evaluate(reg_list = reg, output_dir = config['result_dir'], device = device)
+            #fold_evaluate(reg_list = reg, output_dir = config['result_dir'], device = device)
+            if Cross_val:
+                fold_evaluate(reg_list = reg, output_dir = fold_dir, device = device)
+            if LOGO:
+                domain_evaluate(reg_list = reg, output_dir = domain_dir, device = device, domains = config['domains'])
+            #loop_evaluate(reg_list = reg, output_dir = config['result_dir'], device = device)
 
 if __name__ == '__main__':
     main()

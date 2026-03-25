@@ -269,6 +269,39 @@ def save_tsne_plots(X, Y, target_columns, id_column = 'crop-id',save_dir="tsne_r
         plt.close()
         print(f"保存完了: {filepath}")
 
+import pandas as pd
+from sklearn.cluster import KMeans
+from sklearn.mixture import GaussianMixture
+
+def get_kmeans_labels(X, n_clusters=3, random_state=42):
+    """
+    PandasデータフレームXに対してk-meansクラスタリングを行い、
+    各データ点のクラスラベルをデータフレームとして返す関数。
+    
+    Parameters:
+    X (pd.DataFrame): 入力特徴量
+    n_clusters (int): 分割するクラスタ数
+    random_state (int): 結果を再現するための乱数シード
+    
+    Returns:
+    pd.DataFrame: クラスラベルが格納されたデータフレーム
+    """
+    
+    # 1. k-meansモデルのインスタンス化
+    # n_init="auto" は、計算効率を最適化するための設定です
+    #kmeans = KMeans(n_clusters=n_clusters, n_init="auto", random_state=random_state)
+    kmeans = GaussianMixture(n_components=n_clusters, random_state=random_state)
+    
+    # 2. クラスタリングを実行し、ラベルを取得
+    labels = kmeans.fit_predict(X)
+    
+    # 3. 結果をPandas DataFrameに変換
+    # 元のデータXと同じインデックスを使うことで、後で結合しやすくします
+    labels_df = pd.DataFrame(labels, columns=['cluster_label'], index=X.index)
+    
+    return labels_df
+
+
 def fold_evaluate(reg_list, output_dir, device, 
                   transformer = config['transformer'],
                   #feature_path = config['feature_path'], target_path = config['target_path'], 
@@ -385,6 +418,10 @@ def fold_evaluate(reg_list, output_dir, device,
     #target_columns = reg_list + (labels if labels is not None else [])
 
     save_tsne_plots(X, Y, target_columns, save_dir = sub_dir)
+    
+    cls_labels = get_kmeans_labels(X, n_clusters=3)
+    target_columns = ['cluster_label']
+    save_tsne_plots(X, cls_labels, target_columns, save_dir = sub_dir)
 
     #for fold, (train_index, test_index) in enumerate(kf.split(X, Y['crop'])):
     for fold, (train_index, test_index) in enumerate(kf.split(X,Y[reg_list[0]])):
@@ -677,7 +714,7 @@ def fold_evaluate(reg_list, output_dir, device,
                                         result_dir = csv_dir, index = index, feature_names = features,
                                         reg_encoders = reg_encoders,
                                         eval_reg = eval_reg,
-                                        eval_class = eval_class, 
+                                        eval_class = eval_class, test_ids = test_ids
                                         )
             for method_name, regs in stats_scores.items():
                 for reg_name, dict in regs.items():
@@ -827,167 +864,579 @@ def fold_evaluate(reg_list, output_dir, device,
 
     return avg_dict, std_dict
 
-def loop_evaluate(reg_list, output_dir, device,
-                  feature_selection_all = config['feature_selection_all'], 
-                  #output_dir = config['result_dir'],
-                  start_features = config['start_features'], 
-                  selection_ratio = config['selection_ratio'],
-                  end_features = config['end_features'],fsdir = config['feature_selection_dir'],):
-    if feature_selection_all:
-        os.makedirs(fsdir, exist_ok=True)
-        # ステップ1: 評価結果を保存するための辞書を準備
-        results_avg = {}
-        results_std = {}
-        feature_numbers = range(start_features, end_features + 1, selection_ratio)
+from sklearn.model_selection import LeaveOneGroupOut
 
-        # 特徴量数を変えながら評価を実行し、結果を保存
-        print("モデルの評価を開始します...")
-        for number in feature_numbers:
-            output_name = f'{number}_features'
-            output_dir = os.path.join(fsdir, output_name)
-            print(f"特徴量 {number} 個で評価中...")
-            # fold_evaluate関数が選択する特徴量数を引数に取ると仮定します
-            avg_dict, std_dict = fold_evaluate(reg_list=reg_list, num_features_to_select=number, output_dir=output_dir, device = device)
-            results_avg[number] = avg_dict
-            results_std[number] = std_dict
-        print("モデルの評価が完了しました。")
+def domain_evaluate(reg_list, output_dir, device, 
+                    domains = 'crop', 
 
-        # ステップ2: グラフの描画と保存 (予測対象ごとにファイルを分ける)
-        print("グラフの作成を開始します...")
+                  transformer = config['transformer'],
+                  #feature_path = config['feature_path'], target_path = config['target_path'], 
+                  exclude_ids = config['exclude_ids'],
+                  #k = config['k_fold'], 
+                  #output_dir = config['result_dir'], 
+                  csv_path = config['result_fold'], 
+                  final_output = config['result_average'], model_name = config['model_name'], #reduced_feature_path = config['reduced_feature'],
+                  comp_method = config['comp_method'], corr_calc = config['carr_calc'], #feature_selection_all = config['feature_selection_all'], 
+                  #selection_ratio = config['selection_ratio'],
+                  #fsdir = config['feature_selection_dir'],
+                  feature_selection = config['feature_selection'],
+                  num_features_to_select = config['num_selected_features'],
+                  marginal_hist = config['marginal_hist'],
+                  data_inte = config['data_inte'],
+                  loss_fanctions = config['reg_loss_fanction'],
+                  labels = config['labels'],
+                  embedding = config['embedding'], 
+                  latent_dim = config['latent_dim'], 
+                  embedding_size = config['embedding_size'], 
+                  eval_reg = config['eval_reg'], 
+                  eval_class = config['eval_class'], 
+                  normalize = config['feature_normalize'],
+                  ):
+    #if feature_selection_all:
+    #   output_dir = os.path.join(fsdir, output_dir)
 
-        # グラフを保存するためのフォルダを作成
-        output_dir = "performance_graphs_by_target"
-        os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(output_dir,exist_ok=True)
+    sub_dir = os.path.join(output_dir, f'{reg_list}')
+    os.makedirs(sub_dir,exist_ok=True)
 
-        # 評価結果の辞書構造から、メトリクス名、モデル名、予測対象名を取得
-        first_feature_num = next(iter(results_avg))
-        first_avg_dict = results_avg[first_feature_num]
+    dest_config_path = os.path.join(sub_dir, 'config_saved.yaml')
+    # shutil.copy() を使ってファイルをコピー
+    shutil.copy(yaml_path, dest_config_path)
 
-        metric_names = list(first_avg_dict.keys())
-        model_names = list(first_avg_dict[metric_names[0]].keys())
-        target_names = list(first_avg_dict[metric_names[0]][model_names[0]].keys())
-
-        # x軸のデータ（特徴量数）
-        feature_counts = sorted(results_avg.keys())
-
-        # 予測対象 (target) ごとにグラフを作成
-        for target in target_names:
-            # メトリクスの数だけ縦にサブプロットを作成
-            fig, axes = plt.subplots(len(metric_names), 1, figsize=(12, 10), sharex=True)
-            
-            # サブプロットが1つの場合に備えて、リスト形式に統一
-            if len(metric_names) == 1:
-                axes = [axes]
-            
-            # グラフ全体のタイトル
-            fig.suptitle(f'予測対象「{target}」のモデル性能比較', fontsize=16)
-
-            # 各メトリクスについてサブプロットを描画
-            for i, metric in enumerate(metric_names):
-                ax = axes[i]
-                
-                # モデルごとに折れ線グラフを描画
-                for model in model_names:
-                    # y軸のデータ（平均値と標準偏差）を抽出
-                    y_avg = [results_avg[num][metric][model][target] for num in feature_counts]
-                    y_std = [results_std[num][metric][model][target] for num in feature_counts]
-                    
-                    y_avg = np.array(y_avg)
-                    y_std = np.array(y_std)
-                    
-                    # 凡例にはモデル名を表示
-                    label_text = model
-                    
-                    # 平均値の折れ線グラフをプロット
-                    line, = ax.plot(feature_counts, y_avg, marker='o', linestyle='-', label=label_text)
-                    
-                    # 標準偏差の範囲を半透明のエリアとして描画
-                    ax.fill_between(feature_counts, y_avg - y_std, y_avg + y_std, alpha=0.2, color=line.get_color())
-                
-                # サブプロットの装飾
-                ax.set_ylabel(metric, fontsize=12)
-                ax.legend(title='モデル')
-                ax.grid(True)
-
-            # 共通のx軸ラベル
-            axes[-1].set_xlabel('特徴量の数', fontsize=12)
-            
-            # レイアウトを調整して、タイトルとプロットが重ならないようにする
-            plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-            
-            # ファイルとして保存
-            save_path = os.path.join(fsdir, f'performance_{target}_{start_features}~{end_features}.png')
-            plt.tight_layout()
-            plt.savefig(save_path)
-            plt.close(fig)  # メモリを解放するために図を閉じる
-
-        print(f"グラフが '{fsdir}' フォルダに保存されました。")
-
-        '''
-        # ステップ2: グラフの描画と保存 (メトリクスごとにファイルを分ける)
-        print("グラフの作成を開始します...")
-
-        # グラフを保存するためのフォルダを作成
-        #output_dir = "performance_graphs_by_metric"
-        
-
-        # 評価結果の辞書構造から、メトリクス名、モデル名、予測対象名を取得
-        first_feature_num = next(iter(results_avg))
-        first_avg_dict = results_avg[first_feature_num]
-
-        metric_names = list(first_avg_dict.keys())
-        model_names = list(first_avg_dict[metric_names[0]].keys())
-        target_names = list(first_avg_dict[metric_names[0]][model_names[0]].keys())
-
-        # x軸のデータ（特徴量数）
-        feature_counts = sorted(results_avg.keys())
-
-        # メトリクスごとにグラフを作成
-        for metric in metric_names:
-            # 新しい図（Figure）を作成
-            plt.figure(figsize=(12, 8))
-            
-            # グラフのタイトルと軸ラベルを設定
-            plt.title(f'{metric}', fontsize=16)
-            plt.xlabel('num_features', fontsize=12)
-            plt.ylabel(metric, fontsize=12)
-
-            # モデルごとに折れ線グラフを描画
-            for model in model_names:
-                # 予測対象ごとに線をプロット
-                for target in target_names:
-                    # y軸のデータ（平均値と標準偏差）を抽出
-                    y_avg = [results_avg[num][metric][model][target] for num in feature_counts]
-                    y_std = [results_std[num][metric][model][target] for num in feature_counts]
-                    
-                    y_avg = np.array(y_avg)
-                    y_std = np.array(y_std)
-                    
-                    # 凡例用のラベルを作成（モデル名と予測対象名を組み合わせる）
-                    label_text = f'{model} ({target})'
-                    
-                    # 平均値の折れ線グラフをプロット
-                    line, = plt.plot(feature_counts, y_avg, marker='o', linestyle='-', label=label_text)
-                    
-                    # 標準偏差の範囲を半透明のエリアとして描画
-                    plt.fill_between(feature_counts, y_avg - y_std, y_avg + y_std, alpha=0.2, color=line.get_color())
-
-            # グラフの装飾
-            #plt.legend(title='モデル (予測対象)')
-            plt.legend(title='model (target)', bbox_to_anchor=(1.05, 1), loc='upper left')
-            plt.grid(True)
-            
-            # レイアウトを自動調整
-            plt.tight_layout()
-            
-            # ファイルとして保存
-            save_path = os.path.join(fsdir, f'performance_{metric}_{start_features}~{end_features}.png')
-            plt.savefig(save_path)
-            plt.close()  # メモリを解放するために図を閉じます
-
-        print(f"グラフが '{fsdir}' フォルダに保存されました。")
-        '''
-                    
-    else:
-        _, _ = fold_evaluate(reg_list = reg_list, output_dir = output_dir, device = device)
+    csv_dir = os.path.join(sub_dir, csv_path)
     
+    final_dir = os.path.join(sub_dir, final_output)
+
+    if os.path.exists(csv_dir):
+        os.remove(csv_dir)
+
+    # OS名を取得します
+    os_name = platform.system()
+    if os_name == 'Linux':
+        feature_path = config['feature_path_linux']
+        target_path = config['target_path_linux']
+    elif os_name == 'Windows':
+        feature_path = config['feature_path_windows']
+        target_path = config['target_path_windows']
+
+    if 'AE' in model_name:
+        from src.training.training_foundation import pretrain_foundation
+        features_list, ae_dir = pretrain_foundation(model_name = model_name, device = device, output_dir = sub_dir, latent_dim = latent_dim, normalize = normalize)
+
+        if data_inte:
+            X,Y,reg_encoders, _ = data_create(feature_path, target_path, reg_list, exclude_ids, output_dir=output_dir, feature_transformer='NON_TR',features_list=features_list)
+        else:
+            X,Y,reg_encoders, _ = data_create(feature_path, target_path, reg_list, exclude_ids, output_dir=output_dir, features_list=features_list)
+    else:
+        if data_inte:
+            X,Y,reg_encoders, _ = data_create(feature_path, target_path, reg_list, exclude_ids, output_dir=output_dir, feature_transformer='NON_TR',)
+        else:
+            X,Y,reg_encoders, _ = data_create(feature_path, target_path, reg_list, exclude_ids, output_dir=output_dir)
+        
+        ae_dir = None
+    
+    #print(X)
+    if corr_calc:
+        calculate_and_save_correlations(X, Y, output_dir, reg_list)
+
+    if marginal_hist:
+        from src.experiments.merginal_hist import save_marginal_histograms
+        save_marginal_histograms(x = X, y = Y, features = X.columns, reg_list = reg_list , output_dir = output_dir)
+
+    for reg in reg_list:
+        #os.makedirs(output_dir,exist_ok=True)
+        hist_dir = os.path.join(sub_dir, f'{reg}.png')
+        if pd.api.types.is_numeric_dtype(Y[reg]):
+            plt.hist(np.array(Y[reg]), bins=30, color='skyblue', edgecolor='black')
+            plt.title('Histogram of Data')
+            plt.xlabel('Value')
+            plt.ylabel('Frequency')
+            plt.tight_layout()
+            #plt.grid(True)
+            plt.savefig(hist_dir)
+            plt.close()
+
+    #input_dim = X.shape[1]
+    method = 'MT'
+    method_comp = f'MT_{comp_method}'
+    method_st = 'ST'
+
+    # if k == 'LOOCV':
+    #     kf = LeaveOneOut()
+    # else:
+    #     if len(reg_list) > 1:
+    #         kf = KFold(n_splits=k, shuffle=True, random_state=42)
+    #     else:
+    #         #kf = StratifiedKFold(n_splits=k, shuffle=True, random_state=42)
+    #         kf = ContinuousStratifiedKFold(n_splits=k, shuffle=True, random_state=42)
+    #         #kf = KFold(n_splits=k, shuffle=True, random_state=42)
+
+    # 2. LeaveOneGroupOutの初期化
+    logo = LeaveOneGroupOut()
+
+    predictions = {}
+    trues = {}
+
+    ids = []
+
+    scores = {}
+
+    if labels != None:
+        target_columns = reg_list + labels
+    else:
+        target_columns = reg_list
+    #target_columns = reg_list + (labels if labels is not None else [])
+
+    save_tsne_plots(X, Y, target_columns, save_dir = sub_dir)
+    
+    cls_labels = get_kmeans_labels(X, n_clusters=3)
+    target_columns = ['cluster_label']
+    save_tsne_plots(X, cls_labels, target_columns, save_dir = sub_dir)
+
+    domain_labels = Y[domains]
+    print(f"Total domains: {logo.get_n_splits(groups=domain_labels)}")
+
+    #for fold, (train_index, test_index) in enumerate(kf.split(X, Y['crop'])):
+    #for fold, (train_index, test_index) in enumerate(kf.split(X,Y[reg_list[0]])):
+    for train_index, test_index in logo.split(X, Y, groups=domain_labels):
+        index = [f'{domain_labels.iloc[test_index].unique()[0]}']
+        X_train, X_test = X.iloc[train_index], X.iloc[test_index]
+        Y_train, Y_test = Y.iloc[train_index], Y.iloc[test_index]
+
+        #print(f'train:{Y_train['prefandcrop'].unique()}')
+        #print(f'test:{Y_test['prefandcrop'].unique()}')
+        
+        fold_dir = os.path.join(sub_dir, index[0])
+        os.makedirs(fold_dir,exist_ok=True)
+        
+        X_train_tensor, X_val_tensor, X_test_tensor,features, Y_train_tensor, Y_val_tensor, Y_test_tensor,scalers, train_ids, val_ids, test_ids,label_train_tensor,label_test_tensor,label_val_tensor, label_encoders = transform_after_split(X_train,X_test,Y_train,Y_test, reg_list = reg_list,
+                                                                                                                                                                                                                                              all_x = X, all_y = Y, 
+                                                                                                                                                                                                                              transformer = transformer, 
+                                                                                                                                                                                                                              fold = fold_dir,
+                                                                                                                                                                                                                              feature_selection = feature_selection,
+                                                                                                                                                                                                                              num_selected_features = num_features_to_select,
+                                                                                                                                                                                                                              data_name = feature_path,
+                                                                                                                                                                                                                              data_inte=data_inte,
+                                                                                                                                                                                                                              labels = labels, 
+                                                                                                                                                                                                                              normalize = normalize
+                                                                                                                                                                                                                              )
+        
+        ids.append(test_ids)
+        
+        input_dim = X_train_tensor.shape[1]
+        
+        #test_df = pd.DataFrame(index=test_ids)
+
+        emb_dir = os.path.join(fold_dir, 'embedding')
+        os.makedirs(emb_dir, exist_ok=True)
+
+        if embedding == 'Onehot':
+            from src.datasets.emb_fns import onehot_encode_and_split
+            label_train_embedded, label_val_embedded, label_test_embedded = onehot_encode_and_split(label_train_tensor, label_val_tensor, label_test_tensor,)
+
+        elif embedding == 'Word2Vec':
+            from src.datasets.emb_fns import create_w2v_models, w2v_encode_and_split
+            emb_models = create_w2v_models(label_encoders, vector_size = embedding_size)
+            label_train_embedded, label_val_embedded, label_test_embedded = w2v_encode_and_split(label_train_tensor, 
+                                                                                                 label_val_tensor, 
+                                                                                                 label_test_tensor, 
+                                                                                                 label_encoders, 
+                                                                                                 emb_models,
+                                                                                                output_dir = emb_dir
+                                                                                                )
+        else:
+            #print(label_val_tensor)
+            from src.datasets.emb_fns import concat_encode_and_split
+            label_train_embedded, label_val_embedded, label_test_embedded = concat_encode_and_split(label_train_tensor,  
+                                                                                                 label_test_tensor, 
+                                                                                                 label_val_tensor,
+                                                                                                )
+            #print(label_train_embedded)
+        if labels != []:
+            from src.datasets.emb_fns import save_combined_data_to_csv
+            save_combined_data_to_csv(filepath = 'emb_labels.csv', 
+                                    original_labels = label_train_tensor, 
+                                    embedded_tensor = label_train_embedded, 
+                                    output_dir = emb_dir, 
+                                    target_vars_dict = Y_train_tensor, 
+                                    label_encoders = label_encoders
+                                    )
+
+        if len(reg_list) > 1:
+            vis_dir_main = os.path.join(fold_dir, method)
+            os.makedirs(vis_dir_main,exist_ok=True)
+        
+            #print(X_train_tensor.shape)
+            predictions, trues, result_scores,model_trained = train_and_test(
+                X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor, 
+                scalers, predictions, trues, input_dim, method, index , reg_list, csv_dir,
+                vis_dir = vis_dir_main, model_name = model_name, train_ids = train_ids, test_ids = test_ids, features= features,
+                device = device,
+                reg_encoders = reg_encoders,
+                eval_reg = eval_reg, eval_class = eval_class,
+                reg_loss_fanction = loss_fanctions,
+                latent_dim = latent_dim, 
+                labels_train=label_train_embedded,
+                labels_val=label_val_embedded,
+                labels_test=label_test_embedded,
+                label_encoders = label_encoders,
+                labels_train_original = label_train_tensor,
+                labels_val_original = label_val_tensor,
+                labels_test_original = label_test_tensor,
+                ae_dir = ae_dir, 
+
+                )
+            
+            for reg_name, dict in result_scores.items():
+                for metrics, value in dict.items():
+                    scores.setdefault(metrics, {}).setdefault(method, {}).setdefault(reg_name, []).append(value)
+            
+            if comp_method:
+                vis_dir_comp = os.path.join(fold_dir, method_comp)
+                os.makedirs(vis_dir_comp,exist_ok=True)
+
+                predictions, trues, result_scores_comp, model_trained_comp = train_and_test(
+                    X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor, scalers, 
+                    predictions, trues, 
+                    input_dim, 
+                    method_comp, 
+                    index , reg_list, csv_dir,
+                    vis_dir = vis_dir_comp, 
+                    model_name = model_name, train_ids = train_ids, test_ids = test_ids, features = features,
+                    device = device,
+                    reg_encoders = reg_encoders,
+                    eval_reg = eval_reg, eval_class = eval_class,
+                    reg_loss_fanction = loss_fanctions,
+                    latent_dim = latent_dim, 
+                    loss_sum = comp_method,
+                    labels_train=label_train_embedded,
+                    labels_val=label_val_embedded,
+                    labels_test=label_test_embedded,
+                    label_encoders = label_encoders,
+                    labels_train_original = label_train_tensor,
+                    labels_val_original = label_val_tensor,
+                    labels_test_original = label_test_tensor,
+                    ae_dir = ae_dir,
+                    )
+                
+                #print(r2_results)
+                
+                for reg_name, dict in result_scores_comp.items():
+                    for metrics, value in dict.items():
+                        scores.setdefault(metrics, {}).setdefault(method_st, {}).setdefault(reg_name, []).append(value)
+                else:
+                    pass
+            else:
+                pass
+
+        vis_dir_st = os.path.join(fold_dir, method_st)
+        os.makedirs(vis_dir_st,exist_ok=True)
+
+        #print(f'label_data:{label_train_tensor}')
+
+        for i,r in enumerate(reg_list):
+            Y_train_single, Y_test_single ={r:Y_train_tensor[r]}, {r:Y_test_tensor[r]}
+            loss_fanction = [loss_fanctions[i]]
+
+            if Y_val_tensor:
+                Y_val_single = {r:Y_val_tensor[r]}
+            else:
+                Y_val_single = {}
+            reg = [r]
+            print(X_train_tensor.shape)
+
+            predictions, trues, result_scores_st, model_trained_st = train_and_test(
+                X_train = X_train_tensor, X_val = X_val_tensor, X_test = X_test_tensor, Y_train = Y_train_single, Y_val = Y_val_single, Y_test = Y_test_single, 
+                scalers = scalers, predictions = predictions, trues = trues, input_dim = input_dim, method = method_st, index = index , reg_list = reg, csv_dir = csv_dir, 
+                vis_dir = vis_dir_st, model_name = model_name, train_ids = train_ids, test_ids = test_ids, features = features,
+                device = device,
+                reg_loss_fanction = loss_fanction, 
+                latent_dim = latent_dim, 
+                reg_encoders = reg_encoders,
+                eval_reg = eval_reg, eval_class = eval_class, 
+                labels_train=label_train_embedded,
+                labels_val=label_val_embedded,
+                labels_test=label_test_embedded,
+                label_encoders = label_encoders,
+                labels_train_original = label_train_tensor,
+                labels_val_original = label_val_tensor,
+                labels_test_original = label_test_tensor,
+                ae_dir = ae_dir
+                )
+            
+            #pprint.pprint(predictions)
+
+            #reduced_features = reduce_feature(model = model_trained, X = X_test_tensor, model_name = model_name)
+
+            # scores.setdefault('R', {}).setdefault(method_st, {}).setdefault(r, []).append(r2_result[0])
+            # scores.setdefault('MAE', {}).setdefault(method_st, {}).setdefault(r, []).append(mse_result[0])
+
+            for reg_name, dict in result_scores_st.items():
+                for metrics, value in dict.items():
+                    scores.setdefault(metrics, {}).setdefault(method_st, {}).setdefault(reg_name, []).append(value)
+
+            if 'TabPFN_' in model_name:
+                #model_name_nome = model_name.replace("_ME", "")
+                model_name_nome = 'TabPFN'
+                method_nome = 'ST_nome'
+                
+                vis_dir_nome = os.path.join(fold_dir, method_nome)
+                os.makedirs(vis_dir_nome, exist_ok=True)
+
+                predictions, trues, result_scores_nome, model_trained_nolabel = train_and_test(
+                X_train = X_train_tensor, X_val = X_val_tensor, X_test = X_test_tensor, Y_train = Y_train_single, Y_val = Y_val_single, Y_test = Y_test_single, 
+                scalers = scalers, predictions = predictions, trues = trues, input_dim = input_dim, 
+                method = method_nome, 
+                index = index , reg_list = reg, csv_dir = csv_dir, 
+                vis_dir = vis_dir_nome, 
+                model_name = model_name_nome, 
+                train_ids = train_ids, test_ids = test_ids, features = features,
+                device = device,
+                reg_loss_fanction = loss_fanction, 
+                latent_dim = latent_dim, 
+                reg_encoders = reg_encoders, 
+                eval_reg = eval_reg, eval_class = eval_class, 
+                labels_train=label_train_embedded,
+                labels_val=label_val_embedded,
+                labels_test=label_test_embedded,
+                label_encoders = label_encoders,
+                labels_train_original = label_train_tensor,
+                labels_val_original = label_val_tensor,
+                labels_test_original = label_test_tensor,
+                ae_dir = ae_dir
+                )
+                
+                # scores.setdefault('R', {}).setdefault(method_nolabel, {}).setdefault(r, []).append(r2_result_nolabel[0])
+                # scores.setdefault('MAE', {}).setdefault(method_nolabel, {}).setdefault(r, []).append(mse_result_nolabel[0])
+                for reg_name, dict in result_scores_nome.items():
+                    for metrics, value in dict.items():
+                        scores.setdefault(metrics, {}).setdefault(method_nome, {}).setdefault(reg_name, []).append(value)
+
+            #FiLMなし
+            if 'FiLM' in model_name:
+                model_name_nolabel = model_name.replace("_FiLM", "")
+                method_nolabel = 'ST_nolabel'
+                
+                vis_dir_nolabel = os.path.join(fold_dir, method_nolabel)
+                os.makedirs(vis_dir_nolabel, exist_ok=True)
+                
+                predictions, trues, result_scores_nolabel, model_trained_nolabel = train_and_test(
+                X_train = X_train_tensor, X_val = X_val_tensor, X_test = X_test_tensor, Y_train = Y_train_single, Y_val = Y_val_single, Y_test = Y_test_single, 
+                scalers = scalers, predictions = predictions, trues = trues, input_dim = input_dim, 
+                method = method_nolabel, 
+                index = index , reg_list = reg, csv_dir = csv_dir, 
+                vis_dir = vis_dir_nolabel, 
+                model_name = model_name_nolabel, 
+                train_ids = train_ids, test_ids = test_ids, features = features,
+                device = device,
+                reg_loss_fanction = loss_fanction, 
+                latent_dim = latent_dim, 
+                reg_encoders = reg_encoders, 
+                eval_reg = eval_reg, eval_class = eval_class, 
+                labels_train=label_train_embedded,
+                labels_val=label_val_embedded,
+                labels_test=label_test_embedded,
+                label_encoders = label_encoders,
+                labels_train_original = label_train_tensor,
+                labels_val_original = label_val_tensor,
+                labels_test_original = label_test_tensor,
+                ae_dir = ae_dir
+                )
+                
+                # scores.setdefault('R', {}).setdefault(method_nolabel, {}).setdefault(r, []).append(r2_result_nolabel[0])
+                # scores.setdefault('MAE', {}).setdefault(method_nolabel, {}).setdefault(r, []).append(mse_result_nolabel[0])
+                for reg_name, dict in result_scores_nolabel.items():
+                    for metrics, value in dict.items():
+                        scores.setdefault(metrics, {}).setdefault(method_nolabel, {}).setdefault(reg_name, []).append(value)
+
+                model_name_concat = model_name_nolabel + '_mm'
+                method_concat = 'ST_concat'
+                vis_dir_concat = os.path.join(fold_dir, method_concat)
+                os.makedirs(vis_dir_concat, exist_ok=True)
+                
+                predictions, trues, result_scores_concat, model_trained_concat = train_and_test(
+                    X_train = X_train_tensor, X_val = X_val_tensor, X_test = X_test_tensor, Y_train = Y_train_single, Y_val = Y_val_single, Y_test = Y_test_single, 
+                    scalers = scalers, predictions = predictions, trues = trues, input_dim = input_dim, 
+                    method = method_concat, 
+                    index = index , reg_list = reg, csv_dir = csv_dir, 
+                    vis_dir = vis_dir_concat, 
+                    model_name = model_name_concat, 
+                    train_ids = train_ids, test_ids = test_ids, features = features,
+                    device = device,
+                    reg_loss_fanction = loss_fanction, 
+                    latent_dim = latent_dim, 
+                    reg_encoders = reg_encoders, 
+                    eval_reg = eval_reg, eval_class = eval_class, 
+                    labels_train=label_train_embedded,
+                    labels_val=label_val_embedded,
+                    labels_test=label_test_embedded,
+                    label_encoders = label_encoders,
+                    labels_train_original = label_train_tensor,
+                    labels_val_original = label_val_tensor,
+                    labels_test_original = label_test_tensor,
+                    ae_dir = ae_dir
+                    )
+                
+                # scores.setdefault('R', {}).setdefault(method_concat, {}).setdefault(r, []).append(r2_result_concat[0])
+                # scores.setdefault('MAE', {}).setdefault(method_concat, {}).setdefault(r, []).append(mse_result_concat[0])
+                for reg_name, dict in result_scores_concat.items():
+                    for metrics, value in dict.items():
+                        scores.setdefault(metrics, {}).setdefault(method_concat, {}).setdefault(reg_name, []).append(value)
+
+            stats_scores = stats_models_result(X_train = X_train_tensor, Y_train = Y_train_single, 
+                                        X_test = X_test_tensor, Y_test = Y_test_single, scalers = scalers, reg = r, 
+                                        result_dir = csv_dir, index = index, feature_names = features,
+                                        reg_encoders = reg_encoders,
+                                        eval_reg = eval_reg,
+                                        eval_class = eval_class, test_ids = test_ids
+                                        )
+            #print(stats_scores)
+            for method_name, regs in stats_scores.items():
+                for reg_name, dict in regs.items():
+                    for metrics, value in dict.items():
+                        scores.setdefault(metrics, {}).setdefault(method_name, {}).setdefault(reg_name, []).append(value)
+            #print(scores)
+
+    ids = np.concatenate(ids)
+    test_df = pd.DataFrame(index = ids)
+
+    for method, regs in predictions.items():
+        #print(method)
+        for reg, values in regs.items():
+            target = np.concatenate(trues[method][reg])
+            out = np.concatenate(values)
+
+            if np.issubdtype(target.dtype, np.floating):
+                #print(values.shape)
+                final_hist_dir = os.path.join(sub_dir, 'final_hist')
+                os.makedirs(final_hist_dir, exist_ok=True)
+                all_hist_dir = os.path.join(final_hist_dir, 'all')
+                os.makedirs(all_hist_dir, exist_ok=True)
+
+                all_hist_path = os.path.join(all_hist_dir, f'hist_{reg}_{method}.png')
+                #print(values)
+
+                bins = np.linspace(0, np.max(target), 30)
+
+                loss = np.abs(target-out)
+                test_df[f'{reg}_{method}'] = loss
+
+                plt.hist(out, bins=bins, alpha=0.5, label = 'Predicted',density=True)
+                plt.hist(target, bins=bins, alpha=0.5, label = 'True',density=True)
+
+                #plt.title('Histogram of Data')
+                plt.xlabel('Value')
+                plt.ylabel('Frequency')
+                #plt.grid(True)
+                plt.legend()
+                plt.tight_layout()
+                plt.savefig(all_hist_path)
+                plt.close()
+
+                if reg == 'pH':
+                    # 条件リスト
+                    threshold1 = 5.5
+                    threshold2 = 6.5
+                else:
+                    thresholds = np.quantile(target, [1/3, 2/3])
+                    threshold1, threshold2 = thresholds
+
+                conditions = [
+                    target < threshold1,
+                    (target >= threshold1) & (target < threshold2),
+                    target >= threshold2
+                ]
+
+                # 各条件に対応する値のリスト
+                choices = [0, 1, 2]
+                result = np.select(conditions, choices)
+                
+                for choice in choices:
+                    split_hist_dir = os.path.join(final_hist_dir, 'predict_hist')
+                    os.makedirs(split_hist_dir, exist_ok=True)
+                    split_hist_path = os.path.join(split_hist_dir, f'split_hist_{reg}_{method}_{choice}.png')
+                    
+                    target_split = target[result == choice] # 閾値1未満
+                    output_spilit = out[result == choice]
+
+                    plt.figure(figsize=(10, 6))
+                    # 各カテゴリのヒストグラムを重ねて描画（alphaで透明度を指定）
+                    # binsを共通にすることで、各棒の範囲が揃う
+                    all_data_bins = np.arange(min(target_split), max(target_split), (max(target_split)-min(target_split)) / 10)
+                    plt.hist(target_split, bins=all_data_bins, alpha=0.7, label=f'True')
+                    plt.hist(output_spilit, bins=all_data_bins, alpha=0.7, label=f'Output')
+
+                    # グラフの装飾
+                    plt.title('Histogram by Category', fontsize=16)
+                    plt.xlabel('Value', fontsize=12)
+                    plt.ylabel('Frequency', fontsize=12)
+                    plt.legend()
+                    plt.tight_layout()
+
+                    # 画像として保存
+                    plt.savefig(split_hist_path)
+                    plt.close()
+            else:
+                target = reg_encoders[reg].inverse_transform(target)
+                out = reg_encoders[reg].inverse_transform(out)
+
+    test_df[f'True_{reg}_{method}'] = target
+    test_df[f'Pred_{reg}_{method}'] = out
+    
+    loss_dir = os.path.join(sub_dir, 'loss.csv')
+    test_df = test_df.sort_index(axis=1, ascending=True)
+    test_df.to_csv(loss_dir)
+
+    #pprint.pprint(reduced)
+    pprint.pprint(scores) 
+
+    # 平均値を格納する辞書
+    avg_std = {}
+    avg_dict = {}
+    std_dict = {}
+    metrics_norm = {}
+    for metrics,models in scores.items():
+        for method_name,regs in models.items():
+            for target,values in regs.items():
+                #avg = f'{np.average(values):.3f}'
+                avg = f'{np.average(values)}'
+                avg_dict.setdefault(metrics, {}).setdefault(method_name, {})[target] = np.average(values)
+                #std = f'{np.std(values):.3f}'
+                std = f'{np.std(values)}'
+                #std_dict.setdefault(metrics, {}).setdefault(method_name, {})[target] = np.std(values)
+                result = f'{avg}±{std}'
+                avg_std.setdefault(metrics, {}).setdefault(method_name, {})[target] = result
+
+    #if comp_method != None:
+    #    method_order = [method,method_comp, method_st]  # 先に固定するキー
+    #else:
+    #    method_order = [method, method_st]  # 先に固定するキー
+    # "MT" -> "ST" -> その他 の順にソートする関数
+    #def sort_methods(method_dict):
+        # "MT", "ST" を最優先し、それ以外をアルファベット順で並べる
+    #    sorted_keys = method_order + sorted(set(method_dict.keys()) - set(method_order))
+    #    return collections.OrderedDict((key, method_dict[key]) for key in sorted_keys)
+    
+    #sorted_avg_std = {metric: sort_methods(methods) for metric, methods in avg_std.items()}
+
+    #pprint.pprint(sorted_avg_std)
+    pprint.pprint(avg_std)
+
+    with open(final_dir, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        
+        # ヘッダー（Metric、Model、reg_listのカラム）
+        header = ["Metric", "Model"] + reg_list
+        writer.writerow(header)
+
+        # データの書き込み
+        #for metric, models in sorted_avg_std.items():
+        for metric, models in avg_std.items():
+            for model, values in models.items():
+                row = [metric, model] + [values[col] for col in reg_list]
+                writer.writerow(row)
+
+    print(f"CSVファイル '{final_output}' を作成しました。")
+
+    return avg_dict, std_dict
+

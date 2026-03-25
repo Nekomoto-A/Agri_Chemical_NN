@@ -165,7 +165,9 @@ def apply_smearing_log1p(y_train_log1p, y_train_pred_log1p, y_test_pred_log1p):
 
 from sklearn.preprocessing import PowerTransformer
 
-def statsmodel_test(X, Y, train_x_original, train_y_original, models, scalers, reg, result_dir,index, feature_names, reg_encoders, eval_reg, eval_class):
+def statsmodel_test(X, Y, train_x_original, train_y_original, models, scalers, reg, 
+                    result_dir,index, feature_names, reg_encoders, eval_reg, eval_class, test_ids
+                    ):
     X = X.numpy()
     X_df = pd.DataFrame(X, columns=feature_names)
     #X_df.columns = X_df.columns.astype(str)
@@ -197,8 +199,8 @@ def statsmodel_test(X, Y, train_x_original, train_y_original, models, scalers, r
             # 特徴量の重要度を取得
             if reg in scalers:
                 scaler = scalers[reg]
-                Y_pp = scaler.inverse_transform(Y)
-                Y_pp = scalers[reg].inverse_transform(Y)
+                #true = scaler.inverse_transform(Y)
+                true = scalers[reg].inverse_transform(Y)
                 if is_log1p_transformer(scaler):
                     y_train_pred_log1p = model.predict(train_x)
                     y_train_log1p = train_y
@@ -222,7 +224,7 @@ def statsmodel_test(X, Y, train_x_original, train_y_original, models, scalers, r
                 #pred = scalers[reg].inverse_transform(model.predict(X).reshape(-1, 1))
                 #pred = scalers[reg].inverse_transform(model.predict(X_top_features).reshape(-1, 1))
             else:
-                Y_pp = Y
+                true = Y
                 pred = model.predict(X).reshape(-1, 1)
                 #pred = model.predict(X_top_features).reshape(-1, 1)
             # Y_pp = Y
@@ -231,10 +233,10 @@ def statsmodel_test(X, Y, train_x_original, train_y_original, models, scalers, r
             met_dir = os.path.join(reg_dir, f'{name}_result.png')
 
             plt.figure()
-            plt.scatter(Y_pp,pred, label = 'prediction')
+            plt.scatter(true,pred, label = 'prediction')
 
-            min_val = min(Y_pp.min(), pred.min())
-            max_val = max(Y_pp.max(), pred.max())
+            min_val = min(true.min(), pred.min())
+            max_val = max(true.max(), pred.max())
             plt.plot([min_val, max_val], [min_val, max_val], 'r--', label = 'x=y')
 
             plt.xlabel('true_data')
@@ -256,7 +258,7 @@ def statsmodel_test(X, Y, train_x_original, train_y_original, models, scalers, r
             # print(f'{name}：')
             # print(f'決定係数：{r2}')
             # print(f'MAE：{mse}')
-            score = eval_predictions(Y_pp, pred, eval_reg)
+            score = eval_predictions(true, pred, eval_reg)
 
             if name in ['RF','XGB','LGB']:
                 calculate_and_save_shap_importance(model = model, X_test = X, feature_names = feature_names, output_dir = reg_dir)
@@ -285,21 +287,26 @@ def statsmodel_test(X, Y, train_x_original, train_y_original, models, scalers, r
             )
             cm_path = os.path.join(reg_dir, f"{reg}_confusion_matrix.csv")
             cm_df.to_csv(cm_path)
+        
+        result_path = os.path.join(reg_dir, f"{reg}_result.csv")
+        result_df = pd.DataFrame(true, index = test_ids, columns=['true'])
+        result_df['predicted'] = pred
+        result_df.to_csv(result_path)
 
         for metrics, s in score.items():
             scores[name][reg][metrics] = s
-            write_result(scores[name], columns_list = [reg], csv_dir = result_dir, method = name, ind = index)
+        write_result(scores[name], columns_list = [reg], csv_dir = result_dir, method = name, ind = index)
 
     return scores
 
 def stats_models_result(X_train, Y_train, X_test, Y_test, scalers, reg, result_dir,index, feature_names, reg_encoders,
-                        eval_reg, eval_class,
+                        eval_reg, eval_class, test_ids, 
                         ):
     #print(Y_train)
     models = statsmodel_train(X = X_train,Y = Y_train,scalers = scalers,reg = reg)
     scores = statsmodel_test(X = X_test, Y = Y_test, train_x_original = X_train, train_y_original = Y_train, models = models, 
                              scalers = scalers, reg = reg, result_dir = result_dir, index = index, feature_names = feature_names,
                              reg_encoders=reg_encoders, 
-                             eval_reg = eval_reg, eval_class = eval_class, 
+                             eval_reg = eval_reg, eval_class = eval_class, test_ids = test_ids
                              )
     return scores
