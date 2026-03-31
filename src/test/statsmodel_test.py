@@ -166,7 +166,8 @@ def apply_smearing_log1p(y_train_log1p, y_train_pred_log1p, y_test_pred_log1p):
 from sklearn.preprocessing import PowerTransformer
 
 def statsmodel_test(X, Y, train_x_original, train_y_original, models, scalers, reg, 
-                    result_dir,index, feature_names, reg_encoders, eval_reg, eval_class, test_ids
+                    result_dir,index, feature_names, reg_encoders, eval_reg, eval_class, test_ids, 
+                    label_encoders = None,
                     ):
     X = X.numpy()
     X_df = pd.DataFrame(X, columns=feature_names)
@@ -264,20 +265,21 @@ def statsmodel_test(X, Y, train_x_original, train_y_original, models, scalers, r
                 calculate_and_save_shap_importance(model = model, X_test = X, feature_names = feature_names, output_dir = reg_dir)
 
         else:
-            Y_pp = Y
+            true = Y
             pred = models[name].predict(X)
 
             # r2 = accuracy_score(Y_pp,pred)
             # mse = f1_score(Y_pp,pred, average='macro')
 
-            score = eval_predictions(Y_pp, pred, eval_class)
+            score = eval_predictions(true, pred, eval_class)
 
-            trues = reg_encoders[reg].inverse_transform(Y_pp)
+            trues = reg_encoders[reg].inverse_transform(true)
             preds = reg_encoders[reg].inverse_transform(pred)
 
             # 3. 混合行列の計算
             classes = reg_encoders[reg].classes_ # 元のラベル名のリスト
-            cm = confusion_matrix(trues, preds)
+            cm = confusion_matrix(trues, preds, labels = classes)
+            #cm = confusion_matrix(trues, preds)
             
             # 4. DataFrameに変換（見やすくするために行・列にラベル名を付与）
             cm_df = pd.DataFrame(
@@ -300,13 +302,14 @@ def statsmodel_test(X, Y, train_x_original, train_y_original, models, scalers, r
     return scores
 
 def stats_models_result(X_train, Y_train, X_test, Y_test, scalers, reg, result_dir,index, feature_names, reg_encoders,
-                        eval_reg, eval_class, test_ids, 
+                        eval_reg, eval_class, test_ids, label_encoders = None,
                         ):
     #print(Y_train)
     models = statsmodel_train(X = X_train,Y = Y_train,scalers = scalers,reg = reg)
     scores = statsmodel_test(X = X_test, Y = Y_test, train_x_original = X_train, train_y_original = Y_train, models = models, 
                              scalers = scalers, reg = reg, result_dir = result_dir, index = index, feature_names = feature_names,
                              reg_encoders=reg_encoders, 
-                             eval_reg = eval_reg, eval_class = eval_class, test_ids = test_ids
+                             eval_reg = eval_reg, eval_class = eval_class, test_ids = test_ids, 
+                             label_encoders = label_encoders,
                              )
     return scores

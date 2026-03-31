@@ -1156,4 +1156,106 @@ class TabPFNEnsembleRegressor:
         
         return df_results
     
-    
+import numpy as np
+import pandas as pd
+from sklearn.base import BaseEstimator, RegressorMixin
+from tabpfn import TabPFNRegressor
+
+class TabPFNDomainSelector(BaseEstimator, RegressorMixin):
+    def __init__(self, device='cpu'):
+        self.device = device
+        self.specialist_models = {}
+        self.generalist_model = None
+        self.domains = None
+
+    def _augment_by_shuffling(self, X_d, y_d, target_samples=50):
+        """データ拡張（既存のロジックを維持）"""
+        n_current, n_features = X_d.shape
+        if n_current >= target_samples:
+            return X_d, y_d
+        
+        n_needed = target_samples - n_current
+        indices = np.random.choice(n_current, size=n_needed, replace=True)
+        X_base = X_d[indices].copy()
+        y_base = y_d[indices].copy()
+        
+        feature_indices = np.arange(n_features)
+        np.random.shuffle(feature_indices)
+        X_augmented = X_base[:, feature_indices]
+        
+        return np.vstack([X_d, X_augmented]), np.concatenate([y_d, y_base])
+
+    def fit(self, X, y, domain_labels):
+        """
+        学習: 全体モデル（ジェネラリスト）と各ドメインごとのモデル（スペシャリスト）を学習
+        """
+        self.domains = np.unique(domain_labels)
+        
+        # 1. ジェネラリスト（全体）モデルの学習
+        self.generalist_model = TabPFNRegressor(device=self.device)
+        #self.generalist_model = RandomForestRegressor(random_state=42)
+        self.generalist_model.fit(X, y)
+
+        # 2. 各ドメインごとのスペシャリストモデルの学習
+        for d in self.domains:
+            mask = (domain_labels == d)
+            X_d, y_d = X[mask], y[mask]
+            
+            # データが少ない場合は拡張
+            if len(X_d) < 50:
+                X_d, y_d = self._augment_by_shuffling(X_d, y_d, target_samples=100)
+            
+            spec_reg = TabPFNRegressor(device=self.device)
+            #spec_reg = RandomForestRegressor(random_state=42)
+            spec_reg.fit(X_d, y_d)
+            self.specialist_models[d] = spec_reg
+            
+        return self
+
+    def predict(self, X, domain_labels):
+        """
+        推論: 与えられた domain_labels に基づき、対応するモデルを選択して予測する
+        """
+        n_samples = X.shape[0]
+        final_predictions = np.zeros(n_samples)
+        
+        # サンプルごとに、対応するドメインのモデルで予測
+        # 効率化のため、ドメインごとにまとめて処理します
+        unique_test_domains = np.unique(domain_labels)
+        
+        for d in unique_test_domains:
+            mask = (domain_labels == d)
+            
+            if d in self.specialist_models:
+                # 学習済みのスペシャリストが存在する場合
+                final_predictions[mask] = self.specialist_models[d].predict(X[mask])
+            else:
+                # 未知のドメインラベルが来た場合はジェネラリストで代用
+                final_predictions[mask] = self.generalist_model.predict(X[mask])
+                
+        return final_predictions
+
+    def predict_with_uncertainty(self, X, domain_labels):
+        """
+        予測値に加え、標準偏差（Sigma）も取得する
+        """
+        n_samples = X.shape[0]
+        preds = np.zeros(n_samples)
+        sigmas = np.zeros(n_samples)
+        qs = [0.1587, 0.8413] # ±1シグマに相当する分位点
+        
+        unique_test_domains = np.unique(domain_labels)
+        
+        for d in unique_test_domains:
+            mask = (domain_labels == d)
+            model = self.specialist_models.get(d, self.generalist_model)
+            
+            preds[mask] = model.predict(X[mask])
+            q_spec = model.predict(X[mask], output_type='quantiles', quantiles=qs)
+            sigmas[mask] = (q_spec[1] - q_spec[0]) / 2.0
+            
+        return pd.DataFrame({
+            'Prediction': preds,
+            'Sigma': sigmas,
+            'Domain': domain_labels
+        })

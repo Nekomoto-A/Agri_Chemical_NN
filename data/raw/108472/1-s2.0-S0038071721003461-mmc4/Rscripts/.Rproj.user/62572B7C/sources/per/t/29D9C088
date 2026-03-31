@@ -1,0 +1,27 @@
+{
+    "id": "29D9C088",
+    "path": "C:/Users/dforf/Dropbox/2b - Postdoc Project/5 - Papers in Prep/4. Soil Health Papers/2. Manuscript - MLing the Microbiome/Supplementary Data/Rscripts/ML.block02.feature.importance.SH.R",
+    "project_path": "ML.block02.feature.importance.SH.R",
+    "type": "r_source",
+    "hash": "1922870877",
+    "contents": "",
+    "dirty": false,
+    "created": 1633372699746.0,
+    "source_on_save": false,
+    "relative_order": 1,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "54,15",
+        "scrollLine": "48",
+        "disableDependencyDiscovery": "1"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1633373414,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1633373414683,
+    "read_only": false,
+    "read_only_alternatives": []
+}

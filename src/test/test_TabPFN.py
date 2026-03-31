@@ -264,8 +264,8 @@ def test_TabPFN(x_te, y_te_tensor,
         #         pred = models[reg].predict(batch)
         #         predictions.append(pred)
         #     return np.concatenate(predictions)
-        # explainer = shap.KernelExplainer(batched_predict, shap.sample(x_train, 50))
-        # explainer = shap.PermutationExplainer(models[reg].predict, x_train[:100])
+        # explainer = shap.KernelExplainer(models[reg].predict, shap.sample(x_train, 50))
+        # #explainer = shap.PermutationExplainer(models[reg].predict, x_train[:100])
         
         # shap_values = explainer.shap_values(x_te) # 計算時間を考慮し20件のみ
         # shap_dir = os.path.join(output_dir, 'shap_results')
@@ -300,8 +300,12 @@ def test_TabPFN(x_te, y_te_tensor,
             score = eval_predictions(true, pred, eval_class)
 
             # 3. 混合行列の計算
+            #print(pred)
+            #print(f"label_encoders: {label_encoders[reg]}")
             classes = label_encoders[reg].classes_ # 元のラベル名のリスト
-            cm = confusion_matrix(true, pred)
+            t = label_encoders[reg].inverse_transform(true.astype(int))
+            p = label_encoders[reg].inverse_transform(pred.astype(int))
+            cm = confusion_matrix(t, p, labels = classes)
             
             # 4. DataFrameに変換（見やすくするために行・列にラベル名を付与）
             cm_df = pd.DataFrame(
@@ -309,6 +313,7 @@ def test_TabPFN(x_te, y_te_tensor,
                 index=[f"True:{c}" for c in classes], 
                 columns=[f"Pred:{c}" for c in classes]
             )
+
             cm_path = os.path.join(result_dir, f"{reg}_confusion_matrix.csv")
             cm_df.to_csv(cm_path)
 

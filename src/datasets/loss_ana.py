@@ -459,10 +459,10 @@ def plot_grouped_boxplot(df, category_column, output_dir, t):
         print(f"エラー: 処理中に予期せぬ問題が発生しました: {e}")
 
 if __name__ == '__main__':
-    target = 'Exchangeable_K'
+    target = 'pH'
     
     #path = f"/home/nomura/Agri_Chemical_NN/result_AE_nocombat/['{target}']/loss.csv"
-    path = f"C:\\Users\\asahi\\Agri_Chemical_NN\\result_TabPFN_notr\\['{target}']\\loss.csv"
+    path = f"C:\\Users\\asahi\\Agri_Chemical_NN\\result_0327_select_pref-crop\\Cross-validation_results\\['{target}']\\loss.csv"
 
     df = pd.read_csv(path, index_col=0)
 

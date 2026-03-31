@@ -714,7 +714,7 @@ def fold_evaluate(reg_list, output_dir, device,
                                         result_dir = csv_dir, index = index, feature_names = features,
                                         reg_encoders = reg_encoders,
                                         eval_reg = eval_reg,
-                                        eval_class = eval_class, test_ids = test_ids
+                                        eval_class = eval_class, test_ids = test_ids, label_encoders = reg_encoders
                                         )
             for method_name, regs in stats_scores.items():
                 for reg_name, dict in regs.items():
@@ -891,6 +891,8 @@ def domain_evaluate(reg_list, output_dir, device,
                   eval_reg = config['eval_reg'], 
                   eval_class = config['eval_class'], 
                   normalize = config['feature_normalize'],
+
+                  skip_domains = config['skip_domains']
                   ):
     #if feature_selection_all:
     #   output_dir = os.path.join(fsdir, output_dir)
@@ -999,7 +1001,12 @@ def domain_evaluate(reg_list, output_dir, device,
     #for fold, (train_index, test_index) in enumerate(kf.split(X, Y['crop'])):
     #for fold, (train_index, test_index) in enumerate(kf.split(X,Y[reg_list[0]])):
     for train_index, test_index in logo.split(X, Y, groups=domain_labels):
-        index = [f'{domain_labels.iloc[test_index].unique()[0]}']
+        domain = domain_labels.iloc[test_index].unique()[0]
+
+        if domain in skip_domains:
+            continue
+
+        index = [f'{domain}']
         X_train, X_test = X.iloc[train_index], X.iloc[test_index]
         Y_train, Y_test = Y.iloc[train_index], Y.iloc[test_index]
 
@@ -1288,7 +1295,7 @@ def domain_evaluate(reg_list, output_dir, device,
                                         result_dir = csv_dir, index = index, feature_names = features,
                                         reg_encoders = reg_encoders,
                                         eval_reg = eval_reg,
-                                        eval_class = eval_class, test_ids = test_ids
+                                        eval_class = eval_class, test_ids = test_ids, label_encoders = reg_encoders
                                         )
             #print(stats_scores)
             for method_name, regs in stats_scores.items():
@@ -1332,6 +1339,9 @@ def domain_evaluate(reg_list, output_dir, device,
                 plt.tight_layout()
                 plt.savefig(all_hist_path)
                 plt.close()
+
+                all_dir = os.path.join(sub_dir, f'prediction_analysis_{method}_{reg}.png')
+                save_prediction_plot(target, out, all_dir)
 
                 if reg == 'pH':
                     # 条件リスト
@@ -1398,11 +1408,11 @@ def domain_evaluate(reg_list, output_dir, device,
     for metrics,models in scores.items():
         for method_name,regs in models.items():
             for target,values in regs.items():
-                #avg = f'{np.average(values):.3f}'
-                avg = f'{np.average(values)}'
+                avg = f'{np.average(values):.3f}'
+                #avg = f'{np.average(values)}'
                 avg_dict.setdefault(metrics, {}).setdefault(method_name, {})[target] = np.average(values)
-                #std = f'{np.std(values):.3f}'
-                std = f'{np.std(values)}'
+                std = f'{np.std(values):.3f}'
+                #std = f'{np.std(values)}'
                 #std_dict.setdefault(metrics, {}).setdefault(method_name, {})[target] = np.std(values)
                 result = f'{avg}±{std}'
                 avg_std.setdefault(metrics, {}).setdefault(method_name, {})[target] = result
@@ -1440,3 +1450,39 @@ def domain_evaluate(reg_list, output_dir, device,
 
     return avg_dict, std_dict
 
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.metrics import r2_score, mean_absolute_error
+
+def save_prediction_plot(y_true, y_pred, file_name="prediction_analysis.png"):
+    """
+    実測値と予測値の散布図を作成し、評価指標をタイトルに含めて保存する関数
+    """
+    
+    # 1. 評価指標の計算
+    r2 = r2_score(y_true, y_pred) # 決定係数
+    mae = mean_absolute_error(y_true, y_pred) # 平均絶対誤差
+    correlation = np.corrcoef(y_true, y_pred)[0, 1] # 相関係数
+
+    # 2. グラフの作成
+    plt.figure(figsize=(8, 6))
+    plt.scatter(y_true, y_pred, alpha=0.5, edgecolors='k', label="Data Points")
+    
+    # 理想線 (y=x) の描画
+    max_val = max(np.max(y_true), np.max(y_pred))
+    min_val = min(np.min(y_true), np.min(y_pred))
+    plt.plot([min_val, max_val], [min_val, max_val], color='red', linestyle='--', label="Ideal (y=x)")
+
+    # 3. タイトルとラベルの設定
+    # タイトルに各指標を表示（小数点3桁まで）
+    title_str = f"R2: {r2:.3f}, Corr: {correlation:.3f}, MAE: {mae:.3f}"
+    plt.title(title_str)
+    plt.xlabel("Actual Values")
+    plt.ylabel("Predicted Values")
+    plt.legend()
+    plt.grid(True)
+
+    # 4. 画像の保存
+    plt.savefig(file_name)
+    plt.close()
+    print(f"グラフを {file_name} として保存しました。")

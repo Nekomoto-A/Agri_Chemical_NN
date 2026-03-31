@@ -213,7 +213,7 @@ def training_TabPFN(x_tr,x_val,y_tr,y_val,models, reg_list, scalers, output_dir,
         # score, indices = backward_selection(models[reg], x_tr, y_tr[reg], cv=5)
         # print(f'最終スコア:{score:.4f}, 選択された特徴量のインデックス: {indices}')
         if filter_mi:
-            x_tr, selected_indices = filter_low_mi_features(x_tr, y_tr[reg], threshold=0.2)
+            x_tr, selected_indices = filter_low_mi_features(x_tr, y_tr[reg], threshold=0.1)
         else:
             selected_indices = np.arange(x_tr.shape[1])
         # x_tr = x_tr[:, indices]

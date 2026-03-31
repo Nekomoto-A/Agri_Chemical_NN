@@ -126,7 +126,7 @@ train_GP_NUTS.py:
 train_TabPFN.py:
   optune: False
   n_trials: 50
-  filter_mi: False
+  filter_mi: True
   data_aug: False
 test.py:
   loss_sum: 'WeightedSUM' #'SUM' #
@@ -150,7 +150,7 @@ fold_eval.py:
   marginal_hist: False
   k_fold: 5
   feature_normalize: False
-  model_name: 'TabPFN_concat'
+  model_name: 'TabPFN'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
@@ -200,14 +200,21 @@ fold_eval.py:
   transformer: [None, None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
   reg_loss_fanction: ['mse', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
   eval_reg: ['R', 'R2', 'MedAE', 'MAE', 'RMSLE', 'RMSE']
-  eval_class: ['Accuracy', 'F1score']
+  eval_class: ['accuracy', 'F1score']
   labels: ['crop'] #['experimental_purpose'] # #['crop'] # #['crop'] #['crop', 'pref', 'lati', 'long'] # #
   embedding: 'concat' #'Word2Vec' #'Onehot' # #"concat" #
   embedding_size: 8
   latent_dim: 64
+  skip_domains: [
+                'Miyazaki-Spinach', 
+                'Saitama-Spinach', 
+                'Saitama-Pear', 
+                'Niigata-Pear', 
+                'Miyazaki-Edamame', 
+  ]
 main.py:
-  result_dir: 'result_0327_concat_pref-crop'
-  Cross_val: True
+  result_dir: 'result_0327_th'
+  Cross_val: False
   LOGO: True
   domains: 'pref-crop'
   reg_list: [
@@ -232,10 +239,11 @@ main.py:
             # ['APCP_Feb_me'],
             # ['APCP_Jan_me'],
 
+            ['Available.P_th'],
             #[NH4.N], 
-            ['Available.P'], 
-            ['pH'], 
-            ['NO3.N'], 
+            #['Available.P'], 
+            #['pH'], 
+            #['NO3.N'], 
             # ['EC'], 
             # ['Humus'], 
             # ['Exchangeable.K'], 

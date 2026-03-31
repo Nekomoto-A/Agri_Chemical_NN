@@ -981,6 +981,9 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                 if 'ME' in model_name:
                     from src.models.ME import MixedEffectSklearn
                     model[reg] = MixedEffectSklearn(fixed_model=model[reg])
+                elif 'select' in model_name:
+                    from src.models.TabPFN_ensemble import TabPFNDomainSelector
+                    model[reg] = TabPFNDomainSelector(device=device_name)
                 elif 'ensemble_bin' in model_name:
                     from src.models.TabPFN_ensemble import TabPFNTargetBinningEnsemble
                     model[reg] = TabPFNTargetBinningEnsemble(device=device_name,
@@ -1328,6 +1331,18 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                              models = model_trained, reg_list = reg_list, scalers = scalers, output_dir = vis_dir,
                                               test_ids = test_ids, feature_names=features, lime_local = lime_eval,  #save_feature = save_feature,
                                               eval_reg = eval_reg, eval_class = eval_class, selected_indices = selected_indices)
+    elif model_name == 'TabPFN_select':
+        from src.training.train_TabPFN_select import training_TabPFN_select
+        model_trained, selected_indices = training_TabPFN_select(x_tr = X_train, x_val = X_val, y_tr = Y_train, y_val = Y_val, 
+                                                             labels_train = labels_train_original, labels_val = labels_val_original,
+                                        models = model, reg_list = reg_list, scalers = scalers, 
+                                        output_dir = vis_dir)
+        from src.test.test_TabPFN_select import test_TabPFN_select
+        predicts, true, scores = test_TabPFN_select(x_te = X_test,y_te_tensor = Y_test, labels_test = labels_test_original,
+                                             x_train = X_train, y_train = Y_train, labels_train = labels_train_original,
+                                             models = model_trained, reg_list = reg_list, scalers = scalers, output_dir = vis_dir,
+                                              test_ids = test_ids, feature_names=features, lime_local = lime_eval,  #save_feature = save_feature,
+                                              eval_reg = eval_reg, eval_class = eval_class, selected_indices = selected_indices)
     elif model_name == 'TabPFN_ensemble_bin':
         from src.training.train_TabPFN_bin import training_TabPFN_bin
         model_trained, selected_indices = training_TabPFN_bin(x_tr = X_train, x_val = X_val, y_tr = Y_train, y_val = Y_val, 
@@ -1422,7 +1437,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         predicts, true, scores = test_TabPFN(x_te = X_test,y_te_tensor = Y_test, x_train = X_train, y_train = Y_train, 
                                              models = model_trained, reg_list = reg_list, scalers = scalers, output_dir = vis_dir,
                                               test_ids = test_ids, feature_names=features, lime_local = lime_eval,  #save_feature = save_feature,
-                                              eval_reg = eval_reg, eval_class = eval_class, selected_indices = selected_indices)
+                                              eval_reg = eval_reg, eval_class = eval_class, label_encoders = reg_encoders, selected_indices = selected_indices)
 
     elif model_name == 'HBM':
         from src.training.train_HBM import training_HBM
