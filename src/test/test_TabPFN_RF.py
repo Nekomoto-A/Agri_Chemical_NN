@@ -12,7 +12,6 @@ import mpld3
 import yaml
 import os
 
-
 def normalized_medae_iqr(y_true, y_pred):
     """
     中央絶対誤差（MedAE）を四分位範囲（IQR）で正規化した、
@@ -226,7 +225,7 @@ def log1p_corrected_inverse(model, X_test):
 
 from sklearn.inspection import permutation_importance
 
-def test_TabPFN(x_te, y_te_tensor, 
+def test_TabPFN_RF(x_te, y_te_tensor, 
               x_train, y_train, 
               models, reg_list, scalers, output_dir, 
               test_ids, feature_names, 
@@ -273,7 +272,7 @@ def test_TabPFN(x_te, y_te_tensor,
         if shap_compute:
             # 1. バッチ処理を行うためのラッパー関数を定義
             def batched_predict(data):
-                batch_size = 20  # メモリ状況に応じて調整（小さくするとメモリ消費が減ります）
+                batch_size = 10  # メモリ状況に応じて調整（小さくするとメモリ消費が減ります）
                 predictions = []
                 for i in range(0, len(data), batch_size):
                     batch = data[i:i + batch_size]
@@ -282,18 +281,19 @@ def test_TabPFN(x_te, y_te_tensor,
                     predictions.append(pred)
                 return np.concatenate(predictions)
             #explainer = shap.KernelExplainer(models[reg].predict, shap.sample(x_train, 50))
-            background_data = shap.kmeans(x_train, 10).data
-            explainer = shap.KernelExplainer(batched_predict, background_data)
-            #explainer = shap.KernelExplainer(batched_predict, shap.sample(x_train, 50))
+            background_summary = shap.kmeans(x_train, 10)
+            explainer = shap.KernelExplainer(batched_predict, background_summary)
             #explainer = shap.PermutationExplainer(models[reg].predict, x_train[:100])
             
             shap_values = explainer.shap_values(x_te) # 計算時間を考慮し20件のみ
             shap_dir = os.path.join(output_dir, 'shap_results')
             os.makedirs(shap_dir, exist_ok=True)
-            shap_df = pd.DataFrame(shap_values, columns=feature_names)
-            shap_df['id'] = test_ids.to_list()
+
+            shap_df = pd.DataFrame(shap_values, columns=feature_names_select)
+            # 5. CSVとして保存
             shap_csv_path = os.path.join(shap_dir, f"shap_values_{reg}.csv")
             shap_df.to_csv(shap_csv_path, index=False)
+
             # 3. 描画の設定
             plt.figure(figsize=(12, 8)) # 図のサイズを調整
             # 4. Summary Plotの作成
@@ -441,5 +441,9 @@ def test_TabPFN(x_te, y_te_tensor,
         
         for metrix, value in score.items():
             scores[reg][metrix] = value
+
+        individual_preds = models[reg].get_individual_predictions(x_te, y_true=y_te[reg])
+        individual_preds['id'] = test_ids
+        individual_preds.to_csv(os.path.join(result_dir, f'individual_predictions_{reg}.csv'), index=False, encoding='utf-8-sig')
 
     return predicts, trues, scores

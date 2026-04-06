@@ -981,6 +981,9 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                 if 'ME' in model_name:
                     from src.models.ME import MixedEffectSklearn
                     model[reg] = MixedEffectSklearn(fixed_model=model[reg])
+                elif 'RF' in model_name:
+                    from src.models.TabPFN_RF import TabPFN_RFRegressor
+                    model[reg] = TabPFN_RFRegressor(tabpfn_kwargs={'device': device_name})
                 elif 'select' in model_name:
                     from src.models.TabPFN_ensemble import TabPFNDomainSelector
                     model[reg] = TabPFNDomainSelector(device=device_name)
@@ -1331,6 +1334,16 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
                                              models = model_trained, reg_list = reg_list, scalers = scalers, output_dir = vis_dir,
                                               test_ids = test_ids, feature_names=features, lime_local = lime_eval,  #save_feature = save_feature,
                                               eval_reg = eval_reg, eval_class = eval_class, selected_indices = selected_indices)
+    elif model_name == 'TabPFN_RF':
+        from src.training.train_TabPFN_RF import training_TabPFN_RF
+        model_trained, selected_indices = training_TabPFN_RF(x_tr = X_train,x_val = X_val,y_tr = Y_train,y_val = Y_val, 
+                                        models = model, reg_list = reg_list, scalers = scalers, 
+                                        output_dir = vis_dir, train_ids = train_ids, train_column = features,)
+        from src.test.test_TabPFN_RF import test_TabPFN_RF
+        predicts, true, scores = test_TabPFN_RF(x_te = X_test,y_te_tensor = Y_test, x_train = X_train, y_train = Y_train, 
+                                             models = model_trained, reg_list = reg_list, scalers = scalers, output_dir = vis_dir,
+                                              test_ids = test_ids, feature_names=features, lime_local = lime_eval,  #save_feature = save_feature,
+                                              eval_reg = eval_reg, eval_class = eval_class, label_encoders = reg_encoders, selected_indices = selected_indices)
     elif model_name == 'TabPFN_select':
         from src.training.train_TabPFN_select import training_TabPFN_select
         model_trained, selected_indices = training_TabPFN_select(x_tr = X_train, x_val = X_val, y_tr = Y_train, y_val = Y_val, 

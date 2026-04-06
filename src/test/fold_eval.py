@@ -301,6 +301,92 @@ def get_kmeans_labels(X, n_clusters=3, random_state=42):
     
     return labels_df
 
+import torch
+import lightgbm as lgb
+import numpy as np
+import plotly.graph_objects as go
+import plotly.io as pio
+
+def select_features_with_lgbm(X, Y, k, feature_names, save_path, task='regression'):
+    """
+    LightGBMの重要度に基づき特徴量選択を行う関数
+    
+    Args:
+        X (torch.Tensor): 入力データ (サンプル数, 特徴量数)
+        Y (torch.Tensor): ターゲットデータ
+        k (int): 選択したい特徴量の次元数
+        task (str): 'regression' (回帰) または 'classification' (分類)
+        
+    Returns:
+        X_selected (torch.Tensor): 特徴量選択後のTensor (元のデバイス)
+        selected_indices (np.ndarray): 選択された特徴量のインデックス
+    """
+    # 1. デバイス情報の保持とNumPyへの変換
+    device = X.device
+    X_np = X.detach().cpu().numpy()
+    Y_np = Y.detach().cpu().numpy().flatten()
+
+    # 2. LightGBMモデルの構築
+    if task == 'regression':
+        model = lgb.LGBMRegressor(importance_type='gain', n_estimators=100, random_state=42)
+    else:
+        model = lgb.LGBMClassifier(importance_type='gain', n_estimators=100, random_state=42)
+
+    # 3. 学習と重要度の取得
+    model.fit(X_np, Y_np)
+    importances = model.feature_importances_
+
+    # --- 追加: 重要度の可視化と保存 ---
+    # 3. 上位50件の抽出（可視化用）
+    # 3. 上位50件の抽出とラベル付け
+    all_indices = np.argsort(-importances)
+    top_50_indices = all_indices[:50][::-1] # グラフ表示用に上位50を逆順に
+    
+    top_50_values = importances[top_50_indices]
+    # 指定されたfeature_namesから該当する名前を取得
+    top_50_labels = [feature_names[i] for i in top_50_indices]
+
+    # 4. Plotlyによるグラフ作成
+    fig = go.Figure(go.Bar(
+        x=top_50_values,
+        y=top_50_labels,
+        orientation='h',
+        # marker=dict(
+        #     color=top_50_values,
+        #     colorscale='Viridis', # 視覚的にわかりやすく色付け
+        #     showscale=True
+        # ),
+        marker=dict(
+            color='royalblue' 
+        ),
+        hovertemplate='<b>%{y}</b><br>Importance: %{x:.2f}<extra></extra>'
+    ))
+
+    fig.update_layout(
+        title=f'Top 50 Feature Importances (Total Features: {len(feature_names)})',
+        xaxis_title='Importance (Gain)',
+        yaxis_title='Feature Name',
+        height=min(1200, 200 + len(top_50_labels) * 20), # 件数に応じて高さを自動調整
+        margin=dict(l=200, r=20, t=50, b=50), # ラベルが長い場合に備えて左余白を広く
+        yaxis=dict(autorange="reversed") if len(top_50_labels) < 10 else None
+    )
+
+    # HTMLとして保存
+    fig.write_html(save_path, include_plotlyjs='cdn')
+    # --------------------------------
+
+    # 4. 重要度が高い順にインデックスをk個選択
+    # argsortは昇順なので、マイナスをつけて降順にし、先頭k個を取る
+    selected_indices = np.argsort(-importances)[:k]
+    
+    # 昇順に並び替えておくと元のデータの並び順を維持しやすい（任意）
+    selected_indices = np.sort(selected_indices)
+
+    # 5. データの抽出とTensor化
+    X_selected_np = X_np[:, selected_indices]
+    X_selected = torch.from_numpy(X_selected_np).to(device)
+
+    return X_selected, selected_indices
 
 def fold_evaluate(reg_list, output_dir, device, 
                   transformer = config['transformer'],
@@ -325,6 +411,8 @@ def fold_evaluate(reg_list, output_dir, device,
                   eval_reg = config['eval_reg'], 
                   eval_class = config['eval_class'], 
                   normalize = config['feature_normalize'],
+                  lgb_selection = config['lgb_selection'],
+                  num_features_to_select_lgb = config['num_features_to_select_lgb']
                   ):
     #if feature_selection_all:
     #   output_dir = os.path.join(fsdir, output_dir)
@@ -570,6 +658,20 @@ def fold_evaluate(reg_list, output_dir, device,
                 Y_val_single = {}
             reg = [r]
             print(X_train_tensor.shape)
+
+            #print(X_val_tensor)
+            if lgb_selection:
+                X_train_tensor, selected_indices = select_features_with_lgbm(X_train_tensor, Y_train_single[r], 
+                                                                             k=num_features_to_select_lgb, feature_names=features, 
+                                                                             save_path=os.path.join(fold_dir, f'feature_importance_{r}.html'))
+                if X_val_tensor.numel() != 0:
+                    X_val_tensor = X_val_tensor[:, selected_indices]
+                X_test_tensor = X_test_tensor[:, selected_indices]
+                features = [features[i] for i in selected_indices]
+                print(f"Selected features indices: {selected_indices}")
+                print(f"Selected features: {features}")
+            
+            print(f'学習データ:{X_train_tensor.shape}')
 
             predictions, trues, result_scores_st, model_trained_st = train_and_test(
                 X_train = X_train_tensor, X_val = X_val_tensor, X_test = X_test_tensor, Y_train = Y_train_single, Y_val = Y_val_single, Y_test = Y_test_single, 

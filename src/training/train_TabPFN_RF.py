@@ -12,7 +12,8 @@ import yaml
 yaml_path = 'config.yaml'
 script_name = os.path.basename(__file__)
 with open(yaml_path, "r", encoding="utf-8") as file:
-    config = yaml.safe_load(file)[script_name]
+    #config = yaml.safe_load(file)[script_name]
+    config = yaml.safe_load(file)['train_TabPFN.py']
 
 import optuna
 from optuna.visualization import plot_optimization_history, plot_param_importances, plot_parallel_coordinate
@@ -238,7 +239,7 @@ def select_features_by_lgbm(X, y, top_n):
     
     return X_selected, selected_indices
 
-def training_TabPFN(x_tr,x_val,y_tr,y_val,models, reg_list, scalers, output_dir, train_ids, train_column, 
+def training_TabPFN_RF(x_tr,x_val,y_tr,y_val,models, reg_list, scalers, output_dir, train_ids, train_column, 
                     optune = config['optune'], n_trials = config['n_trials'],filter_mi = config['filter_mi'],
                     data_aug = config['data_aug']
                 ):
@@ -372,6 +373,10 @@ def training_TabPFN(x_tr,x_val,y_tr,y_val,models, reg_list, scalers, output_dir,
         plt.savefig(save_path)
         print(f"学習データに対する予測値を {save_path} に保存しました。")
         plt.close() # メモリ解放のためにプロットを閉じる
+
+        individual_preds = models[reg].get_individual_predictions(x_tr, y_true=y_tr[reg])
+        individual_preds['id'] = train_ids
+        individual_preds.to_csv(os.path.join(save_dir, f'individual_predictions_{reg}.csv'), index=False, encoding='utf-8-sig')
 
     return models, selected_indices
 

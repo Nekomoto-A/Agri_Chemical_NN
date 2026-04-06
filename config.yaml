@@ -27,8 +27,9 @@ dataset.py:
   exclude_ids2: []
   combat: False
   stats_features: ['crop', 'pref', 'lati', 'long']
-  sparce_drop: False
+  sparce_drop: True
   drop_threshold: 0.05
+  uncultured_drop: True
 train.py:
   early_stopping: True
   patience: 20
@@ -126,7 +127,7 @@ train_GP_NUTS.py:
 train_TabPFN.py:
   optune: False
   n_trials: 50
-  filter_mi: True
+  filter_mi: False
   data_aug: False
 test.py:
   loss_sum: 'WeightedSUM' #'SUM' #
@@ -149,12 +150,14 @@ fold_eval.py:
   carr_calc: False
   marginal_hist: False
   k_fold: 5
-  feature_normalize: False
+  feature_normalize: True
   model_name: 'TabPFN'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
   comp_method: 'SUM'
+  lgb_selection: False
+  num_features_to_select_lgb: 18
   exclude_ids: [
     #'042_20_Sait_Eggp'
     #'042_20_Sait_Eggp','235_21_Miyz_Spin', '360_22_Miee_Soyb', '121_20_Miyz_Spin', '125_20_Miyz_Spin', #'161_21_Miyz_Spin' #☓
@@ -194,8 +197,8 @@ fold_eval.py:
   ]
   feature_path_linux: 'data/raw/riken/taxon_data/lv6.csv' #'/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/lv6.csv' # # #
   target_path_linux:  'data/raw/riken/chem_data.xlsx' #'/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/chem_data.xlsx' # # #
-  feature_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\taxon_data\lv6.csv' #'C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\lv6.csv' #
-  target_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\chem_data.xlsx' #'C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\chem_data.xlsx' #
+  feature_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\taxon_data\lv6_filtered.csv' #'C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\lv6.csv' #
+  target_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\chem_filtered.xlsx' #'C:\Users\v' #'C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\chem_data.xlsx' #
   data_inte: False
   transformer: [None, None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
   reg_loss_fanction: ['mse', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
@@ -213,9 +216,9 @@ fold_eval.py:
                 'Miyazaki-Edamame', 
   ]
 main.py:
-  result_dir: 'result_0327_th'
-  Cross_val: False
-  LOGO: True
+  result_dir: 'result_0406_full'
+  Cross_val: True
+  LOGO: False
   domains: 'pref-crop'
   reg_list: [
             # ['pref'], 
@@ -239,11 +242,11 @@ main.py:
             # ['APCP_Feb_me'],
             # ['APCP_Jan_me'],
 
-            ['Available.P_th'],
+            #['Available.P_th'],
             #[NH4.N], 
-            #['Available.P'], 
-            #['pH'], 
-            #['NO3.N'], 
+            ['Available.P'], 
+            ['pH'], 
+            ['NO3.N'], 
             # ['EC'], 
             # ['Humus'], 
             # ['Exchangeable.K'], 

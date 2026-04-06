@@ -1,3 +1,4 @@
+from sklearn.inspection import permutation_importance
 from sklearn.metrics import r2_score,mean_squared_error,accuracy_score, f1_score, median_absolute_error,mean_absolute_error
 from src.training.statsmodel_train import statsmodel_train
 from src.test.test import write_result
@@ -9,7 +10,7 @@ import os
 import pandas as pd
 import shap
 
-def calculate_and_save_shap_importance(model, X_test, feature_names, output_dir):
+def calculate_and_save_shap_importance(model, X_test, feature_names, output_dir, ids):
     """
     学習済みモデルとテストデータを用いてSHAP特徴量重要度を計算し、
     結果をプロットとCSVファイルで保存する関数。
@@ -54,6 +55,8 @@ def calculate_and_save_shap_importance(model, X_test, feature_names, output_dir)
 
     # 4. SHAP値のCSV保存
     shap_df = pd.DataFrame(shap_values_for_analysis, columns=feature_names)
+    #print(ids)
+    shap_df['id'] = ids.to_list()  # ID列を追加
     csv_path = os.path.join(output_dir, "shap_values.csv")
     shap_df.to_csv(csv_path, index=False)
     print(f"SHAP値を '{csv_path}' に保存しました。")
@@ -262,8 +265,12 @@ def statsmodel_test(X, Y, train_x_original, train_y_original, models, scalers, r
             score = eval_predictions(true, pred, eval_reg)
 
             if name in ['RF','XGB','LGB']:
-                calculate_and_save_shap_importance(model = model, X_test = X, feature_names = feature_names, output_dir = reg_dir)
-
+                calculate_and_save_shap_importance(model = model, X_test = X, feature_names = feature_names, output_dir = reg_dir, ids = test_ids)
+            # pi = permutation_importance(model, X, Y, 
+            #                         n_repeats=10, random_state=42)
+            # fold_df = pd.DataFrame(pi.importances.T, columns=feature_names)
+            # pi_dir = os.path.join(reg_dir, f"permutation_importance_{reg}.csv")
+            # fold_df.to_csv(pi_dir, index=False)
         else:
             true = Y
             pred = models[name].predict(X)

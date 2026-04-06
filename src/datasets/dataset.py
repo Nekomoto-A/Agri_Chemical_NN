@@ -178,6 +178,7 @@ class data_create:
                  label_list = None, feature_transformer = config['feature_transformer'], 
                  #label_data = config['labels'], 
                  unknown_drop  = config['unknown_drop'], non_outlier = config['non_outlier'], 
+                 uncultured_drop = config['uncultured_drop'],
                  sparce_drop = config['sparce_drop'], drop_threshold = config['drop_threshold'], 
                  features_list = None
                  ):
@@ -197,6 +198,8 @@ class data_create:
 
         self.sparce_drop = sparce_drop
         self.drop_threshold = drop_threshold
+
+        self.uncultured_drop = uncultured_drop
         
         self.output_dir = os.path.join(output_dir, f'{reg_list}') if output_dir is not None else None
 
@@ -238,7 +241,6 @@ class data_create:
                 elif 'lv1' in self.path_asv:
                     tax_levels = ["domain"]
                     ends_with_patterns = (';__')
-                
                 if self.unknown_drop:
                     #columns_to_drop1 = [col for col in taxa if col.endswith(';s__')]
                     #ends_with_patterns = (';__', ';s__')
@@ -246,6 +248,11 @@ class data_create:
                     
                     columns_to_drop = [col for col in taxa if col.endswith(ends_with_patterns)]
 
+                    asv_data = asv_data.drop(columns_to_drop, axis=1)
+                    taxa = asv_data.columns.to_list()
+
+                if self.uncultured_drop:
+                    columns_to_drop = [col for col in taxa if 'uncultured' in col]
                     asv_data = asv_data.drop(columns_to_drop, axis=1)
                     taxa = asv_data.columns.to_list()
 
