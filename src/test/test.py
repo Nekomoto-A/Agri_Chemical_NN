@@ -201,6 +201,14 @@ def adjusted_r2(y_true, y_pred, n_features):
     adj_r2 = 1 - (1 - r2) * (n - 1) / (n - n_features - 1)
     return adj_r2
 
+from sklearn.metrics import mean_absolute_percentage_error
+def calculate_smape(y_true, y_pred):
+    # 分母が0になるのを防ぐために微小値を加えるのが一般的
+    denominator = (np.abs(y_true) + np.abs(y_pred)) / 2.0
+    diff = np.abs(y_true - y_pred) / denominator
+    
+    return np.mean(diff)
+
 def eval_predictions(true, pred, eval, n_features = None):
     result = {}
     for metrix in eval:
@@ -227,6 +235,8 @@ def eval_predictions(true, pred, eval, n_features = None):
         elif metrix == 'RMSLE':
             pred = np.clip(pred, 0, None)
             result[metrix] = root_mean_squared_log_error(true, pred)
+        elif metrix == 'MAPE':
+            result[metrix] = mean_absolute_percentage_error(true, pred)
     return result
 
 def apply_smearing_yeo_johnson(pt, y_train_transformed, y_train_pred_transformed, y_test_pred_transformed):

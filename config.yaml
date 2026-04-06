@@ -156,8 +156,8 @@ fold_eval.py:
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
   comp_method: 'SUM'
-  lgb_selection: False
-  num_features_to_select_lgb: 18
+  lgb_selection: True
+  num_features_to_select_lgb: 20
   exclude_ids: [
     #'042_20_Sait_Eggp'
     #'042_20_Sait_Eggp','235_21_Miyz_Spin', '360_22_Miee_Soyb', '121_20_Miyz_Spin', '125_20_Miyz_Spin', #'161_21_Miyz_Spin' #☓
@@ -202,7 +202,7 @@ fold_eval.py:
   data_inte: False
   transformer: [None, None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
   reg_loss_fanction: ['mse', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
-  eval_reg: ['R', 'R2', 'MedAE', 'MAE', 'RMSLE', 'RMSE']
+  eval_reg: ['R', 'R2', 'MedAE', 'MAE', 'RMSLE', 'RMSE', 'MAPE']
   eval_class: ['accuracy', 'F1score']
   labels: ['crop'] #['experimental_purpose'] # #['crop'] # #['crop'] #['crop', 'pref', 'lati', 'long'] # #
   embedding: 'concat' #'Word2Vec' #'Onehot' # #"concat" #
@@ -216,7 +216,7 @@ fold_eval.py:
                 'Miyazaki-Edamame', 
   ]
 main.py:
-  result_dir: 'result_0406_full'
+  result_dir: 'result_0406_shap'
   Cross_val: True
   LOGO: False
   domains: 'pref-crop'

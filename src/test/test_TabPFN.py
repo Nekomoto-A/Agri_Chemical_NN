@@ -234,7 +234,7 @@ def test_TabPFN(x_te, y_te_tensor,
               lime_local = False,
               label_encoders = None, 
               selected_indices = None, 
-              shap_compute = False, 
+              shap_compute = True, 
               PI = False
               ):
     x_te = x_te.cpu().detach().numpy()
@@ -287,7 +287,7 @@ def test_TabPFN(x_te, y_te_tensor,
             #explainer = shap.KernelExplainer(batched_predict, shap.sample(x_train, 50))
             #explainer = shap.PermutationExplainer(models[reg].predict, x_train[:100])
             
-            shap_values = explainer.shap_values(x_te) # 計算時間を考慮し20件のみ
+            shap_values = explainer.shap_values(x_te)
             shap_dir = os.path.join(output_dir, 'shap_results')
             os.makedirs(shap_dir, exist_ok=True)
             shap_df = pd.DataFrame(shap_values, columns=feature_names)
