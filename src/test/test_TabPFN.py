@@ -225,6 +225,7 @@ def log1p_corrected_inverse(model, X_test):
     return corrected_pred
 
 from sklearn.inspection import permutation_importance
+from tabpfn_extensions import interpretability
 
 def test_TabPFN(x_te, y_te_tensor, 
               x_train, y_train, 
@@ -272,45 +273,59 @@ def test_TabPFN(x_te, y_te_tensor,
   
         if shap_compute:
             # 1. バッチ処理を行うためのラッパー関数を定義
-            def batched_predict(data):
-                batch_size = 20  # メモリ状況に応じて調整（小さくするとメモリ消費が減ります）
-                predictions = []
-                for i in range(0, len(data), batch_size):
-                    batch = data[i:i + batch_size]
-                    # TabPFNで予測を実行
-                    pred = models[reg].predict(batch)
-                    predictions.append(pred)
-                return np.concatenate(predictions)
-            #explainer = shap.KernelExplainer(models[reg].predict, shap.sample(x_train, 50))
-            background_data = shap.kmeans(x_train, 10).data
-            explainer = shap.KernelExplainer(batched_predict, background_data)
+            # def batched_predict(data):
+            #     batch_size = 20  # メモリ状況に応じて調整（小さくするとメモリ消費が減ります）
+            #     predictions = []
+            #     for i in range(0, len(data), batch_size):
+            #         batch = data[i:i + batch_size]
+            #         # TabPFNで予測を実行
+            #         pred = models[reg].predict(batch)
+            #         predictions.append(pred)
+            #     return np.concatenate(predictions)
+            # #explainer = shap.KernelExplainer(models[reg].predict, shap.sample(x_train, 50))
+            # background_data = shap.kmeans(x_train, 10).data
+            # explainer = shap.KernelExplainer(batched_predict, background_data)
             #explainer = shap.KernelExplainer(batched_predict, shap.sample(x_train, 50))
             #explainer = shap.PermutationExplainer(models[reg].predict, x_train[:100])
-            
-            shap_values = explainer.shap_values(x_te)
+
+            #shap_values = explainer.shap_values(x_te)
+            shap_values = interpretability.shap.get_shap_values(
+                    estimator=models[reg],
+                    #X=x_te
+                    #test_x = x_te
+                    test_x = x_te,
+                    attribute_names=feature_names,
+                    algorithm="permutation",
+                )
+            #print(shap_values)
             shap_dir = os.path.join(output_dir, 'shap_results')
             os.makedirs(shap_dir, exist_ok=True)
-            shap_df = pd.DataFrame(shap_values, columns=feature_names)
-            shap_df['id'] = test_ids.to_list()
+            shap_df = pd.DataFrame(shap_values.values, columns=feature_names)
+            #shap_df['id'] = test_ids.to_list()
             shap_csv_path = os.path.join(shap_dir, f"shap_values_{reg}.csv")
             shap_df.to_csv(shap_csv_path, index=False)
             # 3. 描画の設定
             plt.figure(figsize=(12, 8)) # 図のサイズを調整
-            # 4. Summary Plotの作成
-            # show=False にすることで、即座に表示せずファイル保存を優先する
+            # # 4. Summary Plotの作成
+            # # show=False にすることで、即座に表示せずファイル保存を優先する
             shap.summary_plot(
-                shap_values, 
-                x_te, 
-                feature_names=feature_names, 
+                shap_values = shap_values,
+                #shap_values.values, 
+                #x_te, 
+                #feature_names=feature_names, 
                 show=False
             )
             # 5. タイトルの追加（任意）
             plt.title(f"SHAP Summary Plot - {reg}")
-            # 6. 保存とクローズ
+            # # 6. 保存とクローズ
             save_path = os.path.join(shap_dir, f"shap_summary_{reg}.png")
-            plt.tight_layout()
+            # plt.tight_layout()
+            #fig = interpretability.shap.plot_shap(shap_values)
+
+            #print(fig)
             plt.savefig(save_path, bbox_inches='tight', dpi=300)
             plt.close() # メモリ解放のために閉じる
+            
 
         scores[reg] = {}
         # 分類タスクの処理 (省略)
