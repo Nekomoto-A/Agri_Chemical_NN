@@ -420,6 +420,9 @@ class data_create:
         if 'experimental_purpose' in chem_data.columns:
             std_dir = os.path.join(self.output_dir, 'variance_report_experimental_purpose.csv')
             save_variance_report(asv_feature, chem_data['experimental_purpose'], file_name=std_dir)
+
+        mi_path = os.path.join(self.output_dir, 'mi.csv')
+        save_mutual_info_matrix(df1 = asv_data, df2 = chem_data[self.reg_list], file_name = mi_path)
         # if self.label_data is not None:
         #     for l in self.label_data:
         #         if ('riken' in self.path_asv) and (l == 'experimental_purpose'):

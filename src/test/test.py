@@ -985,8 +985,11 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
         for reg in reg_list:
             if torch.is_floating_point(Y_train[reg]):
                 model[reg] = TabPFNRegressor(
-                    device=device_name
-                    #device='cpu'
+                    device=device_name, 
+                    # inference_config={
+                    #     "REGRESSION_Y_PREPROCESS_TRANSFORMS": ["standardize", "log"]
+                    # }
+                    #inference_config={}
                     )
                 if 'ME' in model_name:
                     from src.models.ME import MixedEffectSklearn

@@ -306,25 +306,49 @@ import lightgbm as lgb
 import numpy as np
 import plotly.graph_objects as go
 import plotly.io as pio
+import os
+import torch
+import numpy as np
+import pandas as pd
+import lightgbm as lgb
+import plotly.graph_objects as go
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.manifold import TSNE
 
 def select_features_with_lgbm(X, Y, k, feature_names, save_path, task='regression'):
     """
-    LightGBMの重要度に基づき特徴量選択を行う関数
-    
-    Args:
-        X (torch.Tensor): 入力データ (サンプル数, 特徴量数)
-        Y (torch.Tensor): ターゲットデータ
-        k (int): 選択したい特徴量の次元数
-        task (str): 'regression' (回帰) または 'classification' (分類)
-        
-    Returns:
-        X_selected (torch.Tensor): 特徴量選択後のTensor (元のデバイス)
-        selected_indices (np.ndarray): 選択された特徴量のインデックス
+    LightGBMの重要度に基づき特徴量選択を行い、前後のt-SNE分布を保存する
     """
     # 1. デバイス情報の保持とNumPyへの変換
     device = X.device
     X_np = X.detach().cpu().numpy()
     Y_np = Y.detach().cpu().numpy().flatten()
+
+    # --- ヘルパー関数: t-SNEの描画と保存 ---
+    def save_tsne_plot(data, target, title, filename):
+        print(f"Generating t-SNE for: {title}...")
+        # サンプル数が多い場合は計算時間を考慮し、perplexity等を調整可能
+        tsne = TSNE(n_components=2, random_state=42, init='pca', learning_rate='auto')
+        X_embedded = tsne.fit_transform(data)
+        
+        plt.figure(figsize=(10, 8))
+        # 回帰か分類かで色合い(cmap)を調整
+        scatter = plt.scatter(X_embedded[:, 0], X_embedded[:, 1], c=target, 
+                            cmap='viridis', alpha=0.6, s=20)
+        plt.colorbar(scatter, label='Target Value')
+        plt.title(title)
+        plt.xlabel('t-SNE dimension 1')
+        plt.ylabel('t-SNE dimension 2')
+        plt.tight_layout()
+        
+        full_path = os.path.join(save_path, filename)
+        plt.savefig(full_path, dpi=300)
+        plt.close()
+        print(f"t-SNE plot saved to: {full_path}")
+
+    # 【追加】選択前のt-SNE可視化
+    save_tsne_plot(X_np, Y_np, "t-SNE Visualization (Before Selection)", "tsne_before_selection.png")
 
     # 2. LightGBMモデルの構築
     if task == 'regression':
@@ -336,57 +360,131 @@ def select_features_with_lgbm(X, Y, k, feature_names, save_path, task='regressio
     model.fit(X_np, Y_np)
     importances = model.feature_importances_
 
-    # --- 追加: 重要度の可視化と保存 ---
-    # 3. 上位50件の抽出（可視化用）
-    # 3. 上位50件の抽出とラベル付け
+    # (重要度のCSV保存とPlotlyのコードはそのまま維持)
+    importance_df = pd.DataFrame({'feature_name': feature_names, 'importance_gain': importances})
+    importance_df = importance_df.sort_values(by='importance_gain', ascending=False)
+    csv_save_path = os.path.join(save_path, 'feature_importance.csv')
+    importance_df.to_csv(csv_save_path, index=False, encoding='utf-8-sig')
+
+    # --- Plotlyによる可視化 ---
     all_indices = np.argsort(-importances)
-    top_50_indices = all_indices[:50][::-1] # グラフ表示用に上位50を逆順に
-    
+    top_50_indices = all_indices[:50][::-1]
     top_50_values = importances[top_50_indices]
-    # 指定されたfeature_namesから該当する名前を取得
     top_50_labels = [feature_names[i] for i in top_50_indices]
 
-    # 4. Plotlyによるグラフ作成
-    fig = go.Figure(go.Bar(
-        x=top_50_values,
-        y=top_50_labels,
-        orientation='h',
-        # marker=dict(
-        #     color=top_50_values,
-        #     colorscale='Viridis', # 視覚的にわかりやすく色付け
-        #     showscale=True
-        # ),
-        marker=dict(
-            color='royalblue' 
-        ),
-        hovertemplate='<b>%{y}</b><br>Importance: %{x:.2f}<extra></extra>'
-    ))
-
-    fig.update_layout(
-        title=f'Top 50 Feature Importances (Total Features: {len(feature_names)})',
-        xaxis_title='Importance (Gain)',
-        yaxis_title='Feature Name',
-        height=min(1200, 200 + len(top_50_labels) * 20), # 件数に応じて高さを自動調整
-        margin=dict(l=200, r=20, t=50, b=50), # ラベルが長い場合に備えて左余白を広く
-        yaxis=dict(autorange="reversed") if len(top_50_labels) < 10 else None
-    )
-
-    # HTMLとして保存
-    fig.write_html(save_path, include_plotlyjs='cdn')
-    # --------------------------------
+    fig = go.Figure(go.Bar(x=top_50_values, y=top_50_labels, orientation='h', marker=dict(color='royalblue')))
+    fig.update_layout(title=f'Top 50 Features', xaxis_title='Importance (Gain)', yaxis_title='Feature Name')
+    fig.write_html(os.path.join(save_path, 'feature_importance.html'))
 
     # 4. 重要度が高い順にインデックスをk個選択
-    # argsortは昇順なので、マイナスをつけて降順にし、先頭k個を取る
     selected_indices = np.argsort(-importances)[:k]
-    
-    # 昇順に並び替えておくと元のデータの並び順を維持しやすい（任意）
     selected_indices = np.sort(selected_indices)
 
-    # 5. データの抽出とTensor化
+    # 5. データの抽出
     X_selected_np = X_np[:, selected_indices]
-    X_selected = torch.from_numpy(X_selected_np).to(device)
+    
+    # 【追加】選択後のt-SNE可視化
+    save_tsne_plot(X_selected_np, Y_np, f"t-SNE Visualization (After Selection - Top {k})", "tsne_after_selection.png")
 
+    # Tensorに戻して返す
+    X_selected = torch.from_numpy(X_selected_np).to(device)
     return X_selected, selected_indices
+
+# def select_features_with_lgbm(X, Y, k, feature_names, save_path, task='regression'):
+#     """
+#     LightGBMの重要度に基づき特徴量選択を行う関数
+    
+#     Args:
+#         X (torch.Tensor): 入力データ (サンプル数, 特徴量数)
+#         Y (torch.Tensor): ターゲットデータ
+#         k (int): 選択したい特徴量の次元数
+#         task (str): 'regression' (回帰) または 'classification' (分類)
+        
+#     Returns:
+#         X_selected (torch.Tensor): 特徴量選択後のTensor (元のデバイス)
+#         selected_indices (np.ndarray): 選択された特徴量のインデックス
+#     """
+#     # 1. デバイス情報の保持とNumPyへの変換
+#     device = X.device
+#     X_np = X.detach().cpu().numpy()
+#     Y_np = Y.detach().cpu().numpy().flatten()
+
+#     # 2. LightGBMモデルの構築
+#     if task == 'regression':
+#         model = lgb.LGBMRegressor(importance_type='gain', n_estimators=100, random_state=42)
+#     else:
+#         model = lgb.LGBMClassifier(importance_type='gain', n_estimators=100, random_state=42)
+
+#     # 3. 学習と重要度の取得
+#     model.fit(X_np, Y_np)
+#     importances = model.feature_importances_
+
+#     importance_df = pd.DataFrame({
+#         'feature_name': feature_names,
+#         'importance_gain': importances
+#     })
+#     # 重要度の高い順に並び替え
+#     importance_df = importance_df.sort_values(by='importance_gain', ascending=False)
+    
+#     # CSVの保存パスを作成 (例: result.html -> result_importance.csv)
+
+#     #csv_save_path = os.path.splitext(save_path)[0] + "_importance.csv"
+#     csv_save_path=os.path.join(save_path, f'feature_importance.csv')
+#     importance_df.to_csv(csv_save_path, index=False, encoding='utf-8-sig')
+#     print(f"Feature importances saved to: {csv_save_path}")
+
+#     # --- 追加: 重要度の可視化と保存 ---
+#     # 3. 上位50件の抽出（可視化用）
+#     # 3. 上位50件の抽出とラベル付け
+#     all_indices = np.argsort(-importances)
+#     top_50_indices = all_indices[:50][::-1] # グラフ表示用に上位50を逆順に
+    
+#     top_50_values = importances[top_50_indices]
+#     # 指定されたfeature_namesから該当する名前を取得
+#     top_50_labels = [feature_names[i] for i in top_50_indices]
+
+#     # 4. Plotlyによるグラフ作成
+#     fig = go.Figure(go.Bar(
+#         x=top_50_values,
+#         y=top_50_labels,
+#         orientation='h',
+#         # marker=dict(
+#         #     color=top_50_values,
+#         #     colorscale='Viridis', # 視覚的にわかりやすく色付け
+#         #     showscale=True
+#         # ),
+#         marker=dict(
+#             color='royalblue' 
+#         ),
+#         hovertemplate='<b>%{y}</b><br>Importance: %{x:.2f}<extra></extra>'
+#     ))
+
+#     fig.update_layout(
+#         title=f'Top 50 Feature Importances (Total Features: {len(feature_names)})',
+#         xaxis_title='Importance (Gain)',
+#         yaxis_title='Feature Name',
+#         height=min(1200, 200 + len(top_50_labels) * 20), # 件数に応じて高さを自動調整
+#         margin=dict(l=200, r=20, t=50, b=50), # ラベルが長い場合に備えて左余白を広く
+#         yaxis=dict(autorange="reversed") if len(top_50_labels) < 10 else None
+#     )
+
+#     # HTMLとして保存
+#     plt_path=os.path.join(save_path, f'feature_importance.html')
+#     fig.write_html(plt_path, include_plotlyjs='cdn')
+#     # --------------------------------
+
+#     # 4. 重要度が高い順にインデックスをk個選択
+#     # argsortは昇順なので、マイナスをつけて降順にし、先頭k個を取る
+#     selected_indices = np.argsort(-importances)[:k]
+    
+#     # 昇順に並び替えておくと元のデータの並び順を維持しやすい（任意）
+#     selected_indices = np.sort(selected_indices)
+
+#     # 5. データの抽出とTensor化
+#     X_selected_np = X_np[:, selected_indices]
+#     X_selected = torch.from_numpy(X_selected_np).to(device)
+
+#     return X_selected, selected_indices
 
 def fold_evaluate(reg_list, output_dir, device, 
                   transformer = config['transformer'],
@@ -661,9 +759,11 @@ def fold_evaluate(reg_list, output_dir, device,
 
             #print(X_val_tensor)
             if lgb_selection:
+                fs_dir = os.path.join(fold_dir, 'feature_selection')
+                os.makedirs(fs_dir, exist_ok=True)
                 X_train_tensor, selected_indices = select_features_with_lgbm(X_train_tensor, Y_train_single[r], 
                                                                              k=num_features_to_select_lgb, feature_names=features, 
-                                                                             save_path=os.path.join(fold_dir, f'feature_importance_{r}.html'))
+                                                                             save_path = fs_dir)
                 if X_val_tensor.numel() != 0:
                     X_val_tensor = X_val_tensor[:, selected_indices]
                 X_test_tensor = X_test_tensor[:, selected_indices]

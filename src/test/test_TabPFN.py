@@ -235,7 +235,7 @@ def test_TabPFN(x_te, y_te_tensor,
               lime_local = False,
               label_encoders = None, 
               selected_indices = None, 
-              shap_compute = True, 
+              shap_compute = False, 
               PI = False
               ):
     x_te = x_te.cpu().detach().numpy()
