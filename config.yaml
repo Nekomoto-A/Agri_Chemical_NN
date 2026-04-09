@@ -156,8 +156,8 @@ fold_eval.py:
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
   comp_method: 'SUM'
-  lgb_selection: True #False #True
-  num_features_to_select_lgb: 200
+  lgb_selection: False #False #True
+  num_features_to_select_lgb: 50
   exclude_ids: [
     #'042_20_Sait_Eggp'
     #'042_20_Sait_Eggp','235_21_Miyz_Spin', '360_22_Miee_Soyb', '121_20_Miyz_Spin', '125_20_Miyz_Spin', #'161_21_Miyz_Spin' #☓
@@ -216,10 +216,10 @@ fold_eval.py:
                 'Miyazaki-Edamame', 
   ]
 main.py:
-  result_dir: 'result_fs_200'
+  result_dir: 'result_fs_full'
   Cross_val: True
-  LOGO: False
-  domains: 'pref-crop'
+  LOGO: True
+  domains: 'year' #'pref-crop'
   reg_list: [
             # ['pref'], 
             # ['crop'], 

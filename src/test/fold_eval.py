@@ -1094,7 +1094,10 @@ def domain_evaluate(reg_list, output_dir, device,
                   eval_class = config['eval_class'], 
                   normalize = config['feature_normalize'],
 
-                  skip_domains = config['skip_domains']
+                  skip_domains = config['skip_domains'], 
+
+                  num_features_to_select_lgb = config['num_features_to_select_lgb'],
+                  lgb_selection = config['lgb_selection'],
                   ):
     #if feature_selection_all:
     #   output_dir = os.path.join(fsdir, output_dir)
@@ -1274,7 +1277,7 @@ def domain_evaluate(reg_list, output_dir, device,
         if len(reg_list) > 1:
             vis_dir_main = os.path.join(fold_dir, method)
             os.makedirs(vis_dir_main,exist_ok=True)
-        
+
             #print(X_train_tensor.shape)
             predictions, trues, result_scores,model_trained = train_and_test(
                 X_train_tensor, X_val_tensor, X_test_tensor, Y_train_tensor, Y_val_tensor, Y_test_tensor, 
@@ -1353,6 +1356,19 @@ def domain_evaluate(reg_list, output_dir, device,
                 Y_val_single = {}
             reg = [r]
             print(X_train_tensor.shape)
+
+            if lgb_selection:
+                fs_dir = os.path.join(fold_dir, 'feature_selection')
+                os.makedirs(fs_dir, exist_ok=True)
+                X_train_tensor, selected_indices = select_features_with_lgbm(X_train_tensor, Y_train_single[r], 
+                                                                             k=num_features_to_select_lgb, feature_names=features, 
+                                                                             save_path = fs_dir)
+                if X_val_tensor.numel() != 0:
+                    X_val_tensor = X_val_tensor[:, selected_indices]
+                X_test_tensor = X_test_tensor[:, selected_indices]
+                features = [features[i] for i in selected_indices]
+                print(f"Selected features indices: {selected_indices}")
+                print(f"Selected features: {features}")
 
             predictions, trues, result_scores_st, model_trained_st = train_and_test(
                 X_train = X_train_tensor, X_val = X_val_tensor, X_test = X_test_tensor, Y_train = Y_train_single, Y_val = Y_val_single, Y_test = Y_test_single, 
