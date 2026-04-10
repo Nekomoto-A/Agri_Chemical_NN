@@ -204,28 +204,28 @@ def statsmodel_test(X, Y, train_x_original, train_y_original, models, scalers, r
             if reg in scalers:
                 scaler = scalers[reg]
                 #true = scaler.inverse_transform(Y)
-                true = scalers[reg].inverse_transform(Y)
-                if is_log1p_transformer(scaler):
-                    y_train_pred_log1p = model.predict(train_x)
-                    y_train_log1p = train_y
+                true = scaler.inverse_transform(Y)
+                # if is_log1p_transformer(scaler):
+                #     y_train_pred_log1p = model.predict(train_x)
+                #     y_train_log1p = train_y
 
-                    pred_log = model.predict(X).reshape(-1, 1)
-                    pred, coff = apply_smearing_log1p(y_train_log1p, y_train_pred_log1p, pred_log)
-                    print(f'対数変換のためスメアリング推定による補正を行います(係数：{coff})')
-                elif isinstance(scaler, PowerTransformer):
-                    y_train_pred_log1p = model.predict(train_x)
-                    y_train_log1p = train_y
+                #     pred_log = model.predict(X).reshape(-1, 1)
+                #     pred, coff = apply_smearing_log1p(y_train_log1p, y_train_pred_log1p, pred_log)
+                #     print(f'対数変換のためスメアリング推定による補正を行います(係数：{coff})')
+                # elif isinstance(scaler, PowerTransformer):
+                #     y_train_pred_log1p = model.predict(train_x)
+                #     y_train_log1p = train_y
 
-                    pred_log = model.predict(X).reshape(-1, 1)
-                    from src.test.test import apply_smearing_yeo_johnson
-                    pred, coff = apply_smearing_yeo_johnson(scaler,y_train_log1p, y_train_pred_log1p, pred_log)
-                    print(f'対数変換のためスメアリング推定による補正を行います(係数：{coff})')
-                else:
-                    # --- 通常のスケーリング解除 ---
-                    pred = scalers[reg].inverse_transform(model.predict(X).reshape(-1, 1))
+                #     pred_log = model.predict(X).reshape(-1, 1)
+                #     from src.test.test import apply_smearing_yeo_johnson
+                #     pred, coff = apply_smearing_yeo_johnson(scaler,y_train_log1p, y_train_pred_log1p, pred_log)
+                #     print(f'対数変換のためスメアリング推定による補正を行います(係数：{coff})')
+                # else:
+                #     # --- 通常のスケーリング解除 ---
+                #     pred = scalers[reg].inverse_transform(model.predict(X).reshape(-1, 1))
                     #pred = model.predict(X).reshape(-1, 1)
                 #pred = model.predict(X)
-                #pred = scalers[reg].inverse_transform(model.predict(X).reshape(-1, 1))
+                pred = scaler.inverse_transform(model.predict(X).reshape(-1, 1))
                 #pred = scalers[reg].inverse_transform(model.predict(X_top_features).reshape(-1, 1))
             else:
                 true = Y
