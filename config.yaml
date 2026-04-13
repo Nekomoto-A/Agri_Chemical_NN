@@ -6,7 +6,7 @@ dataset.py:
   non_outlier: None
   val_size: None
   level: 7
-  feature_transformer: 'ILR'
+  feature_transformer: 'CLR'
   softlabel: True
   data_vis: 'visualize'
   data_augumentation: None #'smoter' #None #'smoter' #'smoter' #'smoter' #'gaussian_copula'
@@ -156,8 +156,8 @@ fold_eval.py:
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
   comp_method: 'SUM'
-  lgb_selection: True #False #True
-  num_features_to_select_lgb: 20
+  selection: 'LGB_BORUTA'
+  num_features_to_select_lgb: 200
   exclude_ids: [
     #'042_20_Sait_Eggp'
     #'042_20_Sait_Eggp','235_21_Miyz_Spin', '360_22_Miee_Soyb', '121_20_Miyz_Spin', '125_20_Miyz_Spin', #'161_21_Miyz_Spin' #☓
@@ -215,11 +215,14 @@ fold_eval.py:
                 'Niigata-Pear', 
                 'Miyazaki-Edamame', 
   ]
-  add_columns: [] #['crop', 'pref']
+  add_columns: ['crop', 'pref'] #[] #
+  features_plot: True
+  hyper_optimize: True
+  shap_comppute: False
 main.py:
-  result_dir: 'result_fs_20_hybrid'
+  result_dir: 'result_fs_LGB_boruta_YJ'
   Cross_val: True
-  LOGO: False
+  LOGO: True
   domains: 'year' #'pref-crop'
   reg_list: [
             # ['pref'], 
@@ -246,7 +249,7 @@ main.py:
             #['Available.P_th'],
             #[NH4.N], 
             ['Available.P'], 
-            #['pH'], 
+            ['pH'], 
             ['NO3.N'], 
             # ['EC'], 
             # ['Humus'], 

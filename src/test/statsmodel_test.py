@@ -10,78 +10,91 @@ import os
 import pandas as pd
 import shap
 
-def calculate_and_save_shap_importance(model, X_test, feature_names, output_dir, ids):
-    """
-    学習済みモデルとテストデータを用いてSHAP特徴量重要度を計算し、
-    結果をプロットとCSVファイルで保存する関数。
+import os
+import pandas as pd
+import matplotlib.pyplot as plt
+import shap
+import numpy as np
+from sklearn.svm import SVC, SVR
+import os
+import pandas as pd
+import matplotlib.pyplot as plt
+import shap
+import numpy as np
+from sklearn.svm import SVC, SVR
 
+def calculate_and_save_shap_importance(model, X_test, X_train , feature_names, output_dir, ids):
+    """
     Args:
-        model: 学習済みのモデルオブジェクト (例: RandomForestClassifier, XGBClassifier)。
-               .predictメソッドを持つ必要があります。
-        X_test (np.ndarray): テスト用の特徴量データ。
-        feature_names (list): 特徴量の名前のリスト。
-        output_dir (str): 結果を保存するディレクトリ名。
+        model: 学習済みモデル
+        X_train (np.ndarray): 学習用データ（背景データとして使用）
+        X_test (np.ndarray): テスト用データ（SHAP値を計算する対象）
+        feature_names (list): 特徴量名のリスト
+        output_dir (str): 保存先パス
+        ids (pd.Series): ID列
     """
     print("SHAP分析を開始します...")
 
-    # 1. 出力ディレクトリの作成
-    # もし指定されたディレクトリが存在しない場合は、新しく作成します。
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-        print(f"ディレクトリ '{output_dir}' を作成しました。")
 
-    # 2. SHAP Explainerの初期化
-    # ツリーベースのモデル（RandomForest, XGBoostなど）に最適化されたExplainerを使用します。
-    explainer = shap.TreeExplainer(model)
-
-    # 3. SHAP値の計算
-    # テストデータセット全体に対してSHAP値を計算します。
-    # shap_valuesは、各データポイント、各特徴量に対する貢献度を示します。
-    print("SHAP値を計算中...")
-    shap_values = explainer.shap_values(X_test)
-    print("SHAP値の計算が完了しました。")
-
-    # 分類問題の場合、shap_valuesはクラスごとのリストになることがあります。
-    # ここでは主にクラス1（陽性クラス）に対する貢献度を使用します。
-    if isinstance(shap_values, list):
-        # 2クラス分類を想定
-        shap_values_for_analysis = shap_values[1]
-    else:
-        # 回帰問題の場合
-        shap_values_for_analysis = shap_values
-        
-    # X_testをPandas DataFrameに変換（SHAPプロットで特徴量名を表示するため）
     X_test_df = pd.DataFrame(X_test, columns=feature_names)
 
-    # 4. SHAP値のCSV保存
+    # モデルの種類を判定
+    model_type_str = str(type(model)).lower()
+    is_tree = any(x in model_type_str for x in ["tree", "forest", "boost", "catboost", "lgbm"])
+    is_svm = isinstance(model, (SVC, SVR)) or "svc" in model_type_str
+
+    # 2. SHAP値の計算
+    if is_tree:
+        print("TreeExplainerを使用します...")
+        explainer = shap.TreeExplainer(model)
+        shap_values = explainer.shap_values(X_test)
+    
+    elif is_svm:
+        print("KernelExplainerを使用します (学習データを背景に設定)...")
+        # 学習データ全体を使うと非常に遅いため、100件程度にサンプリングします
+        # データの構造を維持したい場合は shap.kmeans(X_train, 100) も有効です
+        background_data = shap.sample(X_train, 100) 
+        
+        # SVMで確率を出力できる場合はそちらを優先
+        predict_func = model.predict_proba if hasattr(model, "predict_proba") else model.predict
+        explainer = shap.KernelExplainer(predict_func, background_data)
+        
+        # テストデータのSHAP値を計算
+        shap_values = explainer.shap_values(X_test)
+    
+    else:
+        print("汎用Explainerを使用します...")
+        explainer = shap.Explainer(model, X_train)
+        shap_values = explainer(X_test).values
+
+    # 3. SHAP値の整形 (分類問題のクラス抽出)
+    # TreeSHAP(リスト形式)やKernelSHAP(3次元配列)の差異を吸収
+    if isinstance(shap_values, list):
+        shap_values_for_analysis = shap_values[1] # 陽性クラス
+    elif isinstance(shap_values, np.ndarray) and len(shap_values.shape) == 3:
+        shap_values_for_analysis = shap_values[:, :, 1]
+    else:
+        shap_values_for_analysis = shap_values
+
+    # 4. CSV保存
     shap_df = pd.DataFrame(shap_values_for_analysis, columns=feature_names)
-    #print(ids)
-    shap_df['id'] = ids.to_list()  # ID列を追加
+    shap_df['id'] = ids.to_list()
     csv_path = os.path.join(output_dir, "shap_values.csv")
     shap_df.to_csv(csv_path, index=False)
-    print(f"SHAP値を '{csv_path}' に保存しました。")
 
-    # 5. サマリープロットの保存
-    print("サマリープロットを作成中...")
-    plt.figure()
-    shap.summary_plot(shap_values_for_analysis, X_test_df, show=False)
-    summary_plot_path = os.path.join(output_dir, "summary_plot.png")
-    plt.tight_layout()
-    plt.savefig(summary_plot_path, bbox_inches='tight')
-    plt.close()
-    print(f"サマリープロットを '{summary_plot_path}' に保存しました。")
+    # 5. プロット作成
+    for plot_type in ["summary", "bar"]:
+        plt.figure()
+        is_bar = (plot_type == "bar")
+        shap.summary_plot(shap_values_for_analysis, X_test_df, plot_type="bar" if is_bar else None, show=False)
+        fname = "mean_shap_bar_plot.png" if is_bar else "summary_plot.png"
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, fname), bbox_inches='tight')
+        plt.close()
 
-    # 6. 平均SHAP値の棒グラフの保存
-    print("平均SHAP値の棒グラフを作成中...")
-    plt.figure()
-    shap.summary_plot(shap_values_for_analysis, X_test_df, plot_type="bar", show=False)
-    mean_shap_plot_path = os.path.join(output_dir, "mean_shap_bar_plot.png")
-    plt.tight_layout()
-    plt.savefig(mean_shap_plot_path, bbox_inches='tight')
-    plt.close()
-    print(f"平均SHAP値の棒グラフを '{mean_shap_plot_path}' に保存しました。")
-
-    print("SHAP分析が正常に完了しました！")
+    print(f"SHAP分析が完了しました。出力先: {output_dir}")
 
 def normalized_medae_iqr(y_true, y_pred):
     """
@@ -170,7 +183,7 @@ from sklearn.preprocessing import PowerTransformer
 
 def statsmodel_test(X, Y, train_x_original, train_y_original, models, scalers, reg, 
                     result_dir,index, feature_names, reg_encoders, eval_reg, eval_class, test_ids, 
-                    label_encoders = None,
+                    label_encoders = None, shap_comppute = True
                     ):
     X = X.numpy()
     X_df = pd.DataFrame(X, columns=feature_names)
@@ -264,8 +277,9 @@ def statsmodel_test(X, Y, train_x_original, train_y_original, models, scalers, r
             # print(f'MAE：{mse}')
             score = eval_predictions(true, pred, eval_reg)
 
-            if name in ['RF','XGB','LGB']:
-                calculate_and_save_shap_importance(model = model, X_test = X, feature_names = feature_names, output_dir = reg_dir, ids = test_ids)
+            if shap_comppute:
+                if name in ['RF','XGB','LGB','SVR']:
+                    calculate_and_save_shap_importance(model = model, X_test = X, X_train = train_x, feature_names = feature_names, output_dir = reg_dir, ids = test_ids)
             # pi = permutation_importance(model, X, Y, 
             #                         n_repeats=10, random_state=42)
             # fold_df = pd.DataFrame(pi.importances.T, columns=feature_names)
@@ -309,14 +323,14 @@ def statsmodel_test(X, Y, train_x_original, train_y_original, models, scalers, r
     return scores
 
 def stats_models_result(X_train, Y_train, X_test, Y_test, scalers, reg, result_dir,index, feature_names, reg_encoders,
-                        eval_reg, eval_class, test_ids, label_encoders = None,
+                        eval_reg, eval_class, test_ids, label_encoders = None, optimize = False, shap_comppute = True, 
                         ):
     #print(Y_train)
-    models = statsmodel_train(X = X_train,Y = Y_train,scalers = scalers,reg = reg)
+    models = statsmodel_train(X = X_train,Y = Y_train,reg = reg, optimize = optimize)
     scores = statsmodel_test(X = X_test, Y = Y_test, train_x_original = X_train, train_y_original = Y_train, models = models, 
                              scalers = scalers, reg = reg, result_dir = result_dir, index = index, feature_names = feature_names,
                              reg_encoders=reg_encoders, 
                              eval_reg = eval_reg, eval_class = eval_class, test_ids = test_ids, 
-                             label_encoders = label_encoders,
+                             label_encoders = label_encoders, shap_comppute = shap_comppute, 
                              )
     return scores

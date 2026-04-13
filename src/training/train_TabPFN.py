@@ -7,6 +7,7 @@ import numpy as np
 import os
 from sklearn.metrics import make_scorer, mean_squared_log_error
 from tabpfn import TabPFNClassifier, TabPFNRegressor
+from xgboost import XGBClassifier
 import yaml
 
 yaml_path = 'config.yaml'
@@ -238,6 +239,10 @@ def select_features_by_lgbm(X, y, top_n):
     
     return X_selected, selected_indices
 
+from tabpfn_extensions.interpretability.feature_selection import feature_selection
+from xgboost import XGBRegressor, XGBClassifier
+from boruta import BorutaPy
+
 def training_TabPFN(x_tr,x_val,y_tr,y_val,models, reg_list, scalers, output_dir, train_ids, train_column, 
                     optune = config['optune'], n_trials = config['n_trials'],filter_mi = config['filter_mi'],
                     data_aug = config['data_aug']
@@ -263,7 +268,33 @@ def training_TabPFN(x_tr,x_val,y_tr,y_val,models, reg_list, scalers, output_dir,
             #x_tr, selected_indices = filter_low_mi_features(x_tr, y_tr[reg], threshold=0.2)
             #x_tr = SelectKBest(mutual_info_regression, k=100).fit_transform(x_tr, y_tr[reg])
             #selected_indices = np.arange(x_tr.shape[1])
-            x_tr, selected_indices = select_features_by_lgbm(x_tr, y_tr[reg], top_n=10)
+            #x_tr, selected_indices = select_features_by_lgbm(x_tr, y_tr[reg], top_n=10)
+            # selector = feature_selection(models[reg], x_tr, y_tr[reg], n_features_to_select=50)
+            # x_tr = selector.transform(x_tr)
+            # selected_indices = selector.get_support(indices=True)
+            xgb = XGBRegressor(
+                n_estimators=100, 
+                max_depth=3, 
+                learning_rate=0.1, 
+                n_jobs=-1
+            )
+
+            # 3. Borutaの設定
+            # n_estimators='auto' にすると、特徴量数に合わせて自動調整されます
+            feat_selector = BorutaPy(
+                xgb, 
+                n_estimators='auto', 
+                verbose=2, 
+                alpha=0.05, # 有意水準
+                max_iter=100, # 繰り返しの最大回数
+                random_state=42
+            )
+
+            # 4. 実行 (NumPy配列形式で渡す必要があります)
+            feat_selector.fit(x_tr, y_tr[reg])
+            selected_indices = np.where(feat_selector.support_)[0]
+            x_tr = x_tr[:, selected_indices]
+            #print("Selected feature indices:", selector.get_support(indices=True))
             print(f"特徴量をフィルタリングしました。選択された特徴量数: {x_tr.shape}")
         else:
             selected_indices = np.arange(x_tr.shape[1])
