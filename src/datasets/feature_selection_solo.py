@@ -423,7 +423,7 @@ def select_features_with_lgbm_boruta(X, Y, k, feature_names, save_path, task='re
         model, 
         #n_estimators='auto', 
         n_estimators=100, 
-        verbose=2, 
+        verbose=1, 
         alpha=0.1, # 有意水準
         max_iter=100, # 繰り返しの最大回数
         random_state=42

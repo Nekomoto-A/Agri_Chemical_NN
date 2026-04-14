@@ -920,6 +920,8 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
 
     #print(Y_train)
     for reg in reg_list:
+        #print(Y_train[reg])
+        #print(Y_test[reg])
         if not Y_val:
             all = torch.cat((Y_train[reg], Y_test[reg]), dim=0)
         else:

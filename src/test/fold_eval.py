@@ -395,6 +395,7 @@ def save_scatter_plots(X, Y, feature_names, save_dir="plots"):
         plt.close()
 
 from src.datasets import feature_selection_solo
+from src.datasets.data_augmentation_solo import select_augmentation
 
 def fold_evaluate(reg_list, output_dir, device, 
                   transformer = config['transformer'],
@@ -424,7 +425,8 @@ def fold_evaluate(reg_list, output_dir, device,
                   add_columns = config['add_columns'], 
                   features_plot = config['features_plot'], 
                   hyper_optimize = config['hyper_optimize'], 
-                  shap_comppute = config['shap_comppute']
+                  shap_comppute = config['shap_comppute'], 
+                  augment_method = config['augment_method'], 
                   ):
     #if feature_selection_all:
     #   output_dir = os.path.join(fsdir, output_dir)
@@ -671,6 +673,7 @@ def fold_evaluate(reg_list, output_dir, device,
             reg = [r]
             print(X_train_tensor.shape)
 
+            print(f'学習データ(整形前):{X_train_tensor.shape}, {Y_train_single[r].shape}')
             if add_columns !=[]:
                 #print(features)
                 #print(add_columns)
@@ -679,6 +682,9 @@ def fold_evaluate(reg_list, output_dir, device,
             X_train_tensor, X_val_tensor, X_test_tensor, features = feature_selection_solo.select_features(X_train_tensor, X_val_tensor, X_test_tensor, Y_train_single[r], 
                                                                                                            features, selection_method, num_features_to_select_lgb, fold_dir)
 
+            X_train_tensor, Y_train_single[r] = select_augmentation(X_train_tensor, Y_train_single[r], fold_dir,features, r, augment_method)
+
+            print(f'学習データ(整形後):{X_train_tensor.shape}, {Y_train_single[r].shape}')
 
             if features_plot:
                 features_dir = os.path.join(fold_dir, 'features_plot')
@@ -983,6 +989,7 @@ def fold_evaluate(reg_list, output_dir, device,
 
 from sklearn.model_selection import LeaveOneGroupOut
 
+
 def domain_evaluate(reg_list, output_dir, device, 
                     domains = 'crop', 
 
@@ -1282,6 +1289,10 @@ def domain_evaluate(reg_list, output_dir, device,
             
             X_train_tensor, X_val_tensor, X_test_tensor, features = feature_selection_solo.select_features(X_train_tensor, X_val_tensor, X_test_tensor, Y_train_single[r], 
                                                                                                            features, selection_method, num_features_to_select_lgb, fold_dir)
+
+            
+            X_train_tensor, Y_train_tensor[r] = select_augmentation(X,Y,save_dir, features, reg, method)
+
 
             # print(f"Selected features indices: {selected_indices}")
             # print(f"Selected features: {features}")
