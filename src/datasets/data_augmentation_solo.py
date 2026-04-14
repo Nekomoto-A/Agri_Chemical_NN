@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 
-def augment_with_gaussian_noise(X, Y, noise_level=0.5, save_dir="plots"):
+def augment_with_gaussian_noise(X, Y, noise_level=1.0, save_dir="plots"):
     """
     ガウスノイズによるデータ拡張を行い、元データと結合したデータセットを返す関数
     

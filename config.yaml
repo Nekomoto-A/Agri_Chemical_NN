@@ -151,14 +151,14 @@ fold_eval.py:
   marginal_hist: False
   k_fold: 5
   feature_normalize: True
-  model_name: 'TabPFN_shuffle'
+  model_name: 'TabPFN'
   result_average: 'result.csv'
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
   comp_method: 'SUM'
-  selection: 'LGB_BORUTA' #None #
-  num_features_to_select_lgb: 300
-  augment_method: 'gaussian'
+  selection: 'ElasticNet' #None # #None #
+  num_features_to_select_lgb: None
+  augment_method: None 'gaussian' #None #
   exclude_ids: [
     #'042_20_Sait_Eggp'
     #'042_20_Sait_Eggp','235_21_Miyz_Spin', '360_22_Miee_Soyb', '121_20_Miyz_Spin', '125_20_Miyz_Spin', #'161_21_Miyz_Spin' #☓
@@ -221,7 +221,7 @@ fold_eval.py:
   hyper_optimize: True
   shap_comppute: False
 main.py:
-  result_dir: 'result_YJ_boruta_gaussian_shuffle'
+  result_dir: 'result_YJ_CLR_EN'
   Cross_val: True
   LOGO: False
   domains: 'year' #'pref-crop'
@@ -253,9 +253,9 @@ main.py:
             ['pH'], 
             #['NO3.N'], 
             #['EC'], 
-            # ['Humus'], 
-            # ['Exchangeable.K'], 
-            # ['CEC'], 
+            ['Humus'], 
+            ['Exchangeable.K'], 
+            ['CEC'], 
             # ['pH_dry_soil', 'available_P', 'EC_electric_conductivity', 'Total_C', 'Total_N']
             #['pH', 'Available.P'] 
 

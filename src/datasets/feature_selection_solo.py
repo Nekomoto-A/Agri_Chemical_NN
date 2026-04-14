@@ -276,6 +276,108 @@ def select_features_with_lasso(X, Y, k, feature_names, save_path, task='regressi
     # Tensorに戻して返す
     X_selected = torch.from_numpy(X_selected_np).to(device)
     return X_selected, selected_indices
+import os
+import torch
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+import optuna
+from sklearn.manifold import TSNE
+from sklearn.linear_model import ElasticNet, LogisticRegression
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import cross_val_score
+
+def select_features_with_elasticnet(X, Y, k, feature_names, save_path, task='regression'):
+    """
+    ElasticNetの係数に基づき特徴量選択を行う。
+    kが数値の場合は上位k個、数値以外の場合は係数が0でないものすべてを選択する。
+    """
+    fs_dir = os.path.join(save_path, 'feature_selection')
+    os.makedirs(fs_dir, exist_ok=True)
+    
+    # 1. 前処理
+    device = X.device
+    X_np = X.detach().cpu().numpy()
+    Y_np = Y.detach().cpu().numpy().flatten()
+
+    # scaler = StandardScaler()
+    # X_scaled = scaler.fit_transform(X_np)
+    X_scaled = X_np
+
+    # --- ヘルパー関数: t-SNEの描画 ---
+    def save_tsne_plot(data, target, title, filename):
+        tsne = TSNE(n_components=2, random_state=42, init='pca', learning_rate='auto')
+        X_embedded = tsne.fit_transform(data)
+        plt.figure(figsize=(10, 8))
+        scatter = plt.scatter(X_embedded[:, 0], X_embedded[:, 1], c=target, cmap='viridis', alpha=0.6, s=20)
+        plt.colorbar(scatter, label='Target Value')
+        plt.title(title)
+        plt.tight_layout()
+        plt.savefig(os.path.join(fs_dir, filename), dpi=300)
+        plt.close()
+
+    save_tsne_plot(X_np, Y_np, "t-SNE (Before Selection)", "tsne_before_selection.png")
+
+    # 2. Optunaによるハイパーパラメータ最適化
+    def objective(trial):
+        alpha = trial.suggest_float('alpha', 1e-5, 10.0, log=True)
+        l1_ratio = trial.suggest_float('l1_ratio', 0.1, 1.0) # 0を避けることでL1効果を出しやすくする
+        
+        if task == 'regression':
+            model = ElasticNet(alpha=alpha, l1_ratio=l1_ratio, random_state=42, max_iter=3000)
+            score = cross_val_score(model, X_scaled, Y_np, cv=3, scoring='neg_mean_squared_error').mean()
+        else:
+            model = LogisticRegression(penalty='elasticnet', solver='saga', C=1/alpha, l1_ratio=l1_ratio, random_state=42, max_iter=3000)
+            score = cross_val_score(model, X_scaled, Y_np, cv=3, scoring='accuracy').mean()
+        return score
+
+    study = optuna.create_study(direction='maximize')
+    study.optimize(objective, n_trials=20)
+    
+    # 3. 最良モデルでの学習
+    best_params = study.best_params
+    if task == 'regression':
+        best_model = ElasticNet(**best_params, random_state=42)
+    else:
+        best_model = LogisticRegression(penalty='elasticnet', solver='saga', C=1/best_params['alpha'], 
+                                        l1_ratio=best_params['l1_ratio'], random_state=42)
+    
+    best_model.fit(X_scaled, Y_np)
+    
+    # 重要度（係数の絶対値）の取得
+    if task == 'regression' or len(np.unique(Y_np)) <= 2:
+        importances = np.abs(best_model.coef_).flatten()
+    else:
+        importances = np.mean(np.abs(best_model.coef_), axis=0)
+
+    # 4. 特徴量選択のロジック
+    if isinstance(k, (int, float)):
+        # kが数値なら、上位k個を選択
+        print(f"Selecting top {int(k)} features based on importance.")
+        selected_indices = np.argsort(-importances)[:int(k)]
+    else:
+        # kが数値以外なら、重要度が0より大きい（0でない）インデックスをすべて抽出
+        print("k is not a number. Selecting all features with non-zero coefficients.")
+        selected_indices = np.where(importances > 0)[0]
+        
+        # 万が一すべて0になった場合のフォールバック（最低1つは残す）
+        if len(selected_indices) == 0:
+            print("Warning: All coefficients are zero. Selecting the single most important feature.")
+            selected_indices = np.array([np.argmax(importances)])
+
+    selected_indices = np.sort(selected_indices)
+    X_selected_np = X_np[:, selected_indices]
+
+    # --- 以下、保存と可視化の処理 ---
+    importance_df = pd.DataFrame({'feature_name': feature_names, 'importance_abs_coef': importances})
+    importance_df = importance_df.sort_values(by='importance_abs_coef', ascending=False)
+    importance_df.to_csv(os.path.join(fs_dir, 'feature_importance.csv'), index=False, encoding='utf-8-sig')
+
+    save_tsne_plot(X_selected_np, Y_np, f"t-SNE (After Selection - {len(selected_indices)} features)", "tsne_after_selection.png")
+
+    X_selected = torch.from_numpy(X_selected_np).to(device)
+    return X_selected, selected_indices
 
 import torch
 import lightgbm as lgb
@@ -425,7 +527,8 @@ def select_features_with_lgbm_boruta(X, Y, k, feature_names, save_path, task='re
         n_estimators=100, 
         verbose=1, 
         alpha=0.1, # 有意水準
-        max_iter=100, # 繰り返しの最大回数
+        perc=90,
+        max_iter=300, # 繰り返しの最大回数
         random_state=42
     )
 
@@ -513,11 +616,14 @@ def select_features_with_borutashap(X, Y, feature_names, save_path, task='regres
 
     # 特徴量選択の実行
     # n_trials: 試行回数 (100回程度が推奨されます)
-    Feature_Selector.fit(X=X_df, y=Y_np, n_trials=100, sample=False, verbose=True)
+    print("Running BorutaShap feature selection...")
+    Feature_Selector.fit(X=X_df, y=Y_np, n_trials=300, sample=False, verbose=True)
 
     # 4. 選択された特徴量のインデックス取得
     # .subset は採択された特徴量名（Green zone）を返します
+    #Feature_Selector.TentativeRoughFix()
     selected_columns = Feature_Selector.Subset().columns.tolist()
+    
     # feature_names_list 内でのインデックスを特定
     selected_indices = [feature_names_list.index(col) for col in selected_columns]
     
@@ -765,6 +871,10 @@ def select_features(X_train_tensor, X_val_tensor, X_test_tensor, Y_train_single,
         X_train_tensor, selected_indices = select_features_with_lasso(X_train_tensor, Y_train_single, 
                                                             k=num_features_to_select, feature_names=features, 
                                                             save_path = fold_dir)
+    elif selection_method == 'ElasticNet':
+        X_train_tensor, selected_indices = select_features_with_elasticnet(X_train_tensor, Y_train_single, 
+                                                            k=num_features_to_select, feature_names=features, 
+                                                            save_path = fold_dir, task='regression')
     elif selection_method == 'LGB_BORUTA':
         X_train_tensor, selected_indices = select_features_with_lgbm_boruta(X_train_tensor, Y_train_single, 
                                                                         k=num_features_to_select, feature_names=features, 
