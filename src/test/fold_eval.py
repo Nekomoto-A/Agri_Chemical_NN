@@ -675,41 +675,10 @@ def fold_evaluate(reg_list, output_dir, device,
                 #print(features)
                 #print(add_columns)
                 X_train_tensor, X_val_tensor, X_test_tensor, features = append_pandas_to_split_tensors(X_train_tensor, Y_train, X_test_tensor, Y_test, features, add_columns)
+            
+            X_train_tensor, X_val_tensor, X_test_tensor, features = feature_selection_solo.select_features(X_train_tensor, X_val_tensor, X_test_tensor, Y_train_single[r], 
+                                                                                                           features, selection_method, num_features_to_select_lgb, fold_dir)
 
-
-            #print(X_val_tensor)
-            fs_dir = os.path.join(fold_dir, 'feature_selection')
-            os.makedirs(fs_dir, exist_ok=True)
-            if selection_method == 'LGB_importance':
-                X_train_tensor, selected_indices = feature_selection_solo.select_features_with_lgbm(X_train_tensor, Y_train_single[r], 
-                                                                             k=num_features_to_select_lgb, feature_names=features, 
-                                                                             save_path = fs_dir)
-            elif selection_method == 'mutual_info':
-                X_train_tensor, selected_indices = feature_selection_solo.select_features_with_mutual_info(X_train_tensor, Y_train_single[r], 
-                                                                                                           k=num_features_to_select_lgb, 
-                                                                                                           feature_names=features, 
-                                                                                                            save_path = fs_dir)
-            elif selection_method == 'hybrid':
-                X_train_tensor, selected_indices = feature_selection_solo.select_features_hybrid(X_train_tensor, Y_train_single[r], 
-                                                                k=num_features_to_select_lgb, n_multiplier = 20, 
-                                                                feature_names = features, save_path = fs_dir, task='regression')
-            elif selection_method == 'lasso':
-                X_train_tensor, selected_indices = feature_selection_solo.select_features_with_lasso(X_train_tensor, Y_train_single[r], 
-                                                                 k=num_features_to_select_lgb, feature_names=features, 
-                                                                 save_path = fs_dir)
-            elif selection_method == 'LGB_BORUTA':
-                X_train_tensor, selected_indices = feature_selection_solo.select_features_with_lgbm_boruta(X_train_tensor, Y_train_single[r], 
-                                                                             k=num_features_to_select_lgb, feature_names=features, 
-                                                                             save_path = fs_dir)
-            else:
-                selected_indices = list(range(X_train_tensor.shape[1]))
-
-            if X_val_tensor.numel() != 0:
-                X_val_tensor = X_val_tensor[:, selected_indices]
-            X_test_tensor = X_test_tensor[:, selected_indices]
-            features = [features[i] for i in selected_indices]
-            # print(f"Selected features indices: {selected_indices}")
-            # print(f"Selected features: {features}")
 
             if features_plot:
                 features_dir = os.path.join(fold_dir, 'features_plot')
@@ -1041,7 +1010,10 @@ def domain_evaluate(reg_list, output_dir, device,
                   normalize = config['feature_normalize'],
 
                   skip_domains = config['skip_domains'], 
-
+                  hyper_optimize = config['hyper_optimize'],
+                  shap_comppute = config['shap_comppute'],
+                  add_columns = config['add_columns'],
+                  features_plot = config['features_plot'],
                   num_features_to_select_lgb = config['num_features_to_select_lgb'],
                   selection_method = config['selection'],
                   ):
@@ -1303,39 +1275,21 @@ def domain_evaluate(reg_list, output_dir, device,
             reg = [r]
             print(X_train_tensor.shape)
 
+            if add_columns !=[]:
+                #print(features)
+                #print(add_columns)
+                X_train_tensor, X_val_tensor, X_test_tensor, features = append_pandas_to_split_tensors(X_train_tensor, Y_train, X_test_tensor, Y_test, features, add_columns)
+            
+            X_train_tensor, X_val_tensor, X_test_tensor, features = feature_selection_solo.select_features(X_train_tensor, X_val_tensor, X_test_tensor, Y_train_single[r], 
+                                                                                                           features, selection_method, num_features_to_select_lgb, fold_dir)
 
-            fs_dir = os.path.join(fold_dir, 'feature_selection')
-            os.makedirs(fs_dir, exist_ok=True)
-            if selection_method == 'LGB_importance':
-                X_train_tensor, selected_indices = feature_selection_solo.select_features_with_lgbm(X_train_tensor, Y_train_single[r], 
-                                                                            k=num_features_to_select_lgb, feature_names=features, 
-                                                                            save_path = fs_dir)
-            elif selection_method == 'mutual_info':
-                X_train_tensor, selected_indices = feature_selection_solo.select_features_with_mutual_info(X_train_tensor, Y_train_single[r], 
-                                                                                                        k=num_features_to_select_lgb, 
-                                                                                                        feature_names=features, 
-                                                                                                            save_path = fs_dir)
-            elif selection_method == 'hybrid':
-                X_train_tensor, selected_indices = feature_selection_solo.select_features_hybrid(X_train_tensor, Y_train_single[r], 
-                                                                k=num_features_to_select_lgb, n_multiplier = 20, 
-                                                                feature_names = features, save_path = fs_dir, task='regression')
-            elif selection_method == 'lasso':
-                X_train_tensor, selected_indices = feature_selection_solo.select_features_with_lasso(X_train_tensor, Y_train_single[r], 
-                                                                k=num_features_to_select_lgb, feature_names=features, 
-                                                                save_path = fs_dir)
-            elif selection_method == 'LGB_BORUTA':
-                X_train_tensor, selected_indices = feature_selection_solo.select_features_with_lgbm_boruta(X_train_tensor, Y_train_single[r], 
-                                                                            k=num_features_to_select_lgb, feature_names=features, 
-                                                                            save_path = fs_dir)
-            else:
-                selected_indices = list(range(X_train_tensor.shape[1]))
-
-            if X_val_tensor.numel() != 0:
-                X_val_tensor = X_val_tensor[:, selected_indices]
-            X_test_tensor = X_test_tensor[:, selected_indices]
-            features = [features[i] for i in selected_indices]
             # print(f"Selected features indices: {selected_indices}")
             # print(f"Selected features: {features}")
+
+            if features_plot:
+                features_dir = os.path.join(fold_dir, 'features_plot')
+                os.makedirs(features_dir, exist_ok=True)
+                save_scatter_plots(X_train_tensor, Y_train_single[r], features, save_dir=features_dir)
 
             predictions, trues, result_scores_st, model_trained_st = train_and_test(
                 X_train = X_train_tensor, X_val = X_val_tensor, X_test = X_test_tensor, Y_train = Y_train_single, Y_val = Y_val_single, Y_test = Y_test_single, 
@@ -1476,12 +1430,13 @@ def domain_evaluate(reg_list, output_dir, device,
                         scores.setdefault(metrics, {}).setdefault(method_concat, {}).setdefault(reg_name, []).append(value)
 
             stats_scores = stats_models_result(X_train = X_train_tensor, Y_train = Y_train_single, 
-                                        X_test = X_test_tensor, Y_test = Y_test_single, scalers = scalers, reg = r, 
-                                        result_dir = csv_dir, index = index, feature_names = features,
-                                        reg_encoders = reg_encoders,
-                                        eval_reg = eval_reg,
-                                        eval_class = eval_class, test_ids = test_ids, label_encoders = reg_encoders
-                                        )
+                                    X_test = X_test_tensor, Y_test = Y_test_single, scalers = scalers, reg = r, 
+                                    result_dir = csv_dir, index = index, feature_names = features,
+                                    reg_encoders = reg_encoders,
+                                    eval_reg = eval_reg,
+                                    eval_class = eval_class, test_ids = test_ids, label_encoders = reg_encoders, 
+                                    optimize = hyper_optimize, shap_comppute =shap_comppute, 
+                                    )
             #print(stats_scores)
             for method_name, regs in stats_scores.items():
                 for reg_name, dict in regs.items():
