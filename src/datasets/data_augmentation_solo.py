@@ -4,45 +4,40 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 
-def augment_with_gaussian_noise(X, Y, noise_level=1.0, save_dir="plots"):
+def augment_with_gaussian_noise(X, Y, noise_level=0.1, save_dir="plots"):
     """
-    ガウスノイズによるデータ拡張を行い、元データと結合したデータセットを返す関数
-    
-    Args:
-        X (torch.Tensor): 特徴量データ (n_samples, n_features)
-        Y (torch.Tensor): 目的変数データ (n_samples,)
-        noise_level (float): ノイズの強度
-        save_dir (str): 画像を保存するディレクトリ
-        
-    Returns:
-        X_combined (torch.Tensor): 元データと拡張データを結合した特徴量
-        Y_combined (torch.Tensor): 元データと拡張データを結合した目的変数
+    ガウスノイズによるデータ拡張を行い、元データと結合したデータセットを返す関数。
+    特徴量(X)と目的変数(Y)の両方にノイズを付加します。
     """
     # 1. 保存用ディレクトリの作成
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
     # 2. ガウスノイズの注入
-    # 元のデータの各特徴量の標準偏差に基づいてノイズを生成します
-    noise = torch.randn_like(X) * X.std(dim=0) * noise_level
-    X_augmented = X + noise
+    # 特徴量 X へのノイズ
+    noise_X = torch.randn_like(X) * X.std(dim=0) * noise_level
+    X_augmented = X + noise_X
     
-    # --- ここでデータを結合します ---
-    # dim=0 は行方向（データ数が増える方向）の結合を意味します
+    # 目的変数 Y へのノイズ
+    # Yが1次元 (samples,) の場合を考慮して計算
+    noise_Y = torch.randn_like(Y) * Y.std() * noise_level
+    Y_augmented = Y + noise_Y
+    
+    # --- データの結合 ---
     X_combined = torch.cat([X, X_augmented], dim=0)
-    Y_combined = torch.cat([Y, Y], dim=0)
+    Y_combined = torch.cat([Y, Y_augmented], dim=0)
     
-    # ラベル付け（可視化用：Original=0, Augmented=1）
+    # ラベル付け（Original=0, Augmented=1）
     labels = np.array([0] * len(X) + [1] * len(X_augmented))
 
-    # --- 可視化フェーズ ---
-    print("t-SNEを実行中... (これには時間がかかる場合があります)")
+    # --- 3. 可視化フェーズ (t-SNE) ---
+    print("t-SNEを実行中...")
     tsne = TSNE(n_components=2, random_state=42)
     X_embedded = tsne.fit_transform(X_combined.numpy())
 
-    plt.figure(figsize=(12, 5))
+    plt.figure(figsize=(14, 5))
 
-    # 左側：目的変数(Y)で色付けした散布図
+    # 左側：目的変数(Y)で色付け
     plt.subplot(1, 2, 1)
     sc = plt.scatter(X_embedded[:, 0], X_embedded[:, 1], c=Y_combined.numpy(), cmap='viridis', s=10, alpha=0.6)
     plt.colorbar(sc, label='Target Value (Y)')
@@ -50,8 +45,8 @@ def augment_with_gaussian_noise(X, Y, noise_level=1.0, save_dir="plots"):
 
     # 右側：元データと拡張データの比較
     plt.subplot(1, 2, 2)
-    plt.scatter(X_embedded[labels==0, 0], X_embedded[labels==0, 1], label='Original', s=10, alpha=0.5)
-    plt.scatter(X_embedded[labels==1, 0], X_embedded[labels==1, 1], label='Augmented', s=10, alpha=0.5)
+    plt.scatter(X_embedded[labels==0, 0], X_embedded[labels==0, 1], label='Original', s=10, alpha=0.5, color='tab:blue')
+    plt.scatter(X_embedded[labels==1, 0], X_embedded[labels==1, 1], label='Augmented', s=10, alpha=0.5, color='tab:orange')
     plt.legend()
     plt.title("Comparison: Original vs Augmented")
     
@@ -59,18 +54,24 @@ def augment_with_gaussian_noise(X, Y, noise_level=1.0, save_dir="plots"):
     plt.savefig(os.path.join(save_dir, "tsne_analysis.png"))
     plt.close()
 
-    # 4. 目的変数のヒストグラム（結合後のデータで作成）
-    plt.figure(figsize=(6, 4))
-    plt.hist(Y_combined.numpy(), bins=30, color='skyblue', edgecolor='black')
-    plt.title("Histogram of Combined Target Variable (Y)")
-    plt.xlabel("Value")
+    # --- 4. 目的変数のヒストグラム比較 ---
+    plt.figure(figsize=(8, 5))
+    
+    # オリジナルと拡張データを重ねて表示
+    plt.hist(Y.numpy(), bins=30, alpha=0.5, label='Original', color='tab:blue', edgecolor='black')
+    plt.hist(Y_augmented.numpy(), bins=30, alpha=0.5, label='Augmented', color='tab:orange', edgecolor='black')
+    
+    plt.title("Comparison of Target Variable (Y) Distribution")
+    plt.xlabel("Target Value")
     plt.ylabel("Frequency")
-    plt.savefig(os.path.join(save_dir, "target_histogram.png"))
+    plt.legend()
+    
+    plt.tight_layout()
+    plt.savefig(os.path.join(save_dir, "target_comparison_histogram.png"))
     plt.close()
 
     print(f"解析が完了しました。画像は '{save_dir}' に保存されました。")
     
-    # 結合したデータを返します
     return X_combined, Y_combined
 
 import os

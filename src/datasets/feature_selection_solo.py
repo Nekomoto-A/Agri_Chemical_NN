@@ -279,6 +279,208 @@ def select_features_with_lasso(X, Y, k, feature_names, save_path, task='regressi
     return X_selected, selected_indices
 
 import os
+import numpy as np
+import pandas as pd
+import torch
+import matplotlib.pyplot as plt
+from sklearn.linear_model import Lasso, LogisticRegression
+from sklearn.manifold import TSNE
+from sklearn.utils import resample
+
+def select_features_with_stability_selection(X, Y, k, feature_names, save_path, task='regression', n_bootstrap=100, threshold=0.5):
+    """
+    Stability Selection (Lassoベース) による特徴量選択。
+    n_bootstrap: サブサンプリングの回数
+    threshold: 選択されたとみなす確率の閾値 (kが指定されない場合に使用)
+    """
+    fs_dir = os.path.join(save_path, 'feature_selection')
+    os.makedirs(fs_dir, exist_ok=True)
+    
+    # 1. 前処理
+    device = X.device
+    X_np = X.detach().cpu().numpy()
+    Y_np = Y.detach().cpu().numpy().flatten()
+    n_samples, n_features = X_np.shape
+
+    # --- ヘルパー関数: t-SNEの描画 ---
+    def save_tsne_plot(data, target, title, filename):
+        tsne = TSNE(n_components=2, random_state=42, init='pca', learning_rate='auto')
+        X_embedded = tsne.fit_transform(data)
+        plt.figure(figsize=(10, 8))
+        scatter = plt.scatter(X_embedded[:, 0], X_embedded[:, 1], c=target, cmap='viridis', alpha=0.6, s=20)
+        plt.colorbar(scatter, label='Target Value')
+        plt.title(title)
+        plt.tight_layout()
+        plt.savefig(os.path.join(fs_dir, filename), dpi=300)
+        plt.close()
+
+    save_tsne_plot(X_np, Y_np, "t-SNE (Before Selection)", "tsne_before_selection.png")
+
+    # 2. Stability Selection の実行
+    print(f"Starting Stability Selection with {n_bootstrap} bootstrap samples...")
+    
+    # 特徴量ごとに選択された回数をカウントする配列
+    selected_counts = np.zeros(n_features)
+    
+    # 適切なAlphaを設定 (簡易化のため、小さな値を設定するか本来は別途調整)
+    # 本来はRandomizedLassoのようにAlphaを変えながら行いますが、ここでは固定Alphaで実施します
+    alpha_fixed = 0.01 
+
+    for i in range(n_bootstrap):
+        # データの50%〜80%をランダムにサンプリング
+        X_sub, Y_sub = resample(X_np, Y_np, n_samples=int(n_samples * 0.75), random_state=i)
+        
+        if task == 'regression':
+            model = Lasso(alpha=alpha_fixed, random_state=i, max_iter=2000)
+        else:
+            model = LogisticRegression(penalty='l1', solver='liblinear', C=1/alpha_fixed, random_state=i, max_iter=2000)
+        
+        model.fit(X_sub, Y_sub)
+        
+        # 係数が非ゼロのインデックスをカウント
+        if task == 'regression' or len(np.unique(Y_np)) <= 2:
+            coef = model.coef_.flatten()
+        else:
+            coef = np.mean(np.abs(model.coef_), axis=0)
+            
+        selected_counts[np.abs(coef) > 1e-5] += 1
+
+    # 選択確率を計算
+    selection_probabilities = selected_counts / n_bootstrap
+
+    # 3. 特徴量選択のロジック
+    if isinstance(k, (int, float)):
+        print(f"Selecting top {int(k)} features based on stability scores.")
+        selected_indices = np.argsort(-selection_probabilities)[:int(k)]
+    else:
+        print(f"Selecting features with selection probability > {threshold}.")
+        selected_indices = np.where(selection_probabilities >= threshold)[0]
+        
+        if len(selected_indices) == 0:
+            print("Warning: No features met the threshold. Selecting the most stable feature.")
+            selected_indices = np.array([np.argmax(selection_probabilities)])
+
+    selected_indices = np.sort(selected_indices)
+    X_selected_np = X_np[:, selected_indices]
+
+    # 4. 保存と可視化
+    importance_df = pd.DataFrame({
+        'feature_name': feature_names, 
+        'selection_probability': selection_probabilities
+    })
+    importance_df = importance_df.sort_values(by='selection_probability', ascending=False)
+    importance_df.to_csv(os.path.join(fs_dir, 'feature_stability.csv'), index=False, encoding='utf-8-sig')
+
+    save_tsne_plot(X_selected_np, Y_np, f"t-SNE (After Selection - {len(selected_indices)} features)", "tsne_after_selection.png")
+
+    X_selected = torch.from_numpy(X_selected_np).to(device)
+    return X_selected, selected_indices
+
+import os
+import numpy as np
+import pandas as pd
+import torch
+import matplotlib.pyplot as plt
+from sklearn.linear_model import ElasticNet, LogisticRegression # ElasticNetをインポート
+from sklearn.manifold import TSNE
+from sklearn.utils import resample
+
+def select_features_with_EN_stability_selection(X, Y, k, feature_names, save_path, task='regression', n_bootstrap=100, threshold=0.5, l1_ratio=0.5):
+    """
+    Stability Selection (Elastic Netベース) による特徴量選択。
+    n_bootstrap: サブサンプリングの回数
+    threshold: 選択されたとみなす確率の閾値
+    l1_ratio: Elastic Netのパラメータ (1.0でLasso、0.0でRidgeに相当)
+    """
+    fs_dir = os.path.join(save_path, 'feature_selection')
+    os.makedirs(fs_dir, exist_ok=True)
+    
+    # 1. 前処理
+    device = X.device
+    X_np = X.detach().cpu().numpy()
+    Y_np = Y.detach().cpu().numpy().flatten()
+    n_samples, n_features = X_np.shape
+
+    # --- ヘルパー関数: t-SNEの描画 ---
+    def save_tsne_plot(data, target, title, filename):
+        tsne = TSNE(n_components=2, random_state=42, init='pca', learning_rate='auto')
+        X_embedded = tsne.fit_transform(data)
+        plt.figure(figsize=(10, 8))
+        scatter = plt.scatter(X_embedded[:, 0], X_embedded[:, 1], c=target, cmap='viridis', alpha=0.6, s=20)
+        plt.colorbar(scatter, label='Target Value')
+        plt.title(title)
+        plt.tight_layout()
+        plt.savefig(os.path.join(fs_dir, filename), dpi=300)
+        plt.close()
+
+    save_tsne_plot(X_np, Y_np, "t-SNE (Before Selection)", "tsne_before_selection.png")
+
+    # 2. Stability Selection の実行
+    print(f"Starting Stability Selection (Elastic Net) with {n_bootstrap} bootstrap samples...")
+    
+    selected_counts = np.zeros(n_features)
+    alpha_fixed = 0.01 
+
+    for i in range(n_bootstrap):
+        # データの75%をサンプリング
+        X_sub, Y_sub = resample(X_np, Y_np, n_samples=int(n_samples * 0.75), random_state=i)
+        
+        if task == 'regression':
+            # Lasso(alpha) -> ElasticNet(alpha, l1_ratio)
+            model = ElasticNet(alpha=alpha_fixed, l1_ratio=l1_ratio, random_state=i, max_iter=2000)
+        else:
+            # LogisticRegressionでElasticNetを使う場合は solver='saga' が必要
+            model = LogisticRegression(
+                penalty='elasticnet', 
+                solver='saga', 
+                l1_ratio=l1_ratio, 
+                C=1/alpha_fixed, 
+                random_state=i, 
+                max_iter=2000
+            )
+        
+        model.fit(X_sub, Y_sub)
+        
+        # 係数が非ゼロのインデックスをカウント
+        if task == 'regression' or len(np.unique(Y_np)) <= 2:
+            coef = model.coef_.flatten()
+        else:
+            coef = np.mean(np.abs(model.coef_), axis=0)
+            
+        selected_counts[np.abs(coef) > 1e-5] += 1
+
+    # 選択確率を計算
+    selection_probabilities = selected_counts / n_bootstrap
+
+    # 3. 特徴量選択のロジック
+    if isinstance(k, (int, float)):
+        print(f"Selecting top {int(k)} features based on stability scores.")
+        selected_indices = np.argsort(-selection_probabilities)[:int(k)]
+    else:
+        print(f"Selecting features with selection probability > {threshold}.")
+        selected_indices = np.where(selection_probabilities >= threshold)[0]
+        
+        if len(selected_indices) == 0:
+            print("Warning: No features met the threshold. Selecting the most stable feature.")
+            selected_indices = np.array([np.argmax(selection_probabilities)])
+
+    selected_indices = np.sort(selected_indices)
+    X_selected_np = X_np[:, selected_indices]
+
+    # 4. 保存と可視化
+    importance_df = pd.DataFrame({
+        'feature_name': feature_names, 
+        'selection_probability': selection_probabilities
+    })
+    importance_df = importance_df.sort_values(by='selection_probability', ascending=False)
+    importance_df.to_csv(os.path.join(fs_dir, 'feature_stability.csv'), index=False, encoding='utf-8-sig')
+
+    save_tsne_plot(X_selected_np, Y_np, f"t-SNE (After Selection - {len(selected_indices)} features)", "tsne_after_selection.png")
+
+    X_selected = torch.from_numpy(X_selected_np).to(device)
+    return X_selected, selected_indices
+
+import os
 import torch
 import numpy as np
 import pandas as pd
@@ -1002,8 +1204,16 @@ def select_features(X_train_tensor, X_val_tensor, X_test_tensor, Y_train_single,
         X_train_tensor, selected_indices = select_features_with_lasso(X_train_tensor, Y_train_single, 
                                                             k=num_features_to_select, feature_names=features, 
                                                             save_path = fold_dir)
+    elif selection_method == 'lasso_ss':
+        X_train_tensor, selected_indices = select_features_with_stability_selection(X_train_tensor, Y_train_single, 
+                                                            k=num_features_to_select, feature_names=features, 
+                                                            save_path = fold_dir)
     elif selection_method == 'ElasticNet':
         X_train_tensor, selected_indices = select_features_with_elasticnet(X_train_tensor, Y_train_single, 
+                                                            k=num_features_to_select, feature_names=features, 
+                                                            save_path = fold_dir, task='regression')
+    elif selection_method == 'ElasticNet_ss':
+        X_train_tensor, selected_indices = select_features_with_EN_stability_selection(X_train_tensor, Y_train_single, 
                                                             k=num_features_to_select, feature_names=features, 
                                                             save_path = fold_dir, task='regression')
     elif selection_method == 'LGB_BORUTA':
