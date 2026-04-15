@@ -156,9 +156,9 @@ fold_eval.py:
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
   comp_method: 'SUM'
-  selection: 'ElasticNet' #None # #None #
+  selection: 'RF_importance' #'lasso'  #'lasso' #'LGB_importance' #None #'ElasticNet' #None # #None #
   num_features_to_select_lgb: None
-  augment_method: None 'gaussian' #None #
+  augment_method: None #'gaussian' #None #
   exclude_ids: [
     #'042_20_Sait_Eggp'
     #'042_20_Sait_Eggp','235_21_Miyz_Spin', '360_22_Miee_Soyb', '121_20_Miyz_Spin', '125_20_Miyz_Spin', #'161_21_Miyz_Spin' #☓
@@ -218,10 +218,10 @@ fold_eval.py:
   ]
   add_columns: [] #['crop', 'pref']  #['crop', 'pref'] #[] #
   features_plot: True
-  hyper_optimize: True
+  hyper_optimize: False
   shap_comppute: False
 main.py:
-  result_dir: 'result_YJ_CLR_EN'
+  result_dir: 'result_YJ_CLR_RF_nfold'
   Cross_val: True
   LOGO: False
   domains: 'year' #'pref-crop'
@@ -253,9 +253,9 @@ main.py:
             ['pH'], 
             #['NO3.N'], 
             #['EC'], 
-            ['Humus'], 
-            ['Exchangeable.K'], 
-            ['CEC'], 
+            # ['Humus'], 
+            # ['Exchangeable.K'], 
+            # ['CEC'], 
             # ['pH_dry_soil', 'available_P', 'EC_electric_conductivity', 'Total_C', 'Total_N']
             #['pH', 'Available.P'] 
 

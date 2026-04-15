@@ -504,8 +504,8 @@ def fold_evaluate(reg_list, output_dir, device,
             kf = KFold(n_splits=k, shuffle=True, random_state=42)
         else:
             #kf = StratifiedKFold(n_splits=k, shuffle=True, random_state=42)
-            kf = ContinuousStratifiedKFold(n_splits=k, shuffle=True, random_state=42)
-            #kf = KFold(n_splits=k, shuffle=True, random_state=42)
+            #kf = ContinuousStratifiedKFold(n_splits=k, shuffle=True, random_state=42)
+            kf = KFold(n_splits=k, shuffle=True, random_state=42)
     predictions = {}
     trues = {}
 

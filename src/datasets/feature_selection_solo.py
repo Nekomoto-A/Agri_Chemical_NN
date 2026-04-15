@@ -179,103 +179,105 @@ def select_features_with_mutual_info(X, Y, k, feature_names, save_path, task='re
     # Tensorに戻して返す
     X_selected = torch.from_numpy(X_selected_np).to(device)
     return X_selected, selected_indices
-
 import os
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import torch
-import plotly.graph_objects as go
+import matplotlib.pyplot as plt
+from sklearn.linear_model import Lasso, LogisticRegression
+from sklearn.model_selection import cross_val_score
 from sklearn.manifold import TSNE
-from sklearn.linear_model import ElasticNet, Lasso, LogisticRegression, Ridge
-from sklearn.preprocessing import StandardScaler
+import optuna
 
 def select_features_with_lasso(X, Y, k, feature_names, save_path, task='regression'):
     """
-    Lassoの重み（係数の絶対値）に基づき特徴量選択を行い、前後のt-SNE分布を保存する
+    Lasso(L1正則化)の係数に基づき特徴量選択を行う。
+    kが数値の場合は上位k個、数値以外の場合は係数が0でないものすべてを選択する。
     """
     fs_dir = os.path.join(save_path, 'feature_selection')
     os.makedirs(fs_dir, exist_ok=True)
-    # 1. デバイス情報の保持とNumPyへの変換
+    
+    # 1. 前処理
     device = X.device
     X_np = X.detach().cpu().numpy()
     Y_np = Y.detach().cpu().numpy().flatten()
+    X_scaled = X_np # 必要に応じてStandardScalerを適用してください
 
-    # --- ヘルパー関数: t-SNEの描画と保存 ---
+    # --- ヘルパー関数: t-SNEの描画 ---
     def save_tsne_plot(data, target, title, filename):
-        print(f"Generating t-SNE for: {title}...")
         tsne = TSNE(n_components=2, random_state=42, init='pca', learning_rate='auto')
         X_embedded = tsne.fit_transform(data)
-        
         plt.figure(figsize=(10, 8))
-        scatter = plt.scatter(X_embedded[:, 0], X_embedded[:, 1], c=target, 
-                            cmap='viridis', alpha=0.6, s=20)
+        scatter = plt.scatter(X_embedded[:, 0], X_embedded[:, 1], c=target, cmap='viridis', alpha=0.6, s=20)
         plt.colorbar(scatter, label='Target Value')
         plt.title(title)
-        plt.xlabel('t-SNE dimension 1')
-        plt.ylabel('t-SNE dimension 2')
         plt.tight_layout()
-        
-        full_path = os.path.join(save_path, filename)
-        plt.savefig(full_path, dpi=300)
+        plt.savefig(os.path.join(fs_dir, filename), dpi=300)
         plt.close()
-        print(f"t-SNE plot saved to: {full_path}")
 
-    # 選択前のt-SNE可視化
-    save_tsne_plot(X_np, Y_np, "t-SNE Visualization (Before Selection)", "tsne_before_selection.png")
+    save_tsne_plot(X_np, Y_np, "t-SNE (Before Selection)", "tsne_before_selection.png")
 
-    # 2. 前処理（Lassoには標準化が必須）
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X_np)
+    # 2. Optunaによるハイパーパラメータ(alpha)の最適化
+    def objective(trial):
+        # Lassoの正則化強度 alpha を最適化
+        alpha = trial.suggest_float('alpha', 1e-5, 1.0, log=True)
+        
+        if task == 'regression':
+            # 回帰: Lasso
+            model = Lasso(alpha=alpha, random_state=42, max_iter=5000)
+            # 負のMSEを最大化するように最適化
+            score = cross_val_score(model, X_scaled, Y_np, cv=5, scoring='neg_mean_squared_error').mean()
+        else:
+            # 分類: LogisticRegression (L1正則化)
+            # Cは alpha の逆数に相当するため 1/alpha
+            model = LogisticRegression(penalty='l1', solver='liblinear', C=1/alpha, random_state=42, max_iter=5000)
+            score = cross_val_score(model, X_scaled, Y_np, cv=5, scoring='accuracy').mean()
+        return score
 
-    # 3. Lasso/LogisticRegressionモデルの構築と学習
+    study = optuna.create_study(direction='maximize')
+    study.optimize(objective, n_trials=50)
+    
+    # 3. 最良モデルでの学習
+    best_params = study.best_params
     if task == 'regression':
-        # alphaは正則化の強さです。必要に応じて調整してください。
-        model = Lasso(alpha=0.01, random_state=42)
-        #model = Ridge(alpha=0.01, random_state=42)
-        #model = ElasticNet(alpha=0.01, l1_ratio=0.5, random_state=42)  # L1とL2のバランスを取るElasticNet
+        best_model = Lasso(alpha=best_params['alpha'], random_state=42, max_iter=5000)
     else:
-        # 分類の場合はLogisticRegressionのL1ペナルティを使用
-        model = LogisticRegression(penalty='l1', solver='liblinear', random_state=42)
-
-    model.fit(X_scaled, Y_np)
-
-    # 4. 重み（係数）の絶対値を重要度として取得
-    # 多クラス分類の場合は各クラスの係数の平均絶対値などを取ることが一般的
-    if task == 'classification' and model.coef_.ndim > 1:
-        importances = np.mean(np.abs(model.coef_), axis=0)
+        best_model = LogisticRegression(penalty='l1', solver='liblinear', C=1/best_params['alpha'], random_state=42, max_iter=5000)
+    
+    best_model.fit(X_scaled, Y_np)
+    
+    # 重要度（係数の絶対値）の取得
+    if task == 'regression' or len(np.unique(Y_np)) <= 2:
+        importances = np.abs(best_model.coef_).flatten()
     else:
-        importances = np.abs(model.coef_).flatten()
+        # 多クラス分類の場合は各クラスの係数の平均をとる
+        importances = np.mean(np.abs(best_model.coef_), axis=0)
 
-    # (重要度のCSV保存とPlotlyのコードを維持)
+    # 4. 特徴量選択のロジック
+    if isinstance(k, (int, float)):
+        print(f"Selecting top {int(k)} features based on Lasso coefficients.")
+        selected_indices = np.argsort(-importances)[:int(k)]
+    else:
+        print("Selecting all features with non-zero coefficients (Lasso sparsity).")
+        selected_indices = np.where(importances > 1e-5)[0] # 微小な値を閾値に設定
+        
+        if len(selected_indices) == 0:
+            print("Warning: All coefficients are zero. Selecting the single most important feature.")
+            selected_indices = np.array([np.argmax(importances)])
+
+    selected_indices = np.sort(selected_indices)
+    X_selected_np = X_np[:, selected_indices]
+
+    # --- 保存と可視化 ---
     importance_df = pd.DataFrame({'feature_name': feature_names, 'importance_abs_coef': importances})
     importance_df = importance_df.sort_values(by='importance_abs_coef', ascending=False)
-    csv_save_path = os.path.join(save_path, 'feature_importance_lasso.csv')
-    importance_df.to_csv(csv_save_path, index=False, encoding='utf-8-sig')
+    importance_df.to_csv(os.path.join(fs_dir, 'feature_importance.csv'), index=False, encoding='utf-8-sig')
 
-    # --- Plotlyによる可視化 ---
-    all_indices = np.argsort(-importances)
-    top_50_indices = all_indices[:50][::-1]
-    top_50_values = importances[top_50_indices]
-    top_50_labels = [feature_names[i] for i in top_50_indices]
+    save_tsne_plot(X_selected_np, Y_np, f"t-SNE (After Selection - {len(selected_indices)} features)", "tsne_after_selection.png")
 
-    fig = go.Figure(go.Bar(x=top_50_values, y=top_50_labels, orientation='h', marker=dict(color='indianred')))
-    fig.update_layout(title=f'Top 50 Features (Lasso Coefficients)', xaxis_title='Absolute Coefficient Value', yaxis_title='Feature Name')
-    fig.write_html(os.path.join(save_path, 'feature_importance_lasso.html'))
-
-    # 5. 重要度が高い順にインデックスをk個選択
-    selected_indices = np.argsort(-importances)[:k]
-    selected_indices = np.sort(selected_indices)
-
-    # 6. データの抽出
-    X_selected_np = X_np[:, selected_indices]
-    
-    # 選択後のt-SNE可視化
-    save_tsne_plot(X_selected_np, Y_np, f"t-SNE Visualization (After Selection - Top {k})", "tsne_after_selection.png")
-
-    # Tensorに戻して返す
     X_selected = torch.from_numpy(X_selected_np).to(device)
     return X_selected, selected_indices
+
 import os
 import torch
 import numpy as np
@@ -326,14 +328,14 @@ def select_features_with_elasticnet(X, Y, k, feature_names, save_path, task='reg
         
         if task == 'regression':
             model = ElasticNet(alpha=alpha, l1_ratio=l1_ratio, random_state=42, max_iter=3000)
-            score = cross_val_score(model, X_scaled, Y_np, cv=3, scoring='neg_mean_squared_error').mean()
+            score = cross_val_score(model, X_scaled, Y_np, cv=5, scoring='neg_mean_squared_error').mean()
         else:
             model = LogisticRegression(penalty='elasticnet', solver='saga', C=1/alpha, l1_ratio=l1_ratio, random_state=42, max_iter=3000)
-            score = cross_val_score(model, X_scaled, Y_np, cv=3, scoring='accuracy').mean()
+            score = cross_val_score(model, X_scaled, Y_np, cv=5, scoring='accuracy').mean()
         return score
 
     study = optuna.create_study(direction='maximize')
-    study.optimize(objective, n_trials=20)
+    study.optimize(objective, n_trials=50)
     
     # 3. 最良モデルでの学習
     best_params = study.best_params
@@ -379,97 +381,222 @@ def select_features_with_elasticnet(X, Y, k, feature_names, save_path, task='reg
     X_selected = torch.from_numpy(X_selected_np).to(device)
     return X_selected, selected_indices
 
-import torch
-import lightgbm as lgb
-import numpy as np
-import plotly.graph_objects as go
-import plotly.io as pio
 import os
-import torch
 import numpy as np
 import pandas as pd
-import lightgbm as lgb
-import plotly.graph_objects as go
+import torch
 import matplotlib.pyplot as plt
-import seaborn as sns
 from sklearn.manifold import TSNE
-from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+from sklearn.model_selection import cross_val_score
+import optuna
+import lightgbm as lgb
 
 def select_features_with_lgbm(X, Y, k, feature_names, save_path, task='regression'):
     """
-    LightGBMの重要度に基づき特徴量選択を行い、前後のt-SNE分布を保存する
+    LightGBMのFeature Importanceに基づき特徴量選択を行う。
+    kが数値の場合は上位k個、数値以外の場合は重要度が0より大きいものをすべて選択する。
     """
     fs_dir = os.path.join(save_path, 'feature_selection')
     os.makedirs(fs_dir, exist_ok=True)
-    # 1. デバイス情報の保持とNumPyへの変換
+    
+    # 1. 前処理
     device = X.device
     X_np = X.detach().cpu().numpy()
     Y_np = Y.detach().cpu().numpy().flatten()
 
-    # --- ヘルパー関数: t-SNEの描画と保存 ---
+    # --- ヘルパー関数: t-SNEの描画 ---
     def save_tsne_plot(data, target, title, filename):
-        print(f"Generating t-SNE for: {title}...")
-        # サンプル数が多い場合は計算時間を考慮し、perplexity等を調整可能
         tsne = TSNE(n_components=2, random_state=42, init='pca', learning_rate='auto')
         X_embedded = tsne.fit_transform(data)
-        
         plt.figure(figsize=(10, 8))
-        # 回帰か分類かで色合い(cmap)を調整
-        scatter = plt.scatter(X_embedded[:, 0], X_embedded[:, 1], c=target, 
-                            cmap='viridis', alpha=0.6, s=20)
+        scatter = plt.scatter(X_embedded[:, 0], X_embedded[:, 1], c=target, cmap='viridis', alpha=0.6, s=20)
         plt.colorbar(scatter, label='Target Value')
         plt.title(title)
-        plt.xlabel('t-SNE dimension 1')
-        plt.ylabel('t-SNE dimension 2')
         plt.tight_layout()
-        
-        full_path = os.path.join(save_path, filename)
-        plt.savefig(full_path, dpi=300)
+        plt.savefig(os.path.join(fs_dir, filename), dpi=300)
         plt.close()
-        print(f"t-SNE plot saved to: {full_path}")
 
-    # 【追加】選択前のt-SNE可視化
-    save_tsne_plot(X_np, Y_np, "t-SNE Visualization (Before Selection)", "tsne_before_selection.png")
+    save_tsne_plot(X_np, Y_np, "t-SNE (Before Selection)", "tsne_before_selection.png")
 
-    # 2. LightGBMモデルの構築
-    if task == 'regression':
-        model = lgb.LGBMRegressor(importance_type='gain', n_estimators=100, random_state=42)
-        #model = RandomForestRegressor(importance_type='gain', n_estimators=100, random_state=42)
-    else:
-        model = lgb.LGBMClassifier(importance_type='gain', n_estimators=100, random_state=42)
-        #model = RandomForestClassifier(importance_type='gain', n_estimators=100, random_state=42)
+    # 2. Optunaによるハイパーパラメータ最適化
+    def objective(trial):
+        # LightGBM用の主要なハイパーパラメータ
+        params = {
+            'n_estimators': 100,
+            'verbosity': -1,
+            'random_state': 42,
+            'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3, log=True),
+            'num_leaves': trial.suggest_int('num_leaves', 2, 256),
+            'feature_fraction': trial.suggest_float('feature_fraction', 0.4, 1.0),
+            'bagging_fraction': trial.suggest_float('bagging_fraction', 0.4, 1.0),
+            'bagging_freq': trial.suggest_int('bagging_freq', 1, 7),
+            'min_child_samples': trial.suggest_int('min_child_samples', 5, 100),
+        }
+        
+        if task == 'regression':
+            model = lgb.LGBMRegressor(**params)
+            # 回帰は負の平均二乗誤差を最大化（＝誤差を最小化）
+            score = cross_val_score(model, X_np, Y_np, cv=5, scoring='neg_mean_squared_error').mean()
+        else:
+            model = lgb.LGBMClassifier(**params)
+            # 分類は正解率を最大化
+            score = cross_val_score(model, X_np, Y_np, cv=5, scoring='accuracy').mean()
+        return score
 
-    # 3. 学習と重要度の取得
-    model.fit(X_np, Y_np)
-    importances = model.feature_importances_
-
-    # (重要度のCSV保存とPlotlyのコードはそのまま維持)
-    importance_df = pd.DataFrame({'feature_name': feature_names, 'importance_gain': importances})
-    importance_df = importance_df.sort_values(by='importance_gain', ascending=False)
-    csv_save_path = os.path.join(save_path, 'feature_importance.csv')
-    importance_df.to_csv(csv_save_path, index=False, encoding='utf-8-sig')
-
-    # --- Plotlyによる可視化 ---
-    all_indices = np.argsort(-importances)
-    top_50_indices = all_indices[:50][::-1]
-    top_50_values = importances[top_50_indices]
-    top_50_labels = [feature_names[i] for i in top_50_indices]
-
-    fig = go.Figure(go.Bar(x=top_50_values, y=top_50_labels, orientation='h', marker=dict(color='royalblue')))
-    fig.update_layout(title=f'Top 50 Features', xaxis_title='Importance (Gain)', yaxis_title='Feature Name')
-    fig.write_html(os.path.join(save_path, 'feature_importance.html'))
-
-    # 4. 重要度が高い順にインデックスをk個選択
-    selected_indices = np.argsort(-importances)[:k]
-    selected_indices = np.sort(selected_indices)
-
-    # 5. データの抽出
-    X_selected_np = X_np[:, selected_indices]
+    study = optuna.create_study(direction='maximize')
+    study.optimize(objective, n_trials=50)
     
-    # 【追加】選択後のt-SNE可視化
-    save_tsne_plot(X_selected_np, Y_np, f"t-SNE Visualization (After Selection - Top {k})", "tsne_after_selection.png")
+    # 3. 最良モデルでの学習
+    best_params = study.best_params
+    # 固定パラメータを再度セット
+    best_params.update({'n_estimators': 200, 'verbosity': -1, 'random_state': 42})
+    
+    if task == 'regression':
+        best_model = lgb.LGBMRegressor(
+            **best_params, 
+            importance_type='gain' # ここを追加
+            )
+    else:
+        best_model = lgb.LGBMClassifier(
+            **best_params, 
+            importance_type='gain' # ここを追加
+        )
+    
+    best_model.fit(X_np, Y_np)
+    
+    # 重要度（Feature Importance）の取得
+    # LGBMではデフォルトで 'split' (その特徴量が使われた回数) が取得されます
+    importances = best_model.feature_importances_.astype(float)
 
-    # Tensorに戻して返す
+    # 4. 特徴量選択のロジック
+    if isinstance(k, (int, float)):
+        # kが数値なら、上位k個を選択
+        print(f"Selecting top {int(k)} features based on LGBM Importance.")
+        selected_indices = np.argsort(-importances)[:int(k)]
+    else:
+        # kが数値以外なら、重要度が0より大きいインデックスをすべて抽出
+        print("k is not a number. Selecting all features with importance > 0.")
+        selected_indices = np.where(importances > 0)[0]
+        
+        if len(selected_indices) == 0:
+            print("Warning: All importances are zero. Selecting the single most important feature.")
+            selected_indices = np.array([np.argmax(importances)])
+
+    selected_indices = np.sort(selected_indices)
+    X_selected_np = X_np[:, selected_indices]
+
+    # 5. 保存と可視化の処理
+    importance_df = pd.DataFrame({'feature_name': feature_names, 'importance_score': importances})
+    importance_df = importance_df.sort_values(by='importance_score', ascending=False)
+    importance_df.to_csv(os.path.join(fs_dir, 'feature_importance_lgbm.csv'), index=False, encoding='utf-8-sig')
+
+    save_tsne_plot(X_selected_np, Y_np, f"t-SNE (After Selection - {len(selected_indices)} features)", "tsne_after_selection.png")
+
+    X_selected = torch.from_numpy(X_selected_np).to(device)
+    return X_selected, selected_indices
+
+import os
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import torch
+from sklearn.manifold import TSNE
+from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+from sklearn.model_selection import cross_val_score
+import optuna
+
+def select_features_with_rf(X, Y, k, feature_names, save_path, task='regression'):
+    """
+    Random ForestのFeature Importanceに基づき特徴量選択を行う。
+    kが数値の場合は上位k個、数値以外の場合は重要度が0より大きいものをすべて選択する。
+    """
+    fs_dir = os.path.join(save_path, 'feature_selection')
+    os.makedirs(fs_dir, exist_ok=True)
+    
+    # 1. 前処理
+    device = X.device
+    X_np = X.detach().cpu().numpy()
+    Y_np = Y.detach().cpu().numpy().flatten()
+
+    # --- ヘルパー関数: t-SNEの描画 ---
+    def save_tsne_plot(data, target, title, filename):
+        tsne = TSNE(n_components=2, random_state=42, init='pca', learning_rate='auto')
+        X_embedded = tsne.fit_transform(data)
+        plt.figure(figsize=(10, 8))
+        scatter = plt.scatter(X_embedded[:, 0], X_embedded[:, 1], c=target, cmap='viridis', alpha=0.6, s=20)
+        plt.colorbar(scatter, label='Target Value')
+        plt.title(title)
+        plt.tight_layout()
+        plt.savefig(os.path.join(fs_dir, filename), dpi=300)
+        plt.close()
+
+    save_tsne_plot(X_np, Y_np, "t-SNE (Before Selection)", "tsne_before_selection.png")
+
+    # 2. Optunaによるハイパーパラメータ最適化
+    def objective(trial):
+        # Random Forest用の主要なハイパーパラメータ
+        params = {
+            'n_estimators': trial.suggest_int('n_estimators', 50, 300),
+            'max_depth': trial.suggest_int('max_depth', 3, 15),
+            'min_samples_split': trial.suggest_int('min_samples_split', 2, 20),
+            'min_samples_leaf': trial.suggest_int('min_samples_leaf', 5, 20),
+            #'max_features': trial.suggest_categorical('max_features', ['sqrt', 'log2', None]),
+            'max_features': 'sqrt', # 特徴量を絞る
+            'random_state': 42,
+            'n_jobs': -1 # 並列処理で高速化
+        }
+        
+        if task == 'regression':
+            model = RandomForestRegressor(**params)
+            # 回帰は負の平均二乗誤差を最大化（＝誤差を最小化）
+            score = cross_val_score(model, X_np, Y_np, cv=5, scoring='neg_mean_squared_error').mean()
+        else:
+            model = RandomForestClassifier(**params)
+            # 分類は正解率を最大化
+            score = cross_val_score(model, X_np, Y_np, cv=5, scoring='accuracy').mean()
+        return score
+
+    study = optuna.create_study(direction='maximize')
+    study.optimize(objective, n_trials=20) # RFは学習がLGBMより重いため試行回数を調整
+    
+    # 3. 最良モデルでの学習
+    best_params = study.best_params
+    best_params.update({'random_state': 42, 'n_jobs': -1})
+    
+    if task == 'regression':
+        best_model = RandomForestRegressor(**best_params)
+    else:
+        best_model = RandomForestClassifier(**best_params)
+    
+    best_model.fit(X_np, Y_np)
+    
+    # 重要度（Feature Importance）の取得
+    importances = best_model.feature_importances_.astype(float)
+
+    # 4. 特徴量選択のロジック
+    if isinstance(k, (int, float)):
+        # kが数値なら、上位k個を選択
+        print(f"Selecting top {int(k)} features based on Random Forest Importance.")
+        selected_indices = np.argsort(-importances)[:int(k)]
+    else:
+        # kが数値以外なら、重要度が0より大きいインデックスをすべて抽出
+        print("k is not a number. Selecting all features with importance > 0.")
+        selected_indices = np.where(importances > 1e-6)[0] # 微小な値を閾値にする
+        
+        if len(selected_indices) == 0:
+            print("Warning: All importances are near zero. Selecting the single most important feature.")
+            selected_indices = np.array([np.argmax(importances)])
+
+    selected_indices = np.sort(selected_indices)
+    X_selected_np = X_np[:, selected_indices]
+
+    # 5. 保存と可視化の処理
+    importance_df = pd.DataFrame({'feature_name': feature_names, 'importance_score': importances})
+    importance_df = importance_df.sort_values(by='importance_score', ascending=False)
+    importance_df.to_csv(os.path.join(fs_dir, 'feature_importance_rf.csv'), index=False, encoding='utf-8-sig')
+
+    save_tsne_plot(X_selected_np, Y_np, f"t-SNE (After Selection - {len(selected_indices)} features)", "tsne_after_selection.png")
+
     X_selected = torch.from_numpy(X_selected_np).to(device)
     return X_selected, selected_indices
 
@@ -856,6 +983,10 @@ def select_features_with_lgbm_preselect_rfecv(X, Y, k, feature_names, save_path,
 def select_features(X_train_tensor, X_val_tensor, X_test_tensor, Y_train_single, features, selection_method, num_features_to_select, fold_dir):
     if selection_method == 'LGB_importance':
         X_train_tensor, selected_indices = select_features_with_lgbm(X_train_tensor, Y_train_single, 
+                                                                        k=num_features_to_select, feature_names=features, 
+                                                                        save_path = fold_dir)
+    elif selection_method == 'RF_importance':
+        X_train_tensor, selected_indices = select_features_with_rf(X_train_tensor, Y_train_single, 
                                                                         k=num_features_to_select, feature_names=features, 
                                                                         save_path = fold_dir)
     elif selection_method == 'mutual_info':
