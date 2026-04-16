@@ -156,8 +156,8 @@ fold_eval.py:
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
   comp_method: 'SUM'
-  selection: 'ElasticNet_ss' #'RF_importance' #'lasso'  #'lasso' #'LGB_importance' #None #'ElasticNet' #None # #None #
-  num_features_to_select_lgb: 200
+  selection: 'ElasticNet' #None #'RF_ss' #'ElasticNet_ss'  #None #'ElasticNet_ss' #'RF_importance' #'lasso'  #'lasso' #'LGB_importance' #None #'ElasticNet' #None # #None #
+  num_features_to_select_lgb: None
   augment_method: None #'gaussian' #None #'gaussian' #None #
   exclude_ids: [
     #'042_20_Sait_Eggp'
@@ -221,7 +221,7 @@ fold_eval.py:
   hyper_optimize: False
   shap_comppute: False
 main.py:
-  result_dir: 'result_YJ_CLR_ENss200_nfold'
+  result_dir: 'result_YJ_CLR_EN_nfold'
   Cross_val: True
   LOGO: False
   domains: 'year' #'pref-crop'
@@ -254,8 +254,8 @@ main.py:
             #['NO3.N'], 
             #['EC'], 
             # ['Humus'], 
-            # ['Exchangeable.K'], 
-            # ['CEC'], 
+            ['Exchangeable.K'], 
+            ['CEC'], 
             # ['pH_dry_soil', 'available_P', 'EC_electric_conductivity', 'Total_C', 'Total_N']
             #['pH', 'Available.P'] 
 

@@ -612,7 +612,6 @@ def fold_evaluate(reg_list, output_dir, device,
                 labels_val_original = label_val_tensor,
                 labels_test_original = label_test_tensor,
                 ae_dir = ae_dir, 
-
                 )
             
             for reg_name, dict in result_scores.items():
