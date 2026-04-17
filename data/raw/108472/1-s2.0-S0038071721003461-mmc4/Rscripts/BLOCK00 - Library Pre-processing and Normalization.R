@@ -1,3 +1,4 @@
+install.packages(phyloseq)
 library(phyloseq)
 library(plyr)
 library(reshape2)

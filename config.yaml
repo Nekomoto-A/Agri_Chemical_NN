@@ -156,9 +156,9 @@ fold_eval.py:
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
   comp_method: 'SUM'
-  selection: 'ElasticNet' #None #'RF_ss' #'ElasticNet_ss'  #None #'ElasticNet_ss' #'RF_importance' #'lasso'  #'lasso' #'LGB_importance' #None #'ElasticNet' #None # #None #
+  selection: 'ElasticNet_ss' #None #'RF_ss' #'ElasticNet_ss'  #None #'ElasticNet_ss' #'RF_importance' #'lasso'  #'lasso' #'LGB_importance' #None #'ElasticNet' #None # #None #
   num_features_to_select_lgb: None
-  augment_method: None #'gaussian' #None #'gaussian' #None #
+  augment_method: 'gaussian' #None #'gaussian' #None #'gaussian' #None #
   exclude_ids: [
     #'042_20_Sait_Eggp'
     #'042_20_Sait_Eggp','235_21_Miyz_Spin', '360_22_Miee_Soyb', '121_20_Miyz_Spin', '125_20_Miyz_Spin', #'161_21_Miyz_Spin' #☓
@@ -221,10 +221,10 @@ fold_eval.py:
   hyper_optimize: False
   shap_comppute: False
 main.py:
-  result_dir: 'result_YJ_CLR_EN_nfold'
-  Cross_val: True
-  LOGO: False
-  domains: 'year' #'pref-crop'
+  result_dir: 'result_YJ_CLR_ENss_gaussian_logo'
+  Cross_val: False
+  LOGO: True
+  domains:  'crop' #'year' #'pref-crop'
   reg_list: [
             # ['pref'], 
             # ['crop'], 

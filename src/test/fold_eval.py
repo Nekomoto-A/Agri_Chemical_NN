@@ -1022,6 +1022,7 @@ def domain_evaluate(reg_list, output_dir, device,
                   features_plot = config['features_plot'],
                   num_features_to_select_lgb = config['num_features_to_select_lgb'],
                   selection_method = config['selection'],
+                  augment_method = config['augment_method'],
                   ):
     #if feature_selection_all:
     #   output_dir = os.path.join(fsdir, output_dir)
@@ -1289,8 +1290,7 @@ def domain_evaluate(reg_list, output_dir, device,
             X_train_tensor, X_val_tensor, X_test_tensor, features = feature_selection_solo.select_features(X_train_tensor, X_val_tensor, X_test_tensor, Y_train_single[r], 
                                                                                                            features, selection_method, num_features_to_select_lgb, fold_dir)
 
-            
-            X_train_tensor, Y_train_tensor[r] = select_augmentation(X,Y,save_dir, features, reg, method)
+            X_train_tensor, Y_train_single[r] = select_augmentation(X_train_tensor, Y_train_single[r], fold_dir,features, r, augment_method)
 
 
             # print(f"Selected features indices: {selected_indices}")
