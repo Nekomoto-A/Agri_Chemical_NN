@@ -385,7 +385,7 @@ from sklearn.linear_model import ElasticNet, LogisticRegression # ElasticNetを�
 from sklearn.manifold import TSNE
 from sklearn.utils import resample
 
-def select_features_with_EN_stability_selection(X, Y, k, feature_names, save_path, task='regression', n_bootstrap=500, threshold=0.5, l1_ratio=0.5):
+def select_features_with_EN_stability_selection(X, Y, k, feature_names, save_path, task='regression', n_bootstrap=500, threshold=0.5, l1_ratio=0.1):
     """
     Stability Selection (Elastic Netベース) による特徴量選択。
     n_bootstrap: サブサンプリングの回数

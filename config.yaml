@@ -156,7 +156,7 @@ fold_eval.py:
   result_fold: 'fold_result.csv'
   reduced_feature: 'reduced_feature'
   comp_method: 'SUM'
-  selection: None #'LGB_ss' #'LGB_ss' #'ElasticNet_ss' #None #'RF_ss' #'ElasticNet_ss'  #None #'ElasticNet_ss' #'RF_importance' #'lasso'  #'lasso' #'LGB_importance' #None #'ElasticNet' #None # #None #
+  selection: 'LGB_ss' #'LGB_ss' #'LGB_ss'  #'LGB_ss' #'LGB_ss' #'ElasticNet_ss' #None #'RF_ss' #'ElasticNet_ss'  #None #'ElasticNet_ss' #'RF_importance' #'lasso'  #'lasso' #'LGB_importance' #None #'ElasticNet' #None # #None #
   num_features_to_select_lgb: None
   augment_method: None #'smogn' #'gaussian' #None #'gaussian' #None #'gaussian' #None #
   exclude_ids: [
@@ -171,33 +171,13 @@ fold_eval.py:
 
     '042_20_Sait_Eggp', '214_21_Miyz_Edam', '273_22_Naga_Rice', '235_21_Miyz_Spin',
 
-    # '186_21_Miyz_Spin', '133_21_Akit_Edam', '264_21_Naga_Appl', '244_21_Aomo_Appl',
-    # '132_21_Akit_Edam', '240_21_Aomo_Appl', '252_21_Aomo_Appl', '250_21_Aomo_Appl', 
-    # '213_21_Miyz_Edam', 
-
-    #'239_21_Aomo_Appl', '241_21_Aomo_Appl', '347_22_Yama_Rice', '243_21_Aomo_Appl', 
-    #'122_20_Miyz_Spin', #'228_21_Miyz_Edam'
-    '145_21_Miyz_Spin',
-    '163_21_Miyz_Spin', #'171_21_Miyz_Spin',
-    '141_21_Miyz_Spin', #'146_21_Miyz_Spin',
-
-    '161_21_Miyz_Spin',
-
-    # '166_21_Miyz_Spin', '150_21_Miyz_Spin', 
-    # '170_21_Miyz_Spin', #'156_21_Miyz_Spin', 
-    # '167_21_Miyz_Spin', 
-    # '327_22_Niig_Pear', 
-    # '330_22_Niig_Pear',
-
-    '137_21_Akit_Soyb', #'231_21_Miyz_Edam',
-    #'167_21_Miyz_Spin', #'244_21_Aomo_Appl'
-    #'261_21_Naga_Appl'
-
-    #'239_21_Aomo_Appl'
-    #'125_20_Miyz_Spin', '121_20_Miyz_Spin', 
+    #P:300~
+    '151_21_Miyz_Spin', '329_22_Niig_Pear', '330_22_Niig_Pear', '165_21_Miyz_Spin', '152_21_Miyz_Spin', '158_21_Miyz_Spin', 
+    '172_21_Miyz_Spin', '164_21_Miyz_Spin', '273_22_Naga_Rice', '163_21_Miyz_Spin', '159_21_Miyz_Spin', '171_21_Miyz_Spin', '214_21_Miyz_Edam', 
+    
   ]
   feature_path_linux: 'data/raw/riken/taxon_data/lv6_filtered.csv' #'/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/lv6.csv' # # #
-  target_path_linux:  'data/raw/riken/chem_data_filtered.xlsx' #'/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/chem_data.xlsx' # # #
+  target_path_linux:  'data/raw/riken/chem_filtered.xlsx' #'/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/chem_data.xlsx' # # #
   feature_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\taxon_data\lv6_filtered.csv' #'C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\lv6.csv' #
   target_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\chem_filtered.xlsx' #'C:\Users\v' #'C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\chem_data.xlsx' #
   data_inte: False
@@ -224,9 +204,9 @@ fold_eval.py:
   hyper_optimize: False
   shap_comppute: False
 main.py:
-  result_dir: 'result_YJ_CLR_soil' #'result_YJ_SS_target_encoding' #result_YJ_SS #result_YJ_CLR #result_YJ_SS #result
-  Cross_val: False
-  LOGO: True
+  result_dir: 'result_JSSSPN_CLR_YJ_LGBss_SHAP' #'result_YJ_SS_target_encoding' #result_YJ_SS #result_YJ_CLR #result_YJ_SS #result
+  Cross_val: True
+  LOGO: False
   domains: 'SoilType' #'year' #'pref-crop'
   reg_list: [
            # ['pref'], 
@@ -253,12 +233,12 @@ main.py:
             #['Available.P_th'],
             #[NH4.N], 
             ['Available.P'], 
-            ['pH'], 
+            #['pH'], 
             #['NO3.N'], 
-            #['EC'], 
+            # ['EC'], 
             # ['Humus'], 
-            ['Exchangeable.K'], 
-            ['CEC'], 
+            # ['Exchangeable.K'], 
+            # ['CEC'], 
             # ['pH_dry_soil', 'available_P', 'EC_electric_conductivity', 'Total_C', 'Total_N']
             #['pH', 'Available.P'] 
 
