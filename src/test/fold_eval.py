@@ -1,3 +1,4 @@
+from src.datasets.add_features import select_add_features
 from src.datasets.dataset import data_create,transform_after_split
 
 from sklearn.model_selection import KFold,LeaveOneOut, StratifiedKFold
@@ -302,53 +303,6 @@ def get_kmeans_labels(X, n_clusters=3, random_state=42):
     return labels_df
 
 import torch
-import pandas as pd
-from sklearn.preprocessing import LabelEncoder
-
-def append_pandas_to_split_tensors(X_train, df_train, X_test, df_test, feature_names, columns, X_val=None, df_val=None):
-    """
-    分割されたTensorとDataFrameを受け取り、共通のLabelEncoderを適用して結合する。
-    """
-    # 1. 全データを統合してLabelEncoderを適合させる
-    # 検証データがある場合とない場合でリストを切り替え
-    dfs_to_concat = [df_train[columns], df_test[columns]]
-    if df_val is not None:
-        dfs_to_concat.insert(1, df_val[columns])
-    
-    combined_df = pd.concat(dfs_to_concat, axis=0)
-    
-    # カラムごとにエンコーダーを保持
-    encoders = {}
-    for col in columns:
-        if combined_df[col].dtype == 'object' or combined_df[col].dtype.name == 'category':
-            le = LabelEncoder()
-            le.fit(combined_df[col].astype(str))
-            encoders[col] = le
-
-    # 2. 各データセットを処理する内部関数の定義
-    def process_and_cat(X_tensor, df_source):
-        temp_df = df_source[columns].copy()
-        for col, le in encoders.items():
-            temp_df[col] = le.transform(temp_df[col].astype(str))
-        
-        # Tensor変換とデバイス・型合わせ
-        new_feat = torch.tensor(temp_df.values).to(device=X_tensor.device, dtype=X_tensor.dtype)
-        return torch.cat([X_tensor, new_feat], dim=1)
-
-    # 3. 変換の適用
-    new_X_train = process_and_cat(X_train, df_train)
-    new_X_test = process_and_cat(X_test, df_test)
-    
-    new_X_val = torch.tensor([])
-    if X_val is not None and df_val is not None:
-        new_X_val = process_and_cat(X_val, df_val)
-    
-    features = list(feature_names) + columns
-
-    return new_X_train, new_X_val, new_X_test, features
-
-
-import torch
 import matplotlib.pyplot as plt
 import os
 import re # 正規表現ライブラリを追加
@@ -423,6 +377,7 @@ def fold_evaluate(reg_list, output_dir, device,
                   selection_method = config['selection'],
                   num_features_to_select_lgb = config['num_features_to_select_lgb'],
                   add_columns = config['add_columns'], 
+                  method_add_features = config['method_add_features'], 
                   features_plot = config['features_plot'], 
                   hyper_optimize = config['hyper_optimize'], 
                   shap_comppute = config['shap_comppute'], 
@@ -673,16 +628,23 @@ def fold_evaluate(reg_list, output_dir, device,
             print(X_train_tensor.shape)
 
             print(f'学習データ(整形前):{X_train_tensor.shape}, {Y_train_single[r].shape}')
-            if add_columns !=[]:
-                #print(features)
-                #print(add_columns)
-                X_train_tensor, X_val_tensor, X_test_tensor, features = append_pandas_to_split_tensors(X_train_tensor, Y_train, X_test_tensor, Y_test, features, add_columns)
             
+            # if add_columns != []:
+            #     from src.datasets.add_features import select_add_features
+            #     X_train_tensor, X_val_tensor, X_test_tensor, features = select_add_features(method_add_features, X_train_tensor, Y_train, Y_train_single[r],  X_test_tensor, Y_test, features, add_columns, X_val=None, df_val=None)
+            #         #select_add_features(method, X_train, df_train, Y_train, X_test, df_test, feature_names, columns, X_val=None, df_val=None
+
+            X_val_tensor = torch.tensor([])
+
             X_train_tensor, X_val_tensor, X_test_tensor, features = feature_selection_solo.select_features(X_train_tensor, X_val_tensor, X_test_tensor, Y_train_single[r], 
                                                                                                            features, selection_method, num_features_to_select_lgb, fold_dir)
 
             X_train_tensor, Y_train_single[r] = select_augmentation(X_train_tensor, Y_train_single[r], fold_dir,features, r, augment_method)
-
+            if add_columns != []:
+                from src.datasets.add_features import select_add_features
+                X_train_tensor, X_val_tensor, X_test_tensor, features = select_add_features(method_add_features, X_train_tensor, Y_train, Y_train_single[r],  X_test_tensor, Y_test, features, add_columns, X_val=None, df_val=None)
+                    #select_add_features(method, X_train, df_train, Y_train, X_test, df_test, feature_names, columns, X_val=None, df_val=None
+        
             print(f'学習データ(整形後):{X_train_tensor.shape}, {Y_train_single[r].shape}')
 
             if features_plot:
@@ -1282,16 +1244,16 @@ def domain_evaluate(reg_list, output_dir, device,
             reg = [r]
             print(X_train_tensor.shape)
 
-            if add_columns !=[]:
-                #print(features)
-                #print(add_columns)
-                X_train_tensor, X_val_tensor, X_test_tensor, features = append_pandas_to_split_tensors(X_train_tensor, Y_train, X_test_tensor, Y_test, features, add_columns)
-            
+                        
             X_train_tensor, X_val_tensor, X_test_tensor, features = feature_selection_solo.select_features(X_train_tensor, X_val_tensor, X_test_tensor, Y_train_single[r], 
                                                                                                            features, selection_method, num_features_to_select_lgb, fold_dir)
 
             X_train_tensor, Y_train_single[r] = select_augmentation(X_train_tensor, Y_train_single[r], fold_dir,features, r, augment_method)
 
+            if add_columns !=[]:
+                #print(features)
+                #print(add_columns)
+                X_train_tensor, X_val_tensor, X_test_tensor, features = append_pandas_to_split_tensors(X_train_tensor, Y_train, X_test_tensor, Y_test, features, add_columns)
 
             # print(f"Selected features indices: {selected_indices}")
             # print(f"Selected features: {features}")

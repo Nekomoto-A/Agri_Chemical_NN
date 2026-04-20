@@ -251,10 +251,10 @@ def training_TabPFN(x_tr,x_val,y_tr,y_val,models, reg_list, scalers, output_dir,
     os.makedirs(train_dir, exist_ok=True)
     
     x_tr = x_tr.cpu().detach().numpy()
-    x_val = x_val.cpu().detach().numpy()
+    #x_val = x_val.cpu().detach().numpy()
     
     y_tr = {reg: y.cpu().detach().numpy() for reg, y in y_tr.items()}
-    y_val = {reg: y.cpu().detach().numpy() for reg, y in y_val.items()}
+    #y_val = {reg: y.cpu().detach().numpy() for reg, y in y_val.items()}
 
     true = {}
     pred = {}
@@ -262,6 +262,7 @@ def training_TabPFN(x_tr,x_val,y_tr,y_val,models, reg_list, scalers, output_dir,
     analyze_and_save_clusters(x_tr, train_ids, train_column, n_clusters=6, output_dir=train_dir)
 
     for reg in reg_list:
+        #print(len(np.unique(y_tr[reg])))
         # score, indices = backward_selection(models[reg], x_tr, y_tr[reg], cv=5)
         # print(f'最終スコア:{score:.4f}, 選択された特徴量のインデックス: {indices}')
         if filter_mi:

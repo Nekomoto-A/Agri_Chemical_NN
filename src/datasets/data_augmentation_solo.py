@@ -81,86 +81,90 @@ import numpy as np
 import smogn
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
+from imblearn.over_sampling import SMOTE
 
 def augment_with_smogn(X, Y, save_dir="plots"):
     """
-    SMOGNアルゴリズムを用いて回帰データの拡張を行い、
-    元データと拡張データを統合した結果を返す関数。
+    目的変数の型を判定し、回帰(SMOGN)または分類(SMOTE)のデータ拡張を行う。
     
     Args:
         X (torch.Tensor): 特徴量データ (n_samples, n_features)
         Y (torch.Tensor): 目的変数データ (n_samples,)
         save_dir (str): 画像を保存するディレクトリ
-        
-    Returns:
-        X_combined (torch.Tensor): 元データと拡張データを統合した特徴量
-        Y_combined (torch.Tensor): 元データと拡張データを統合した目的変数
     """
     # 1. 保存用ディレクトリの作成
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
-    # 2. SMOGNの実行準備 (Pandas DataFrameへ変換)
-    feature_names = [f'f{i}' for i in range(X.shape[1])]
-    df_x = pd.DataFrame(X.numpy(), columns=feature_names)
-    df_y = pd.DataFrame(Y.numpy(), columns=['target'])
-    df = pd.concat([df_x, df_y], axis=1)
-
-    print("SMOGNによるデータ拡張を開始中...")
+    # データ型の判定 (整数型なら分類、浮動小数点型なら回帰)
+    is_classification = torch.is_floating_point(Y) == False
     
-    try:
-        # SMOGNの実行
-        # smogn.smoter はデフォルトで「元のデータ + 生成されたデータ」の混合セットを返します
-        df_smogn = smogn.smoter(
-            data=df, 
-            y='target',
-            k=5,
-            samp_method='balance', 
-            rel_thres=0.3
-        )
-    except Exception as e:
-        print(f"SMOGNの実行中にエラーが発生しました: {e}")
-        return X, Y
+    # 2. データ拡張の実行
+    if is_classification:
+        print("整数型を検出しました。SMOTE（分類用）による拡張を開始中...")
+        smote = SMOTE(random_state=42)
+        X_resampled, Y_resampled = smote.fit_resample(X.numpy(), Y.numpy())
+        
+        X_combined = torch.from_numpy(X_resampled).float()
+        Y_combined = torch.from_numpy(Y_resampled).long().view(-1,1) # 分類はlong型
+        method_name = "SMOTE"
+    else:
+        print("浮動小数点型を検出しました。SMOGN（回帰用）による拡張を開始中...")
+        feature_names = [f'f{i}' for i in range(X.shape[1])]
+        df_x = pd.DataFrame(X.numpy(), columns=feature_names)
+        df_y = pd.DataFrame(Y.numpy(), columns=['target'])
+        df = pd.concat([df_x, df_y], axis=1)
 
-    # 3. 統合データの抽出と型変換
-    # df_smogn から特徴量と目的変数を取り出し、Tensorに変換します
-    X_combined_np = df_smogn[feature_names].values
-    Y_combined_np = df_smogn['target'].values
-    
-    X_combined = torch.from_numpy(X_combined_np).float()
-    Y_combined = torch.from_numpy(Y_combined_np).float().view(-1,1)
+        try:
+            df_smogn = smogn.smoter(
+                data=df, 
+                y='target',
+                k=5,
+                samp_method='balance', 
+                rel_thres=0.3
+            )
+            X_combined = torch.from_numpy(df_smogn[feature_names].values).float()
+            Y_combined = torch.from_numpy(df_smogn['target'].values).float().view(-1,1)
+        except Exception as e:
+            print(f"SMOGNの実行中にエラーが発生しました: {e}")
+            return X, Y
+        method_name = "SMOGN"
 
     # --- 可視化フェーズ ---
-    # 元のデータ(X)と統合データ(X_combined)の差分を可視化するために利用
-    
     print("可視化用の計算を実行中...")
     tsne = TSNE(n_components=2, random_state=42)
-    # 統合データ全体を次元圧縮
     X_embedded = tsne.fit_transform(X_combined.numpy())
 
-    plt.figure(figsize=(12, 5))
+    plt.figure(figsize=(14, 6))
 
-    # 左側：目的変数値で色付け
+    # 左側：t-SNEによる可視化
     plt.subplot(1, 2, 1)
-    sc = plt.scatter(X_embedded[:, 0], X_embedded[:, 1], c=Y_combined.numpy(), cmap='viridis', s=10, alpha=0.6)
-    plt.colorbar(sc, label='Target Value (Y)')
-    plt.title("t-SNE colored by Target (Y)")
+    if is_classification:
+        # 分類の場合：クラスごとにループして凡例を表示
+        unique_labels = np.unique(Y_combined.numpy())
+        for label in unique_labels:
+            indices = np.where(Y_combined.numpy() == label)
+            plt.scatter(X_embedded[indices, 0], X_embedded[indices, 1], label=f'Class {label}', s=15, alpha=0.6)
+        plt.legend(title="Classes")
+    else:
+        # 回帰の場合：カラーバーを表示
+        sc = plt.scatter(X_embedded[:, 0], X_embedded[:, 1], c=Y_combined.numpy(), cmap='viridis', s=10, alpha=0.6)
+        plt.colorbar(sc, label='Target Value (Y)')
+    
+    plt.title(f"t-SNE colored by Target ({method_name})")
 
     # 右側：ヒストグラムによる分布比較
     plt.subplot(1, 2, 2)
     plt.hist(Y.numpy(), bins=30, alpha=0.5, label='Original', color='blue', density=True)
-    plt.hist(Y_combined_np, bins=30, alpha=0.5, label='Combined (SMOGN)', color='orange', density=True)
+    plt.hist(Y_combined.numpy(), bins=30, alpha=0.5, label=f'Combined ({method_name})', color='orange', density=True)
     plt.legend()
     plt.title("Target Distribution Comparison")
     
     plt.tight_layout()
-    plt.savefig(os.path.join(save_dir, "smogn_analysis.png"))
+    plt.savefig(os.path.join(save_dir, f"{method_name.lower()}_analysis.png"))
     plt.close()
 
     print(f"完了！ データ数: {len(X)} -> {len(X_combined)}")
-    print(f"画像保存先: {save_dir}")
-    
-    # 4. 統合されたデータを返す
     return X_combined, Y_combined
 
 from pathlib import Path
