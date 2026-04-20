@@ -256,7 +256,7 @@ if __name__ == '__main__':
     os.makedirs(output_dir, exist_ok=True)
 
     exclude_ids = [
-        '041_20_Sait_Carr', '043_20_Sait_Carr', '046_20_Sait_Burd', '047_20_Sait_Burd', 
+    '041_20_Sait_Carr', '043_20_Sait_Carr', '046_20_Sait_Burd', '047_20_Sait_Burd', 
     '044_20_Sait_Broc', '045_20_Sait_Broc', '061_20_Naga_Barl', '062_20_Naga_Barl', 
     '331_22_Niig_jpea', '332_22_Niig_jpea', 
     '067_20_Naga_Pump', '050_20_Sait_Stra', '048_20_Sait_Yama',  '049_20_Sait_Yama', 
@@ -267,7 +267,13 @@ if __name__ == '__main__':
     #P:300~
     '151_21_Miyz_Spin', '329_22_Niig_Pear', '330_22_Niig_Pear', '165_21_Miyz_Spin', '152_21_Miyz_Spin', '158_21_Miyz_Spin', 
     '172_21_Miyz_Spin', '164_21_Miyz_Spin', '273_22_Naga_Rice', '163_21_Miyz_Spin', '159_21_Miyz_Spin', '171_21_Miyz_Spin', '214_21_Miyz_Edam', 
-    ]
+    #P:200~
+    '143_21_Miyz_Spin', '203_21_Miyz_Spin', '168_21_Miyz_Spin', '354_22_Sait_Pear', '162_21_Miyz_Spin', '254_21_Sait_Spin', 
+    '236_21_Miyz_Spin', '328_22_Niig_Pear', '253_21_Sait_Spin', '167_21_Miyz_Spin', '213_21_Miyz_Edam', '327_22_Niig_Pear', 
+    '170_21_Miyz_Spin', '255_21_Sait_Spin', '142_21_Miyz_Spin', '160_21_Miyz_Spin'  
+
+
+  ]
 
     target = ['Available_P'] #['Exchangeable_K']#['CEC'] #['NO3_N'] #['EC'] #['pH'] #['Available_P'] #['CEC']#['pH'] #['EC']#['pH'] #['NO3_N'] #['CEC'] ##['Available_P'] 
 
@@ -276,7 +282,7 @@ if __name__ == '__main__':
     from src.datasets.dataset import data_create
     X,Y,reg_encoders, _ = data_create(asv_path, chem_path, reg_list = target, exclude_ids=exclude_ids, output_dir=output_dir)
 
-    label = 'soiltype' #'crop' #'soiltype' #'experimental_purpose' #crop
+    label = 'crop' #'crop' #'soiltype' #'experimental_purpose' #crop
     Y['soiltype'] = Y['SoilTypeID'].str[0:1]  # 欠損値を 'Unknown' に置換
     print(Y[label].unique())
     filtered_label_df, filtered_other_df = sync_filter_by_index(Y[[label]], Y[target], label, min_count=4)

@@ -171,17 +171,36 @@ fold_eval.py:
 
     '042_20_Sait_Eggp', '214_21_Miyz_Edam', '273_22_Naga_Rice', '235_21_Miyz_Spin',
 
-    #P:300~
-    '151_21_Miyz_Spin', '329_22_Niig_Pear', '330_22_Niig_Pear', '165_21_Miyz_Spin', '152_21_Miyz_Spin', '158_21_Miyz_Spin', 
-    '172_21_Miyz_Spin', '164_21_Miyz_Spin', '273_22_Naga_Rice', '163_21_Miyz_Spin', '159_21_Miyz_Spin', '171_21_Miyz_Spin', '214_21_Miyz_Edam', 
+    # #P:300~
+    # '151_21_Miyz_Spin', '329_22_Niig_Pear', '330_22_Niig_Pear', '165_21_Miyz_Spin', '152_21_Miyz_Spin', '158_21_Miyz_Spin', 
+    # '172_21_Miyz_Spin', '164_21_Miyz_Spin', '273_22_Naga_Rice', '163_21_Miyz_Spin', '159_21_Miyz_Spin', '171_21_Miyz_Spin', '214_21_Miyz_Edam', 
+    # #P:200~
+    # '143_21_Miyz_Spin', '203_21_Miyz_Spin', '168_21_Miyz_Spin', '354_22_Sait_Pear', '162_21_Miyz_Spin', '254_21_Sait_Spin', 
+    # '236_21_Miyz_Spin', '328_22_Niig_Pear', '253_21_Sait_Spin', '167_21_Miyz_Spin', '213_21_Miyz_Edam', '327_22_Niig_Pear', 
+    # '170_21_Miyz_Spin', '255_21_Sait_Spin', '142_21_Miyz_Spin', '160_21_Miyz_Spin',
+    # #P:150~
+    # '244_21_Aomo_Appl', '196_21_Miyz_Spin', '210_21_Miyz_Spin', '209_21_Miyz_Spin', '356_22_Sait_Pear', '207_21_Miyz_Spin', '259_21_Sait_Spin', 
+    # '169_21_Miyz_Spin', '307_22_Hokk_Whea', '144_21_Miyz_Spin', '153_21_Miyz_Spin', 
+    # #P:100~
+    # '258_21_Sait_Spin', '155_21_Miyz_Spin', '050_20_Sait_Stra', '225_21_Miyz_Edam', '264_21_Naga_Appl', '348_22_Sait_Pear', '197_21_Miyz_Spin',
+    # '211_21_Miyz_Spin', '202_21_Miyz_Spin', '248_21_Aomo_Appl', '266_21_Naga_Appl', '353_22_Sait_Pear', '149_21_Miyz_Spin', '189_21_Miyz_Spin',
+    # '045_20_Sait_Broc', '332_22_Niig_jpea',  '206_21_Miyz_Spin', '133_21_Akit_Edam', '147_21_Miyz_Spin', '166_21_Miyz_Spin', '221_21_Miyz_Edam',
+    # '175_21_Miyz_Spin', '256_21_Sait_Spin', '357_22_Sait_Pear'
+
+    #CEC
+    '239_21_Aomo_Appl', '241_21_Aomo_Appl', '243_21_Aomo_Appl', '128_20_Miyz_Spin', 
+    '011_20_Akit_Rice', '122_20_Miyz_Spin', '124_20_Miyz_Spin', '347_22_Yama_Rice', '223_21_Miyz_Edam', 
+    '215_21_Miyz_Edam', '017_20_Akit_Soyb', '218_21_Miyz_Edam', '219_21_Miyz_Edam', '132_21_Akit_Edam'
+
     
-  ]
+
+    ]
   feature_path_linux: 'data/raw/riken/taxon_data/lv6_filtered.csv' #'/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/lv6.csv' # # #
   target_path_linux:  'data/raw/riken/chem_filtered.xlsx' #'/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/chem_data.xlsx' # # #
   feature_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\taxon_data\lv6_filtered.csv' #'C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\lv6.csv' #
   target_path_windows: 'C:\Users\asahi\Agri_Chemical_NN\data\raw\riken\chem_filtered.xlsx' #'C:\Users\v' #'C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\chem_data.xlsx' #
   data_inte: False
-  transformer: ['YJ', None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
+  transformer: [None, None] #[None, 'SS','SS', 'SS','SS', 'SS',] #['SS', 'SS', 'SS', 'SS', 'SS', 'SS'] ##['SS', 'SS'] #[None, None, None, None, None, None] #
   reg_loss_fanction: ['mse', 'cross'] #['mse', 'mse'] #['mse','mse','mse','mse','mse','mse'] #['Uncertainly', 'Uncertainly'] #['mse','mse', 'mse','mse', 'mse','mse']
   eval_reg: ['R', 'R2', 'MedAE', 'MAE', 'RMSLE', 'RMSE', 'MAPE']
   eval_class: ['accuracy', 'F1score']
@@ -204,7 +223,7 @@ fold_eval.py:
   hyper_optimize: False
   shap_comppute: False
 main.py:
-  result_dir: 'result_JSSSPN_CLR_YJ_LGBss_SHAP' #'result_YJ_SS_target_encoding' #result_YJ_SS #result_YJ_CLR #result_YJ_SS #result
+  result_dir: 'result_JSSSPN_CLR_LGBss_SHAP' #'result_YJ_SS_target_encoding' #result_YJ_SS #result_YJ_CLR #result_YJ_SS #result
   Cross_val: True
   LOGO: False
   domains: 'SoilType' #'year' #'pref-crop'
@@ -232,13 +251,13 @@ main.py:
 
             #['Available.P_th'],
             #[NH4.N], 
-            ['Available.P'], 
+            #['Available.P'], 
             #['pH'], 
             #['NO3.N'], 
             # ['EC'], 
             # ['Humus'], 
             # ['Exchangeable.K'], 
-            # ['CEC'], 
+            ['CEC'], 
             # ['pH_dry_soil', 'available_P', 'EC_electric_conductivity', 'Total_C', 'Total_N']
             #['pH', 'Available.P'] 
 
