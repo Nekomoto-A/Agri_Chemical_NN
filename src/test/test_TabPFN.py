@@ -235,7 +235,7 @@ def test_TabPFN(x_te, y_te_tensor,
               lime_local = False,
               label_encoders = None, 
               selected_indices = None, 
-              shap_compute = False, 
+              shap_compute = True, 
               PI = False
               ):
     x_te = x_te.cpu().detach().numpy()
@@ -301,7 +301,7 @@ def test_TabPFN(x_te, y_te_tensor,
             shap_dir = os.path.join(output_dir, 'shap_results')
             os.makedirs(shap_dir, exist_ok=True)
             shap_df = pd.DataFrame(shap_values.values, columns=feature_names)
-            #shap_df['id'] = test_ids.to_list()
+            shap_df['id'] = test_ids.to_list()
             shap_csv_path = os.path.join(shap_dir, f"shap_values_{reg}.csv")
             shap_df.to_csv(shap_csv_path, index=False)
             # 3. 描画の設定
@@ -366,26 +366,26 @@ def test_TabPFN(x_te, y_te_tensor,
             if reg in scalers:
                 scaler = scalers[reg]
                 true = scaler.inverse_transform(true_tensor.reshape(-1, 1))
-                # if is_log1p_transformer(scaler):
-                #     pred = log1p_corrected_inverse(models[reg], x_te).reshape(-1,1)
-                # elif isinstance(scaler, PowerTransformer):
-                #     # 1. 必要な分位点を指定して取得
-                #     qs = [0.1587, 0.5, 0.8413] 
-                #     quantiles_out = models[reg].predict(x_te, output_type='quantiles', quantiles=qs)
+                if is_log1p_transformer(scaler):
+                    pred = log1p_corrected_inverse(models[reg], x_te).reshape(-1,1)
+                elif isinstance(scaler, PowerTransformer):
+                    # 1. 必要な分位点を指定して取得
+                    qs = [0.1587, 0.5, 0.8413] 
+                    quantiles_out = models[reg].predict(x_te, output_type='quantiles', quantiles=qs)
 
-                #     # 2. 各分位点を取り出す
-                #     q_low = quantiles_out[0]   # 15.87%
-                #     y_pred_mu = quantiles_out[1] # 50% (Median) または別途 'mean' を取得
-                #     q_high = quantiles_out[2]  # 84.13%
+                    # 2. 各分位点を取り出す
+                    q_low = quantiles_out[0]   # 15.87%
+                    y_pred_mu = quantiles_out[1] # 50% (Median) または別途 'mean' を取得
+                    q_high = quantiles_out[2]  # 84.13%
 
-                #     # 3. 標準偏差を近似
-                #     output_sigma = (q_high - q_low) / 2.0
-                #     #output_sigma = models[reg].predict(x_te, output_type='std')
-                #     pred = tabpfn_corrected_inverse(y_pred_mu, output_sigma, scaler).reshape(-1,1)
-                # else:
-                #     # --- 通常のスケーリング解除 ---
-                #     pred = scaler.inverse_transform(pred_tensor_for_eval.reshape(-1, 1))
-                pred = scaler.inverse_transform(pred_tensor_for_eval.reshape(-1, 1))
+                    # 3. 標準偏差を近似
+                    output_sigma = (q_high - q_low) / 2.0
+                    #output_sigma = models[reg].predict(x_te, output_type='std')
+                    pred = tabpfn_corrected_inverse(y_pred_mu, output_sigma, scaler).reshape(-1,1)
+                else:
+                    # --- 通常のスケーリング解除 ---
+                    pred = scaler.inverse_transform(pred_tensor_for_eval.reshape(-1, 1))
+                #pred = scaler.inverse_transform(pred_tensor_for_eval.reshape(-1, 1))
             else:
                 # スケーラーなし
                 pred = pred_tensor_for_eval.reshape(-1, 1)
