@@ -235,7 +235,7 @@ def test_TabPFN(x_te, y_te_tensor,
               lime_local = False,
               label_encoders = None, 
               selected_indices = None, 
-              shap_compute = True, 
+              shap_compute = False, 
               PI = False
               ):
     x_te = x_te.cpu().detach().numpy()
@@ -454,6 +454,12 @@ def test_TabPFN(x_te, y_te_tensor,
 
             score = eval_predictions(true, pred, eval_reg)
         
+        pd.DataFrame({
+            'TRUE': true_flat,
+            'predicted': pred_flat,
+            'crop-id': ids_flat
+        }).to_csv(os.path.join(result_dir, f"{reg}_result.csv"), index=False)
+
         for metrix, value in score.items():
             scores[reg][metrix] = value
 

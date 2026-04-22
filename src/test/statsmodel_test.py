@@ -278,7 +278,7 @@ def statsmodel_test(X, Y, train_x_original, train_y_original, models, scalers, r
             score = eval_predictions(true, pred, eval_reg)
 
             if shap_comppute:
-                if name in ['RF','XGB','LGB','SVR']:
+                if name in ['RF','XGB','LGB']:
                     calculate_and_save_shap_importance(model = model, X_test = X, X_train = train_x, feature_names = feature_names, output_dir = reg_dir, ids = test_ids)
             # pi = permutation_importance(model, X, Y, 
             #                         n_repeats=10, random_state=42)
@@ -313,7 +313,8 @@ def statsmodel_test(X, Y, train_x_original, train_y_original, models, scalers, r
         
         result_path = os.path.join(reg_dir, f"{reg}_result.csv")
         result_df = pd.DataFrame(true, index = test_ids, columns=['true'])
-        result_df['predicted'] = pred
+        # result_df['predicted'] = pred
+        result_df[f'Pred_{reg}_{name}'] = pred
         result_df.to_csv(result_path)
 
         for metrics, s in score.items():

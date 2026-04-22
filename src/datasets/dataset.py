@@ -647,7 +647,9 @@ def transform_after_split(x_train,x_test,y_train,y_test,reg_list, transformer,
         y_train_split.to_csv(train_target_dir)
 
         test_feature_dir = os.path.join(fold, f'test_feature.csv')
-        x_test.to_csv(test_feature_dir)
+        x_test_save = x_test.copy()
+        x_test_save['id'] = y_test['crop-id'] if 'crop-id' in y_test.columns else y_test['index']
+        x_test_save.to_csv(test_feature_dir)
         test_target_dir = os.path.join(fold, f'test_chem.csv')
         y_test.to_csv(test_target_dir)
         
