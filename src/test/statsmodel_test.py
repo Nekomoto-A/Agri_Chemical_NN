@@ -1,3 +1,5 @@
+from copyreg import pickle
+
 from sklearn.inspection import permutation_importance
 from sklearn.metrics import r2_score,mean_squared_error,accuracy_score, f1_score, median_absolute_error,mean_absolute_error
 from src.training.statsmodel_train import statsmodel_train
@@ -22,6 +24,8 @@ import matplotlib.pyplot as plt
 import shap
 import numpy as np
 from sklearn.svm import SVC, SVR
+
+import pickle as pkl
 
 def calculate_and_save_shap_importance(model, X_test, X_train , feature_names, output_dir, ids):
     """
@@ -68,6 +72,10 @@ def calculate_and_save_shap_importance(model, X_test, X_train , feature_names, o
         print("汎用Explainerを使用します...")
         explainer = shap.Explainer(model, X_train)
         shap_values = explainer(X_test).values
+
+    pkl_path = os.path.join(output_dir, "shap_values.pkl")
+    with open(pkl_path, "wb") as f:
+        pkl.dump(shap_values, f)
 
     # 3. SHAP値の整形 (分類問題のクラス抽出)
     # TreeSHAP(リスト形式)やKernelSHAP(3次元配列)の差異を吸収
@@ -313,8 +321,8 @@ def statsmodel_test(X, Y, train_x_original, train_y_original, models, scalers, r
         
         result_path = os.path.join(reg_dir, f"{reg}_result.csv")
         result_df = pd.DataFrame(true, index = test_ids, columns=['true'])
-        # result_df['predicted'] = pred
-        result_df[f'Pred_{reg}_{name}'] = pred
+        result_df['predicted'] = pred
+        #result_df[f'Pred_{reg}_{name}'] = pred
         result_df.to_csv(result_path)
 
         for metrics, s in score.items():

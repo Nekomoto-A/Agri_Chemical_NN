@@ -16,7 +16,7 @@ def get_last_category(full_name):
     return last_part
 
 if __name__ == "__main__":
-    result_path = 'C:\\Users\\asahi\\Agri_Chemical_NN\\result_JSSSPN_CLR_LGBss_SHAP\\Cross-validation_results'
+    result_path = 'C:\\Users\\asahi\\Agri_Chemical_NN\\result_JSSSPN_CLR_full_SHAP\\Cross-validation_results'
     
     reg = 'pH'
     model = 'ST'
@@ -24,6 +24,7 @@ if __name__ == "__main__":
     reg_path = os.path.join(result_path, f"['{reg}']",)
 
     features = pd.DataFrame()
+    predictions = pd.DataFrame()
     all_shap = pd.DataFrame()
 
     for i in range(5):
@@ -35,11 +36,17 @@ if __name__ == "__main__":
         features = pd.concat([features, features_df], ignore_index=True)
 
         model_path = os.path.join(fold_path, model)
+        model_pred_path = os.path.join(model_path, reg)
+        pred_path = os.path.join(model_pred_path, f'{reg}_result.csv')
+        pred_df = pd.read_csv(pred_path)
+        predictions = pd.concat([predictions, pred_df], ignore_index=True)
+
+        model_path = os.path.join(fold_path, model)
         if model == 'ST':
             shap_path = os.path.join(model_path, 'shap_results')
             shap_data_path = os.path.join(shap_path, f'shap_values_{reg}.csv')
         else:
-            shap_path = model_path
+            shap_path = os.path.join(model_path, reg)
             shap_data_path = os.path.join(shap_path, 'shap_values.csv')
         
         shap_df = pd.read_csv(shap_data_path)
@@ -74,9 +81,10 @@ if __name__ == "__main__":
     feature_names_in_shap = shap_values.columns.tolist()
     X_for_analysis = features.set_index('id').loc[all_shap['id']].reset_index(drop=True)
 
-    pred_data = pd.read_csv(os.path.join(reg_path, f'loss.csv'), index_col=0)
-    pred_data = pred_data.loc[all_shap['id']].reset_index(drop=True)
-    #print(pred_data.head())
+    # pred_data = pd.read_csv(os.path.join(reg_path, f'loss.csv'), index_col=0)
+    #print(predictions.head())
+    predictions = predictions.set_index('crop-id').loc[all_shap['id']].reset_index(drop=True)
+    #print(predictions.head())
 
     chem_data = pd.read_excel(r'C:\\Users\\asahi\\Agri_Chemical_NN\\data\\raw\\riken\\chem_filtered.xlsx')
     chem_analysis = chem_data.set_index('crop-id').loc[all_shap['id']].reset_index(drop=True)
@@ -95,7 +103,9 @@ if __name__ == "__main__":
 
     abs_shap_mean = np.abs(expl.values).mean(axis=0)
 
-    top = 30
+    #top = len(feature_names_in_shap) # 全特徴量を表示する場合はこの行を使用
+    top = 20
+
     # 2. 重要度の上位30件のインデックスを取得
     top_indices = np.argsort(abs_shap_mean)[-top:]
 
@@ -116,7 +126,7 @@ if __name__ == "__main__":
     os.makedirs(scatter_path, exist_ok=True)
     
     #labels = chem_analysis[scatter_target] #pred_data[f'Pred_{reg}_{model}'].values
-    labels = pred_data[f'Pred_{reg}_{model}']
+    labels = predictions[f'predicted']
     
     if labels.dtype == 'object' or isinstance(labels.iloc[0], str):
         labels_cat = labels.astype('category').cat
@@ -148,6 +158,15 @@ if __name__ == "__main__":
         # 4. 画像として保存
         plt.savefig(save_path)
         plt.close()  # メモリ解放のためにグラフを閉じる
+    
+    for i, id in enumerate(all_shap['id']):
+        shap.plots.waterfall(expl[i], show=False)
+        instance_path = os.path.join(model_shap_path, f'{id}')
+        os.makedirs(instance_path, exist_ok=True)
+        save_shap_plot(instance_path, f'shap_waterfall')
+
+        shap.plots.force(expl[i], matplotlib=True, show=False)
+        save_shap_plot(instance_path, f'shap_force')
 
     # インスタンスごとの寄与を俯瞰
     shap.plots.heatmap(expl_top, show=False, max_display=top) # サンプルが多い場合はスライス推奨

@@ -227,6 +227,8 @@ def log1p_corrected_inverse(model, X_test):
 from sklearn.inspection import permutation_importance
 from tabpfn_extensions import interpretability
 
+import pickle
+
 def test_TabPFN(x_te, y_te_tensor, 
               x_train, y_train, 
               models, reg_list, scalers, output_dir, 
@@ -235,7 +237,7 @@ def test_TabPFN(x_te, y_te_tensor,
               lime_local = False,
               label_encoders = None, 
               selected_indices = None, 
-              shap_compute = False, 
+              shap_compute = True, 
               PI = False
               ):
     x_te = x_te.cpu().detach().numpy()
@@ -296,10 +298,15 @@ def test_TabPFN(x_te, y_te_tensor,
                     test_x = x_te,
                     attribute_names=feature_names,
                     algorithm="permutation",
+                    max_evals=1500
                 )
             #print(shap_values)
             shap_dir = os.path.join(output_dir, 'shap_results')
             os.makedirs(shap_dir, exist_ok=True)
+            # オブジェクトごとバイナリ保存
+            dumps_path = os.path.join(shap_dir, f"shap_values_{reg}.pkl")
+            with open(dumps_path, "wb") as f:
+                pickle.dump(shap_values, f)
             shap_df = pd.DataFrame(shap_values.values, columns=feature_names)
             shap_df['id'] = test_ids.to_list()
             shap_csv_path = os.path.join(shap_dir, f"shap_values_{reg}.csv")

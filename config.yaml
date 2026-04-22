@@ -188,9 +188,9 @@ fold_eval.py:
     # '215_21_Miyz_Edam', '017_20_Akit_Soyb', '218_21_Miyz_Edam', '219_21_Miyz_Edam', '132_21_Akit_Edam'
 
     # NO3.N
-    '213_21_Miyz_Edam', '214_21_Miyz_Edam', '121_20_Miyz_Spin', '125_20_Miyz_Spin', 
-    '191_21_Miyz_Spin', '156_21_Miyz_Spin', '132_21_Akit_Edam', '253_21_Sait_Spin', 
-    '190_21_Miyz_Spin', '305_22_Hokk_Whea', '327_22_Niig_Pear', '161_21_Miyz_Spin', 
+    # '213_21_Miyz_Edam', '214_21_Miyz_Edam', '121_20_Miyz_Spin', '125_20_Miyz_Spin', 
+    # '191_21_Miyz_Spin', '156_21_Miyz_Spin', '132_21_Akit_Edam', '253_21_Sait_Spin', 
+    # '190_21_Miyz_Spin', '305_22_Hokk_Whea', '327_22_Niig_Pear', '161_21_Miyz_Spin', 
 
     #Exchangeable.K
     # '193_21_Miyz_Spin', '132_21_Akit_Edam', 
@@ -202,9 +202,9 @@ fold_eval.py:
     # '132_21_Akit_Edam', 
 
     #pH
-    # '167_21_Miyz_Spin', '137_21_Akit_Soyb', '354_22_Sait_Pear', '163_21_Miyz_Spin', '253_21_Sait_Spin', 
-    # '254_21_Sait_Spin', '190_21_Miyz_Spin', '258_21_Sait_Spin', '164_21_Miyz_Spin', '231_21_Miyz_Edam', 
-    # '069_20_Naga_Rice', 
+    '167_21_Miyz_Spin', '137_21_Akit_Soyb', '354_22_Sait_Pear', '163_21_Miyz_Spin', '253_21_Sait_Spin', 
+    '254_21_Sait_Spin', '190_21_Miyz_Spin', '258_21_Sait_Spin', '164_21_Miyz_Spin', '231_21_Miyz_Edam', 
+    '069_20_Naga_Rice', 
 
     #EC
     # '161_21_Miyz_Spin', '121_20_Miyz_Spin', '125_20_Miyz_Spin', '122_20_Miyz_Spin'
@@ -234,7 +234,7 @@ fold_eval.py:
   add_columns: [] #['crop'] #['crop', 'pref']  #['crop', 'pref'] #[] #
   method_add_features: 'target_encoding' #'label_encoding' # #None #'statistical' #'PCA' #None #
   features_plot: False
-  hyper_optimize: False
+  hyper_optimize: True
   shap_comppute: True
 main.py:
   result_dir: 'result_JSSSPN_CLR_full_SHAP' #'result_YJ_SS_target_encoding' #result_YJ_SS #result_YJ_CLR #result_YJ_SS #result
@@ -266,8 +266,8 @@ main.py:
             #['Available.P_th'],
             #[NH4.N], 
             #['Available.P'], 
-            #['pH'], 
-            ['NO3.N'], 
+            ['pH'], 
+            #['NO3.N'], 
             #['EC'], 
             # ['Humus'], 
             #['Exchangeable.K'], 

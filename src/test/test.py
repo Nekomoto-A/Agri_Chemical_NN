@@ -988,7 +988,7 @@ def train_and_test(X_train,X_val,X_test, Y_train,Y_val, Y_test, scalers, predict
             if torch.is_floating_point(Y_train[reg]):
                 model[reg] = TabPFNRegressor(
                     device=device_name, 
-                    n_estimators = 32
+                    #n_estimators = 32
                     #N_ensemble_configurations = 10
                     # inference_config={
                     #     "REGRESSION_Y_PREPROCESS_TRANSFORMS": ["standardize", "log"]
