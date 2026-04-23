@@ -202,9 +202,9 @@ fold_eval.py:
     # '132_21_Akit_Edam', 
 
     #pH
-    '167_21_Miyz_Spin', '137_21_Akit_Soyb', '354_22_Sait_Pear', '163_21_Miyz_Spin', '253_21_Sait_Spin', 
-    '254_21_Sait_Spin', '190_21_Miyz_Spin', '258_21_Sait_Spin', '164_21_Miyz_Spin', '231_21_Miyz_Edam', 
-    '069_20_Naga_Rice', 
+    # '167_21_Miyz_Spin', '137_21_Akit_Soyb', '354_22_Sait_Pear', '163_21_Miyz_Spin', '253_21_Sait_Spin', 
+    # '254_21_Sait_Spin', '190_21_Miyz_Spin', '258_21_Sait_Spin', '164_21_Miyz_Spin', '231_21_Miyz_Edam', 
+    # '069_20_Naga_Rice', 
 
     #EC
     # '161_21_Miyz_Spin', '121_20_Miyz_Spin', '125_20_Miyz_Spin', '122_20_Miyz_Spin'
@@ -265,8 +265,9 @@ main.py:
 
             #['Available.P_th'],
             #[NH4.N], 
-            #['Available.P'], 
-            ['pH'], 
+            #
+            ['Available.P'], 
+            #['pH'], 
             #['NO3.N'], 
             #['EC'], 
             # ['Humus'], 

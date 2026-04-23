@@ -916,7 +916,7 @@ from sklearn.manifold import TSNE
 from sklearn.utils import resample
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier  # RandomForestをインポート
 
-def select_features_with_stability_selection_rf(X, Y, k, feature_names, save_path, task='regression', n_bootstrap=100, threshold=0.5):
+def select_features_with_stability_selection_rf(X, Y, k, feature_names, save_path, task='regression', n_bootstrap=100, threshold=0.1):
     """
     Stability Selection (RandomForestベース) による特徴量選択。
     n_bootstrap: サブサンプリングの回数

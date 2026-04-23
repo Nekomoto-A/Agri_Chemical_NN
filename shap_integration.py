@@ -1,3 +1,5 @@
+#from copyreg import pickle
+import pickle
 import shap
 import os
 import pandas as pd
@@ -18,14 +20,15 @@ def get_last_category(full_name):
 if __name__ == "__main__":
     result_path = 'C:\\Users\\asahi\\Agri_Chemical_NN\\result_JSSSPN_CLR_full_SHAP\\Cross-validation_results'
     
-    reg = 'pH'
+    reg = 'Available_P'
     model = 'ST'
 
     reg_path = os.path.join(result_path, f"['{reg}']",)
 
     features = pd.DataFrame()
     predictions = pd.DataFrame()
-    all_shap = pd.DataFrame()
+    #all_shap = pd.DataFrame()
+    all_shap = []
 
     for i in range(5):
         fold = i+1
@@ -44,131 +47,152 @@ if __name__ == "__main__":
         model_path = os.path.join(fold_path, model)
         if model == 'ST':
             shap_path = os.path.join(model_path, 'shap_results')
-            shap_data_path = os.path.join(shap_path, f'shap_values_{reg}.csv')
+            #shap_data_path = os.path.join(shap_path, f'shap_values_{reg}.csv')
+            shap_data_path = os.path.join(shap_path, f'shap_values_{reg}.pkl')
         else:
             shap_path = os.path.join(model_path, reg)
-            shap_data_path = os.path.join(shap_path, 'shap_values.csv')
+            #shap_data_path = os.path.join(shap_path, 'shap_values.csv')
+            shap_data_path = os.path.join(shap_path, 'shap_explanation.pkl')
         
-        shap_df = pd.read_csv(shap_data_path)
-        print(f"Fold {fold} SHAP values:")
-        print('統合前のSHAP値の形状:', shap_df.shape)
-        #print(shap_df.head())
-        all_shap = pd.concat([all_shap, shap_df], ignore_index=False)
-        all_shap = all_shap.fillna(0)
-        print('統合後のSHAP値の形状:', all_shap.shape)
+        #shap_df = pd.read_csv(shap_data_path)
+        with open(shap_data_path, "rb") as f:
+            shap_values = pickle.load(f)
+        all_shap.append(shap_values)
+        
+    # 1. 各要素から 'values' (SHAP値本体) を取り出す
+    # v がオブジェクトなら v.values、配列ならそのまま v を使う
+    val_list = [v.values if hasattr(v, 'values') else v for v in all_shap]
+    combined_values = np.concatenate(val_list, axis=0)
+
+    # 2. base_values (期待値) の統合
+    # スカラー(単一数値)の場合と配列の場合があるため、形状を整えて結合
+    base_val_list = []
+    for v in all_shap:
+        # 期待値を取得（属性がなければ0などで代用するが、基本はあるはず）
+        bv = v.base_values if hasattr(v, 'base_values') else 0
+        # サンプル数に合わせて配列化
+        count = v.shape[0] if hasattr(v, 'shape') else len(v)
+        base_val_list.append(np.full(count, bv) if np.isscalar(bv) else bv)
+    combined_base_values = np.concatenate(base_val_list, axis=0)
+
+    # 3. data (元の特徴量データ) の統合
+    if hasattr(all_shap[0], 'data'):
+        combined_data = np.concatenate([v.data for v in all_shap], axis=0)
+    else:
+        # dataがない場合は None にする（一部のプロットが簡略化されます）
+        combined_data = None
+
+    # 4. 新しい Explanation オブジェクトの作成
+    all_shap_values = shap.Explanation(
+        values=combined_values,
+        base_values=combined_base_values,
+        data=combined_data,
+        feature_names=all_shap[0].feature_names if hasattr(all_shap[0], 'feature_names') else None
+    )
+
 
     shap_result_path = os.path.join(reg_path, 'shap_results')
     os.makedirs(shap_result_path, exist_ok=True)
     model_shap_path = os.path.join(shap_result_path, model)
     os.makedirs(model_shap_path, exist_ok=True)
-    all_shap.to_csv(os.path.join(model_shap_path, f'all_shap_values_{reg}.csv'), index=False)
-    print(f"All SHAP values for {reg} saved to {os.path.join(model_shap_path, f'all_shap_values_{reg}.csv')}")
-
+    # all_shap.to_csv(os.path.join(model_shap_path, f'all_shap_values_{reg}.csv'), index=False)
+    # print(f"All SHAP values for {reg} saved to {os.path.join(model_shap_path, f'all_shap_values_{reg}.csv')}")
+    with open(os.path.join(model_shap_path, f'all_shap_values_{reg}.pkl'), "wb") as f:
+        pickle.dump(all_shap_values, f)
 
     # 共通の保存関数を作っておくと便利です
     def save_shap_plot(dir, plot_name):
         #path = os.path.join(model_shap_path, f"{plot_name}.png")
+        # 現在のアクティブな軸を取得してフォントサイズを変更
+        # ax = plt.gca()
+
+        # # y軸（特徴量名）のラベルサイズを調整
+        # ax.tick_params(axis='y', labelsize=8) 
+
+        # # x軸（SHAP値）のラベルサイズを調整
+        # ax.tick_params(axis='x', labelsize=8)
+
         path = os.path.join(dir, f"{plot_name}.png")
         # bbox_inches='tight' をつけるとラベルの欠けを防げます
         plt.savefig(path, bbox_inches='tight', dpi=300)
         plt.close() # メモリ解放のため必ず閉じる
         print(f"Saved: {path}")
-
-    # print(features.head())
-    # print(all_shap.head())
     
-    shap_values = all_shap.drop(columns=['id'])
-    feature_names_in_shap = shap_values.columns.tolist()
-    X_for_analysis = features.set_index('id').loc[all_shap['id']].reset_index(drop=True)
+    # 1. 各特徴量の重要度（SHAP値の絶対値平均）を計算
+    # valuesの形状が (サンプル数, 特徴量数) なので、軸0で平均をとる
+    importance = np.abs(all_shap_values.values).mean(0)
 
-    # pred_data = pd.read_csv(os.path.join(reg_path, f'loss.csv'), index_col=0)
-    #print(predictions.head())
-    predictions = predictions.set_index('crop-id').loc[all_shap['id']].reset_index(drop=True)
-    #print(predictions.head())
-
-    chem_data = pd.read_excel(r'C:\\Users\\asahi\\Agri_Chemical_NN\\data\\raw\\riken\\chem_filtered.xlsx')
-    chem_analysis = chem_data.set_index('crop-id').loc[all_shap['id']].reset_index(drop=True)
-    #print(chem_analysis)
-
-    # 4. 列の順序をSHAP値の列順と完全に一致させる
-    # これを行わないと、Beeswarm plotなどで色がチグハグになります
-    X_for_analysis = X_for_analysis[feature_names_in_shap]
-    #print(X_for_analysis.head())
-
-    expl = shap.Explanation(
-        values=shap_values.values,          # SHAP値 (numpy)
-        data=X_for_analysis.values,            # 元の特徴量数値 (numpy)
-        feature_names=feature_names_in_shap    # 特徴量名
-    )
-
-    abs_shap_mean = np.abs(expl.values).mean(axis=0)
-
-    #top = len(feature_names_in_shap) # 全特徴量を表示する場合はこの行を使用
     top = 20
+    # 2. 重要度が高い順にインデックスを並び替え、上位20件を取得
+    top_indices = np.argsort(importance)[-top:]
 
-    # 2. 重要度の上位30件のインデックスを取得
-    top_indices = np.argsort(abs_shap_mean)[-top:]
+    # 3. Explanationオブジェクトをスライス
+    # all_shap_values[サンプル指定, 特徴量指定]
+    top_shap_values = all_shap_values[:, top_indices]
 
-    # 3. Explanationオブジェクトを上位30件だけにスライスする
-    # 全行 (:) に対して、列を top_30_indices で絞り込む
-    expl_top = expl[:, top_indices]
-
-    # max_display で表示する特徴量の数を制限できます
-    shap.plots.beeswarm(expl_top, max_display=top, show=False)
+    shap.plots.beeswarm(top_shap_values, max_display=top, show=False)
     save_shap_plot(model_shap_path, f'shap_beeswarm_{reg}')
 
-    # 特徴量の重要度ランキング
-    shap.plots.bar(expl_top, max_display=top, show=False)
+    shap.plots.bar(top_shap_values, max_display=top, show=False)
     save_shap_plot(model_shap_path, f'shap_bar_{reg}')
 
-    scatter_target = reg
-    scatter_path = os.path.join(model_shap_path, f'shap_scatter_{scatter_target}')
-    os.makedirs(scatter_path, exist_ok=True)
-    
-    #labels = chem_analysis[scatter_target] #pred_data[f'Pred_{reg}_{model}'].values
-    labels = predictions[f'predicted']
-    
-    if labels.dtype == 'object' or isinstance(labels.iloc[0], str):
-        labels_cat = labels.astype('category').cat
-        categories = labels_cat.categories
-        labels_values = labels_cat.codes.values
-    else:
-        labels_values = labels.values
-    
-    for i, feature in enumerate(expl_top.feature_names):
-        shap.plots.scatter(expl_top[:, feature], color = labels_values, 
-                           #cmap=plt.get_cmap("tab10", len(categories)), # クラス数に応じた色分け
-                           show=False)
-        #feature_path = os.path.join(scatter_path, f'{i}_{feature}')
-        feature_path = os.path.join(scatter_path, f'{i}_{get_last_category(feature)}')
-        os.makedirs(feature_path, exist_ok=True)
-        save_shap_plot(feature_path, f'shap')
-
-        plt.figure(figsize=(8, 6))  # グラフのサイズを設定
-        X_for_analysis[feature].hist(bins=30, color='skyblue', edgecolor='black')
-        
-        # グラフの装飾
-        plt.xlabel(feature)
-        plt.ylabel('Frequency')
-        plt.grid(axis='y', alpha=0.75)
-
-        # 3. ファイルの保存パスを作成
-        save_path = os.path.join(feature_path, f'hist.png')
-        
-        # 4. 画像として保存
-        plt.savefig(save_path)
-        plt.close()  # メモリ解放のためにグラフを閉じる
-    
-    for i, id in enumerate(all_shap['id']):
-        shap.plots.waterfall(expl[i], show=False)
-        instance_path = os.path.join(model_shap_path, f'{id}')
-        os.makedirs(instance_path, exist_ok=True)
-        save_shap_plot(instance_path, f'shap_waterfall')
-
-        shap.plots.force(expl[i], matplotlib=True, show=False)
-        save_shap_plot(instance_path, f'shap_force')
-
-    # インスタンスごとの寄与を俯瞰
-    shap.plots.heatmap(expl_top, show=False, max_display=top) # サンプルが多い場合はスライス推奨
+    shap.plots.heatmap(top_shap_values, max_display=top, show=False)
     save_shap_plot(model_shap_path, f'shap_heatmap_{reg}')
+
+    scatter_dir = os.path.join(model_shap_path, 'scatter_plots')
+    os.makedirs(scatter_dir, exist_ok=True)
+
+    for n, i in enumerate(top_indices):
+        feature_name = all_shap_values.feature_names[i]
+        
+        shap.plots.scatter(all_shap_values[:, feature_name], 
+                        #color=all_shap_values, 
+                        color=predictions['predicted'].values,
+                        show=False)
+        
+        save_shap_plot(scatter_dir, f'{n}_{i}_{(get_last_category(feature_name))}_{reg}')
+
+
+    # # 1. Explanationオブジェクトのコピーを作成（元のデータを壊さないため）
+    # vis_shap_values = all_shap_values
+    # # 2. .data（CLR値）を逆変換（組成データ：0~1の範囲）に戻す
+    # # CLRの逆変換: exp(x) / sum(exp(x))
+    # exp_data = np.exp(vis_shap_values.data)
+    # # 行ごとに合計して割る（組成に戻す）
+    # proportions = exp_data / exp_data.sum(axis=1, keepdims=True)
+
+    # # 3. データを上書き
+    # vis_shap_values.data = proportions * 100
+    # scatter_dir_per = os.path.join(model_shap_path, 'scatter_plots_per')
+    # os.makedirs(scatter_dir_per, exist_ok=True)
+    # for n, i in enumerate(top_indices):
+    #     feature_name = vis_shap_values.feature_names[i]
+        
+    #     shap.plots.scatter(vis_shap_values[:, feature_name], 
+    #                     #color=vis_shap_values, 
+    #                     color=predictions['predicted'].values,
+    #                     show=False)
+    
+    #     save_shap_plot(scatter_dir_per, f'{n}_{i}_{(get_last_category(feature_name))}_{reg}')
+
+    sample_dir = os.path.join(model_shap_path, 'sample_plots')
+    os.makedirs(sample_dir, exist_ok=True)
+    water_dir = os.path.join(sample_dir, 'waterfall_plots')
+    os.makedirs(water_dir, exist_ok=True)
+    force_dir = os.path.join(sample_dir, 'force_plots')
+    os.makedirs(force_dir, exist_ok=True)
+
+    for i in range(len(all_shap_values)):
+        id = predictions['crop-id'][i]
+        pred = predictions['predicted'][i]
+        #shap.plots.waterfall(all_shap_values[i], max_display=top, show=False)
+        #shap.plots.waterfall(top_shap_values[i], max_display=top, show=False)
+        shap.plots.waterfall(all_shap_values[i], max_display=top, show=False)
+        # 軸ラベルのフォントサイズを小さく設定 (fontsizeで調整)
+        plt.xlabel("Feature Value", fontsize=5)
+        plt.ylabel("SHAP Value", fontsize=5)
+        save_shap_plot(water_dir, f'{pred}_{id}_{reg}')
+
+        shap.plots.force(all_shap_values[i], matplotlib=True, show=False)
+        save_shap_plot(force_dir, f'{pred}_{id}_{reg}')
 

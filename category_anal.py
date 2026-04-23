@@ -256,6 +256,9 @@ if __name__ == '__main__':
     os.makedirs(output_dir, exist_ok=True)
 
     exclude_ids = [
+    #'042_20_Sait_Eggp'
+    #'042_20_Sait_Eggp','235_21_Miyz_Spin', '360_22_Miee_Soyb', '121_20_Miyz_Spin', '125_20_Miyz_Spin', #'161_21_Miyz_Spin' #☓
+    
     '041_20_Sait_Carr', '043_20_Sait_Carr', '046_20_Sait_Burd', '047_20_Sait_Burd', 
     '044_20_Sait_Broc', '045_20_Sait_Broc', '061_20_Naga_Barl', '062_20_Naga_Barl', 
     '331_22_Niig_jpea', '332_22_Niig_jpea', 
@@ -264,23 +267,51 @@ if __name__ == '__main__':
 
     '042_20_Sait_Eggp', '214_21_Miyz_Edam', '273_22_Naga_Rice', '235_21_Miyz_Spin',
 
-    #P:300~
-    '151_21_Miyz_Spin', '329_22_Niig_Pear', '330_22_Niig_Pear', '165_21_Miyz_Spin', '152_21_Miyz_Spin', '158_21_Miyz_Spin', 
-    '172_21_Miyz_Spin', '164_21_Miyz_Spin', '273_22_Naga_Rice', '163_21_Miyz_Spin', '159_21_Miyz_Spin', '171_21_Miyz_Spin', '214_21_Miyz_Edam', 
-    #P:200~
-    '143_21_Miyz_Spin', '203_21_Miyz_Spin', '168_21_Miyz_Spin', '354_22_Sait_Pear', '162_21_Miyz_Spin', '254_21_Sait_Spin', 
-    '236_21_Miyz_Spin', '328_22_Niig_Pear', '253_21_Sait_Spin', '167_21_Miyz_Spin', '213_21_Miyz_Edam', '327_22_Niig_Pear', 
-    '170_21_Miyz_Spin', '255_21_Sait_Spin', '142_21_Miyz_Spin', '160_21_Miyz_Spin'  
+    # P
+    # '151_21_Miyz_Spin', '329_22_Niig_Pear', '330_22_Niig_Pear', '165_21_Miyz_Spin', '152_21_Miyz_Spin', '158_21_Miyz_Spin', 
+    # '172_21_Miyz_Spin', '164_21_Miyz_Spin', '273_22_Naga_Rice', '163_21_Miyz_Spin', '159_21_Miyz_Spin', '171_21_Miyz_Spin', 
+    # '143_21_Miyz_Spin', '203_21_Miyz_Spin', '168_21_Miyz_Spin', '354_22_Sait_Pear', '162_21_Miyz_Spin', '254_21_Sait_Spin', 
+    # '236_21_Miyz_Spin', '328_22_Niig_Pear', '253_21_Sait_Spin', '167_21_Miyz_Spin', '213_21_Miyz_Edam', '327_22_Niig_Pear', 
+    # '170_21_Miyz_Spin', '255_21_Sait_Spin', '142_21_Miyz_Spin', '160_21_Miyz_Spin', '214_21_Miyz_Edam', '356_22_Sait_Pear', 
+    # '258_21_Sait_Spin', '263_21_Naga_Appl', '141_21_Miyz_Spin', '133_21_Akit_Edam', '146_21_Miyz_Spin', 
+    # '242_21_Aommo_Appl', '150_21_Miyz_Spin', '194_21_Miyz_Spin', '244_21_Aomo_Appl', 
+    # '259_21_Sait_Spin', '307_22_Hokk_Whea', '153_21_Miyz_Spin', '264_21_Naga_Appl', 
+    # '145_21_Miyz_Spin', '156_21_Miyz_Spin', 
 
+    #CEC
+    # '239_21_Aomo_Appl', '241_21_Aomo_Appl', '243_21_Aomo_Appl', '128_20_Miyz_Spin', 
+    # '011_20_Akit_Rice', '122_20_Miyz_Spin', '124_20_Miyz_Spin', '347_22_Yama_Rice', '223_21_Miyz_Edam', 
+    # '215_21_Miyz_Edam', '017_20_Akit_Soyb', '218_21_Miyz_Edam', '219_21_Miyz_Edam', '132_21_Akit_Edam'
 
-  ]
+    # NO3.N
+    '213_21_Miyz_Edam', '214_21_Miyz_Edam', '121_20_Miyz_Spin', '125_20_Miyz_Spin', 
+    '191_21_Miyz_Spin', '156_21_Miyz_Spin', '132_21_Akit_Edam', '253_21_Sait_Spin', 
+    '190_21_Miyz_Spin', '305_22_Hokk_Whea', '327_22_Niig_Pear', '161_21_Miyz_Spin', 
 
-    target = ['Available_P'] #['Exchangeable_K']#['CEC'] #['NO3_N'] #['EC'] #['pH'] #['Available_P'] #['CEC']#['pH'] #['EC']#['pH'] #['NO3_N'] #['CEC'] ##['Available_P'] 
+    #Exchangeable.K
+    # '193_21_Miyz_Spin', '132_21_Akit_Edam', 
+    # '256_21_Ait_Spin', '019_20_Akit_Soyb', '246_21_Aomo_Appl', '136_21_Akit_Soyb', 
+    # '169_20_Akit_Soyb', '250_21_Aomo_Appl', '213_21_Miyz_Edam', 
+    # '256_21_Sait_Spin', '244_21_Aomo_Appl', '252_21_Aomo_Appl', '330_22_Niig_Pear', 
+    # '273_22_Naga_Rice', '264_21_Naga_Appl', '133_21_Akit_Edam', 
+    # '214_21_Miyz_Edam', '240_21_Aomo_Appl', 
+    # '132_21_Akit_Edam', 
+
+    #pH
+    # '167_21_Miyz_Spin', '137_21_Akit_Soyb', '354_22_Sait_Pear', '163_21_Miyz_Spin', '253_21_Sait_Spin', 
+    # '254_21_Sait_Spin', '190_21_Miyz_Spin', '258_21_Sait_Spin', '164_21_Miyz_Spin', '231_21_Miyz_Edam', 
+    # '069_20_Naga_Rice', 
+
+    #EC
+    # '161_21_Miyz_Spin', '121_20_Miyz_Spin', '125_20_Miyz_Spin', '122_20_Miyz_Spin'
+    ]
+
+    target = ['NO3_N'] #['Exchangeable_K']#['CEC'] #['NO3_N'] #['EC'] #['pH'] #['Available_P'] #['CEC']#['pH'] #['EC']#['pH'] #['NO3_N'] #['CEC'] ##['Available_P'] 
 
     os.makedirs(os.path.join(output_dir, f'{target}'),exist_ok=True)
 
     from src.datasets.dataset import data_create
-    X,Y,reg_encoders, _ = data_create(asv_path, chem_path, reg_list = target, exclude_ids=exclude_ids, output_dir=output_dir)
+    X,Y,reg_encoders, _ = data_create(asv_path, chem_path, reg_list = target, exclude_ids=exclude_ids, output_dir=output_dir, feature_transformer = None)
 
     label = 'crop' #'crop' #'soiltype' #'experimental_purpose' #crop
     Y['soiltype'] = Y['SoilTypeID'].str[0:1]  # 欠損値を 'Unknown' に置換
@@ -290,9 +321,43 @@ if __name__ == '__main__':
     output_dir = 'C:\\Users\\asahi\\Agri_Chemical_NN\\datas\\category_analysis\\' # # #
     os.makedirs(output_dir, exist_ok=True)
     save_path = os.path.join(output_dir, f'{target}_{label}_boxplot.png')
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    #os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
     save_boxplot(filtered_label_df[label], filtered_other_df[target], save_path, title="Boxplot of Target by Label")
 
-    #filtered_label_df, filtered_other_df = sync_filter_by_index(Y[[label]], X, label, min_count=4)
-    #save_tsne_plot(filtered_other_df, filtered_label_df[label], output_dir, file_name=f"{label}_tsne_plot.png", perplexity=30, random_state=42)
+    X_filtered = X.loc[filtered_other_df.index]
+    Y_filtered = Y.loc[filtered_other_df.index]
+
+    #print(X_filtered)
+    #P
+    #taxon = ['d__Archaea;p__Crenarchaeota;c__Nitrososphaeria;o__Nitrosopumilales;f__Nitrosopumilaceae;g__Nitrosarchaeum']
+    #taxon = ['d__Bacteria;p__Actinobacteriota;c__Acidimicrobiia;o__Microtrichales;f__Ilumatobacteraceae;g__Ilumatobacter']
+    #taxon = ['d__Bacteria;p__Fibrobacterota;c__Fibrobacteria;o__Fibrobacterales;f__Fibrobacterales;g__BBMC-4']
+    #taxon = ['d__Bacteria;p__Firmicutes;c__Clostridia;o__Peptostreptococcales-Tissierellales;f__Family_XI;g__Tepidimicrobium']
+
+    #pH
+    #taxon = ['d__Archaea;p__Crenarchaeota;c__Nitrososphaeria;o__Nitrosotaleales;f__Nitrosotaleaceae;g__Candidatus_Nitrosotalea']
+    #taxon = ['d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__PLTA13;f__PLTA13;g__PLTA13']
+    #taxon = ['d__Bacteria;p__Acidobacteriota;c__Acidobacteriae;o__Acidobacteriales;f__Acidobacteriaceae_(Subgroup_1);g__Terracidiphilus']
+
+    #taxon = ['d__Bacteria;p__Bacteroidota;c__Bacteroidia;o__Chitinophagales;f__Chitinophagaceae;g__Pseudoflavitalea']
+    #taxon = ['d__Bacteria;p__Nitrospinota;c__P9X2b3D02;o__P9X2b3D02;f__P9X2b3D02;g__P9X2b3D02']
+    #taxon = ['d__Bacteria;p__Acidobacteriota;c__Holophagae;o__Holophagales;f__Holophagaceae;g__Geothrix']
+    #taxon = ['d__Bacteria;p__Firmicutes;c__Bacilli;o__Caldalkalibacillales;f__Caldalkalibacillaceae;g__Caldalkalibacillus']
+
+    #taxon = ['d__Bacteria;p__Proteobacteria;c__Alphaproteobacteria;o__Caulobacterales;f__Caulobacteraceae;g__Brevundimonas']
+    #taxon = ['d__Bacteria;p__Actinobacteriota;c__Actinobacteria;o__Micrococcales;f__Micrococcaceae;g__Paenarthrobacter']
+    #taxon = ['d__Bacteria;p__Actinobacteriota;c__Actinobacteria;o__Frankiales;f__Nakamurellaceae;g__Nakamurella']
+    taxon = ['d__Bacteria;p__Fibrobacterota;c__Fibrobacteria;o__Fibrobacterales;f__Fibrobacterales;g__BBMC-4']
+
+
+    X_filtered_taxon = X_filtered[taxon]
+    Y_filtered_target = Y_filtered[target]
+
+    taxon_path = os.path.join(output_dir, f'{target}_{taxon}_{label}_boxplot.png')
+    save_boxplot(Y_filtered[label], X_filtered[taxon], taxon_path, title="Boxplot of Target by Label")
+    
+    # plt.figure(figsize=(10, 6))
+    # sns.scatterplot(x=X_filtered_taxon, y=Y_filtered_target[target[0]], hue=Y_filtered[label], palette='viridis')
+    # plt.show()
+

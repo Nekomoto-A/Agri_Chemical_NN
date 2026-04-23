@@ -27,80 +27,164 @@ from sklearn.svm import SVC, SVR
 
 import pickle as pkl
 
-def calculate_and_save_shap_importance(model, X_test, X_train , feature_names, output_dir, ids):
-    """
-    Args:
-        model: 学習済みモデル
-        X_train (np.ndarray): 学習用データ（背景データとして使用）
-        X_test (np.ndarray): テスト用データ（SHAP値を計算する対象）
-        feature_names (list): 特徴量名のリスト
-        output_dir (str): 保存先パス
-        ids (pd.Series): ID列
-    """
+# def calculate_and_save_shap_importance(model, X_test, X_train , feature_names, output_dir, ids):
+#     """
+#     Args:
+#         model: 学習済みモデル
+#         X_train (np.ndarray): 学習用データ（背景データとして使用）
+#         X_test (np.ndarray): テスト用データ（SHAP値を計算する対象）
+#         feature_names (list): 特徴量名のリスト
+#         output_dir (str): 保存先パス
+#         ids (pd.Series): ID列
+#     """
+#     print("SHAP分析を開始します...")
+
+#     if not os.path.exists(output_dir):
+#         os.makedirs(output_dir)
+
+#     X_test_df = pd.DataFrame(X_test, columns=feature_names)
+
+#     # モデルの種類を判定
+#     model_type_str = str(type(model)).lower()
+#     is_tree = any(x in model_type_str for x in ["tree", "forest", "boost", "catboost", "lgbm"])
+#     is_svm = isinstance(model, (SVC, SVR)) or "svc" in model_type_str
+
+#     # 2. SHAP値の計算
+#     if is_tree:
+#         print("TreeExplainerを使用します...")
+#         explainer = shap.TreeExplainer(model)
+#         shap_values = explainer.shap_values(X_test)
+    
+#     elif is_svm:
+#         print("KernelExplainerを使用します (学習データを背景に設定)...")
+#         # 学習データ全体を使うと非常に遅いため、100件程度にサンプリングします
+#         # データの構造を維持したい場合は shap.kmeans(X_train, 100) も有効です
+#         background_data = shap.sample(X_train, 100) 
+        
+#         # SVMで確率を出力できる場合はそちらを優先
+#         predict_func = model.predict_proba if hasattr(model, "predict_proba") else model.predict
+#         explainer = shap.KernelExplainer(predict_func, background_data)
+        
+#         # テストデータのSHAP値を計算
+#         shap_values = explainer.shap_values(X_test)
+    
+#     else:
+#         print("汎用Explainerを使用します...")
+#         explainer = shap.Explainer(model, X_train)
+#         shap_values = explainer(X_test).values
+
+#     pkl_path = os.path.join(output_dir, "shap_values.pkl")
+#     with open(pkl_path, "wb") as f:
+#         pkl.dump(shap_values, f)
+
+#     bin_path = os.path.join(output_dir, "shap_explanation.bin")
+#     with open(bin_path, "wb") as f:
+#         explainer.save(f)
+
+#     # 3. SHAP値の整形 (分類問題のクラス抽出)
+#     # TreeSHAP(リスト形式)やKernelSHAP(3次元配列)の差異を吸収
+#     if isinstance(shap_values, list):
+#         shap_values_for_analysis = shap_values[1] # 陽性クラス
+#     elif isinstance(shap_values, np.ndarray) and len(shap_values.shape) == 3:
+#         shap_values_for_analysis = shap_values[:, :, 1]
+#     else:
+#         shap_values_for_analysis = shap_values
+
+#     # 4. CSV保存
+#     shap_df = pd.DataFrame(shap_values_for_analysis, columns=feature_names)
+#     shap_df['id'] = ids.to_list()
+#     csv_path = os.path.join(output_dir, "shap_values.csv")
+#     shap_df.to_csv(csv_path, index=False)
+
+#     # 5. プロット作成
+#     for plot_type in ["summary", "bar"]:
+#         plt.figure()
+#         is_bar = (plot_type == "bar")
+#         shap.summary_plot(shap_values_for_analysis, X_test_df, plot_type="bar" if is_bar else None, show=False)
+#         fname = "mean_shap_bar_plot.png" if is_bar else "summary_plot.png"
+#         plt.tight_layout()
+#         plt.savefig(os.path.join(output_dir, fname), bbox_inches='tight')
+#         plt.close()
+
+#     print(f"SHAP分析が完了しました。出力先: {output_dir}")
+
+import os
+import pickle as pkl
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import shap
+
+def calculate_and_save_shap_importance(model, X_test, X_train, feature_names, output_dir, ids):
     print("SHAP分析を開始します...")
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
+    # 可視化・データフレーム用にDF化
     X_test_df = pd.DataFrame(X_test, columns=feature_names)
 
     # モデルの種類を判定
     model_type_str = str(type(model)).lower()
     is_tree = any(x in model_type_str for x in ["tree", "forest", "boost", "catboost", "lgbm"])
-    is_svm = isinstance(model, (SVC, SVR)) or "svc" in model_type_str
-
-    # 2. SHAP値の計算
+    
+    # 1. SHAP値の計算
+    # 後の統合のために「values」「base_values」「data」を保持する構造にする
     if is_tree:
         print("TreeExplainerを使用します...")
         explainer = shap.TreeExplainer(model)
-        shap_values = explainer.shap_values(X_test)
-    
-    elif is_svm:
-        print("KernelExplainerを使用します (学習データを背景に設定)...")
-        # 学習データ全体を使うと非常に遅いため、100件程度にサンプリングします
-        # データの構造を維持したい場合は shap.kmeans(X_train, 100) も有効です
-        background_data = shap.sample(X_train, 100) 
-        
-        # SVMで確率を出力できる場合はそちらを優先
+        raw_shap_values = explainer.shap_values(X_test)
+        base_values = explainer.expected_value
+    else:
+        # SVMやNNなどの場合
+        print("汎用/KernelExplainerを使用します...")
+        background_data = shap.sample(X_train, 100)
         predict_func = model.predict_proba if hasattr(model, "predict_proba") else model.predict
         explainer = shap.KernelExplainer(predict_func, background_data)
-        
-        # テストデータのSHAP値を計算
-        shap_values = explainer.shap_values(X_test)
-    
-    else:
-        print("汎用Explainerを使用します...")
-        explainer = shap.Explainer(model, X_train)
-        shap_values = explainer(X_test).values
+        raw_shap_values = explainer.shap_values(X_test)
+        base_values = explainer.expected_value
 
-    pkl_path = os.path.join(output_dir, "shap_values.pkl")
+    # 2. クラス選択 (分類問題の場合の次元調整)
+    # raw_shap_values がリスト(Tree)や3次元配列(Kernel)の場合、陽性クラス[1]を抽出
+    if isinstance(raw_shap_values, list):
+        final_values = raw_shap_values[1]
+        final_base_value = base_values[1] if isinstance(base_values, (list, np.ndarray)) else base_values
+    elif isinstance(raw_shap_values, np.ndarray) and len(raw_shap_values.shape) == 3:
+        final_values = raw_shap_values[:, :, 1]
+        final_base_value = base_values[1] if isinstance(base_values, (list, np.ndarray)) else base_values
+    else:
+        final_values = raw_shap_values
+        final_base_value = base_values
+
+    # 3. ★最重要：Explanationオブジェクトとして構成
+    # これにより feature_names, data, base_values が一つのパッケージになる
+    shap_explanation = shap.Explanation(
+        values=final_values,
+        base_values=final_base_value,
+        data=X_test, # 元の数値データ
+        feature_names=feature_names # 特徴量名
+    )
+
+    # 4. 保存 (後の統合で v.values が使える状態にする)
+    pkl_path = os.path.join(output_dir, "shap_explanation.pkl")
     with open(pkl_path, "wb") as f:
-        pkl.dump(shap_values, f)
+        pkl.dump(shap_explanation, f) # オブジェクトを丸ごと保存
 
-    # 3. SHAP値の整形 (分類問題のクラス抽出)
-    # TreeSHAP(リスト形式)やKernelSHAP(3次元配列)の差異を吸収
-    if isinstance(shap_values, list):
-        shap_values_for_analysis = shap_values[1] # 陽性クラス
-    elif isinstance(shap_values, np.ndarray) and len(shap_values.shape) == 3:
-        shap_values_for_analysis = shap_values[:, :, 1]
-    else:
-        shap_values_for_analysis = shap_values
-
-    # 4. CSV保存
-    shap_df = pd.DataFrame(shap_values_for_analysis, columns=feature_names)
+    # 5. CSV保存
+    shap_df = pd.DataFrame(final_values, columns=feature_names)
     shap_df['id'] = ids.to_list()
-    csv_path = os.path.join(output_dir, "shap_values.csv")
-    shap_df.to_csv(csv_path, index=False)
+    shap_df.to_csv(os.path.join(output_dir, "shap_values.csv"), index=False)
 
-    # 5. プロット作成
-    for plot_type in ["summary", "bar"]:
-        plt.figure()
-        is_bar = (plot_type == "bar")
-        shap.summary_plot(shap_values_for_analysis, X_test_df, plot_type="bar" if is_bar else None, show=False)
-        fname = "mean_shap_bar_plot.png" if is_bar else "summary_plot.png"
-        plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, fname), bbox_inches='tight')
-        plt.close()
+    # 6. プロット作成 (Explanationオブジェクトを直接渡せる)
+    plt.figure()
+    shap.plots.bar(shap_explanation, show=False)
+    plt.savefig(os.path.join(output_dir, "mean_shap_bar_plot.png"), bbox_inches='tight')
+    plt.close()
+
+    plt.figure()
+    shap.plots.beeswarm(shap_explanation, show=False)
+    plt.savefig(os.path.join(output_dir, "summary_plot.png"), bbox_inches='tight')
+    plt.close()
 
     print(f"SHAP分析が完了しました。出力先: {output_dir}")
 

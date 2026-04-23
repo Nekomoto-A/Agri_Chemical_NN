@@ -142,6 +142,7 @@ def save_variance_report(df_cont, labels, file_name="variance_report.csv"):
     print(f"分散レポートを '{file_name}' として保存しました。")
     
     return result
+
 import pandas as pd
 
 def calculate_nonzero_ratios_safe(df, labels):
@@ -178,7 +179,7 @@ class data_create:
                  label_list = None, feature_transformer = config['feature_transformer'], 
                  #label_data = config['labels'], 
                  unknown_drop  = config['unknown_drop'], non_outlier = config['non_outlier'], 
-                 uncultured_drop = config['uncultured_drop'],
+                 uncultured_drop = config['uncultured_drop'], 
                  sparce_drop = config['sparce_drop'], drop_threshold = config['drop_threshold'], 
                  features_list = None
                  ):
