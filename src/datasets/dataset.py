@@ -11,7 +11,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.cluster import DBSCAN
 import matplotlib.pyplot as plt
 import seaborn as sns
-
+from skbio.stats.composition import clr #, multiplicative_replacement
 
 import yaml
 import os
@@ -203,6 +203,8 @@ class data_create:
         self.uncultured_drop = uncultured_drop
         
         self.output_dir = os.path.join(output_dir, f'{reg_list}') if output_dir is not None else None
+        if self.output_dir is not None:
+            os.makedirs(self.output_dir, exist_ok=True)
 
     def __iter__(self):
         if self.features_list is not None:
@@ -264,14 +266,6 @@ class data_create:
                     index=taxa
                 )
 
-                # # 階層順にソート
-                # tax_sorted = tax_split.sort_values(by=tax_levels)
-                # # 並び替えた分類名で元のデータフレームの列順を並び替え
-                # asv_data = asv_data[tax_sorted.index]
-                # non_zero_ratio = (asv_data != 0).apply(lambda x: x.dropna().sum()) / len(asv_data)
-
-                # # 3. 結果をDataFrameに変換して整形
-                # result_df = non_zero_ratio.to_frame(name='non_zero_percentage')
                 if 'crop' in self.chem_data.columns:
                     result_df = calculate_nonzero_ratios_safe(asv_data, self.chem_data['crop'])
                     output_filename = 'features_non_zero_ratios_crop.csv'
@@ -387,7 +381,7 @@ class data_create:
             asv_array = asv_data.where(asv_data != 0, asv_data + 1e-100).values
             #print(asv_data)
             
-            from skbio.stats.composition import clr #, multiplicative_replacement
+            
             clr_array = clr(asv_array)
             # 結果をDataFrameに戻す
             asv_feature = pd.DataFrame(clr_array, columns=asv_data.columns, index=asv_data.index)
@@ -439,9 +433,121 @@ class data_create:
         yield chem_data
         yield label_encoders
         yield use_columns
-
+        
         #if self.label_list != None:
         #    label_data = chem_data[self.label_list]
+
+def data_create_table(path_asv, path_chem, reg_list, exclude_ids, features_list = None,
+                      feature_transformer = config['feature_transformer'], unknown_drop  = config['unknown_drop'], non_outlier = config['non_outlier'], 
+                      uncultured_drop = config['uncultured_drop'], sparce_drop = config['sparce_drop'], drop_threshold = config['drop_threshold'], 
+                      data_restriction = config['data_restriction'], data_restriction_list = config['data_restriction_list'], 
+                      ): 
+    asv_data = pd.read_csv(path_asv)
+    chem_data = pd.read_excel(path_chem)
+    chem_data.columns = chem_data.columns.str.replace('.', '_', regex=False)
+
+    if 'riken' in path_asv:
+        if exclude_ids != None:
+            mask = ~chem_data['crop-id'].isin(exclude_ids)
+            asv_data,chem_data = asv_data[mask], chem_data[mask]
+
+    if features_list is not None:
+        print(asv_data.shape)
+        asv_data = asv_data.reindex(columns=features_list, fill_value=0)
+    else:
+        #self.chem_data.columns = [col.replace('.', '_') for col in self.chem_data.columns]
+        if config['level'] != 'asv':
+            asv_data = asv_data.loc[:, asv_data.columns.str.contains('d_')]
+
+            taxa = asv_data.columns.to_list()
+            
+            if 'lv6' in path_asv:
+                #tax_levels = ["domain", "phylum", "class", "order", "family", "genus", "species"]
+                tax_levels = ["domain", "phylum", "class", "order", "family", "genus"]
+                ends_with_patterns = (';__',';g__')
+            elif 'lv7' in path_asv:
+                tax_levels = ["domain", "phylum", "class", "order", "family", "genus", "species"]
+                ends_with_patterns = (';__',';s__')
+            elif 'lv5' in path_asv:
+                #tax_levels = ["domain", "phylum", "class", "order", "family", "genus", "species"]
+                tax_levels = ["domain", "phylum", "class", "order", "family"]
+                ends_with_patterns = (';__',';f__')
+            elif 'lv4' in path_asv:
+                tax_levels = ["domain", "phylum", "class", "order"]
+                ends_with_patterns = (';__',';o__')
+            elif 'lv3' in path_asv:
+                tax_levels = ["domain", "phylum", "class"]
+                ends_with_patterns = (';__',';c__')
+            elif 'lv2' in path_asv:
+                tax_levels = ["domain", "phylum"]
+                ends_with_patterns = (';__',';p__')
+            elif 'lv1' in path_asv:
+                tax_levels = ["domain"]
+                ends_with_patterns = (';__')
+            if unknown_drop:
+                #columns_to_drop1 = [col for col in taxa if col.endswith(';s__')]
+                #ends_with_patterns = (';__', ';s__')
+                #    endswith()メソッドはタプルを渡すことで、いずれかのパターンに一致するかを判定できます。]
+                
+                columns_to_drop = [col for col in taxa if col.endswith(ends_with_patterns)]
+
+                asv_data = asv_data.drop(columns_to_drop, axis=1)
+                taxa = asv_data.columns.to_list()
+            if uncultured_drop:
+                columns_to_drop = [col for col in taxa if 'uncultured' in col]
+                asv_data = asv_data.drop(columns_to_drop, axis=1)
+                taxa = asv_data.columns.to_list()
+    
+    if data_restriction != 'None':
+        chem_data = chem_data[chem_data[data_restriction] == data_restriction_list]
+        # 2. 合致したデータの「インデックス」を取得
+        target_index = chem_data.index
+        # 3. もう一つのデータ(df2)から、同じインデックスのデータを抜き出す
+        asv_data = asv_data.loc[target_index]
+
+        asv_data = asv_data.loc[:, (asv_data != 0).any(axis=0)]
+
+    print('asvの形式：', asv_data.shape)
+    if sparce_drop:
+        asv_data = drop_sparse_columns(asv_data, threshold = drop_threshold)
+
+    if feature_transformer=='CLR':
+        asv_data = asv_data.div(asv_data.sum(axis=1), axis=0)
+        #asv_array = multiplicative_replacement(asv_data.values)
+        asv_array = asv_data.where(asv_data != 0, asv_data + 1e-100).values
+        #print(asv_data)
+        
+        clr_array = clr(asv_array)
+        # 結果をDataFrameに戻す
+        asv_feature = pd.DataFrame(clr_array, columns=asv_data.columns, index=asv_data.index)
+    elif feature_transformer=='ILR':
+        #print(asv_data)
+
+        #print(len(asv_data.columns))
+        #print(asv_data.columns)
+        asv_data = asv_data.div(asv_data.sum(axis=1), axis=0)
+        #asv_array = multiplicative_replacement(asv_data.values)
+        asv_array = asv_data.where(asv_data != 0, asv_data + 1e-100).values
+        ilr_array = ilr_transform(asv_array)
+        #print(ilr_array.shape)
+        # 結果をDataFrameに戻す
+        asv_feature = pd.DataFrame(ilr_array, columns=asv_data.columns[:-1], index=asv_data.index)
+        #print(asv_feature)
+    elif feature_transformer == 'NON_TR':
+        asv_feature = asv_data
+    else:
+        asv_data = asv_data.div(asv_data.sum(axis=1), axis=0)
+        #asv_array = multiplicative_replacement(asv_data.values)
+        asv_array = asv_data.where(asv_data != 0, asv_data + 1e-100).values
+        asv_feature = pd.DataFrame(asv_array, columns=asv_data.columns, index=asv_data.index)
+
+    for r in reg_list:
+        ind = chem_data[chem_data[r].isna()].index
+        asv_data = asv_data.drop(ind)
+        chem_data = chem_data.drop(ind)
+
+    return asv_feature, chem_data
+
 
 def create_soft_labels_vectorized(values: torch.Tensor, thresholds: torch.Tensor, scale: float) -> torch.Tensor:
     """
@@ -1643,3 +1749,236 @@ def features_label_analysis_pipeline(features_train, features_test, train_df, te
 
     print(f"すべての工程が完了しました。出力先: {output_dir}")
     return model
+
+
+def transform_after_split_table(x_train,x_test,y_train,y_test,reg_list, transformer, 
+                          normalize = False, 
+                          hist = config['hist'], 
+                          fold = None, 
+                        ):
+
+    if normalize:
+        #fp = StandardScaler()
+        from sklearn.preprocessing import QuantileTransformer
+        fp = QuantileTransformer(
+                n_quantiles=100, 
+                output_distribution='normal', 
+                random_state=42
+            )
+        #x_train_split = fp.fit_transform(x_train_split)
+        x_train = pd.DataFrame(fp.fit_transform(x_train), columns=x_train.columns, index=x_train.index)
+        x_test = pd.DataFrame(fp.transform(x_test), columns=x_test.columns, index=x_test.index)
+
+    if fold is not None:
+        train_feature_dir = os.path.join(fold, f'train_feature.csv')
+        x_train.to_csv(train_feature_dir)
+        train_target_dir = os.path.join(fold, f'train_chem.csv')
+        y_train.to_csv(train_target_dir)
+
+        test_feature_dir = os.path.join(fold, f'test_feature.csv')
+        x_test_save = x_test.copy()
+        x_test_save['id'] = y_test['crop-id'] if 'crop-id' in y_test.columns else y_test['index']
+        x_test_save.to_csv(test_feature_dir)
+        test_target_dir = os.path.join(fold, f'test_chem.csv')
+        y_test.to_csv(test_target_dir)
+    
+    if fold is not None:
+        if hist:
+            # 診断結果を保存するディレクトリを作成
+            hist_dir = os.path.join(fold, 'histograms')
+            os.makedirs(hist_dir, exist_ok=True)
+
+            # 数値型の列を取得 (ID列は除く)
+            numerical_cols = x_train.select_dtypes(include=['float64', 'int64']).columns
+            if 'crop-id' in numerical_cols:
+                numerical_cols = numerical_cols.drop('crop-id')
+
+            print(f"各数値列のヒストグラムを {hist_dir} フォルダに保存します...")
+
+            # 各数値列のヒストグラムを個別のファイルとして保存
+            for col in numerical_cols:
+                # グラフの作成
+                plt.figure(figsize=(8, 6))
+                x_train[col].hist(bins=50)
+                
+                # タイトルとラベルの設定
+                plt.title(f'Histogram of {col}')
+                plt.xlabel(col)
+                plt.ylabel('Frequency')
+                
+                # ファイルに保存
+                save_path = os.path.join(hist_dir, f'{col}.png')
+                plt.savefig(save_path)
+                
+                # メモリを解放するためにグラフを閉じる
+                plt.close()
+
+            print("ヒストグラムの保存が完了しました。")
+    # カラム名を縦に列挙してテキスト保存
+    used_dir = os.path.join(fold,'used_columns.txt')
+    with open(used_dir, "w", encoding="utf-8") as f:
+        for col in x_train.columns:
+            f.write(col + "\n")
+    
+    scalers = {}
+    label_encoders = {}
+
+    for reg, tr in zip(reg_list,transformer):
+        if np.issubdtype(y_train[reg].dtype, np.floating):
+            #print("SS")
+            if tr == 'SS':
+                pp = StandardScaler()
+                #pp = MinMaxScaler()
+                #pp = PowerTransformer(method='yeo-johnson')
+                pp = pp.fit(y_train[reg].values.reshape(-1, 1))
+                y_train[reg] = pp.transform(y_train[reg].values.reshape(-1, 1))
+                y_test[reg] = pp.transform(y_test[reg].values.reshape(-1, 1))
+                scalers[reg] = pp  # スケーラーを保存
+            elif tr == 'RS':
+                pp = RobustScaler()
+                pp = pp.fit(y_train[reg].values.reshape(-1, 1))
+                y_train[reg] = pp.transform(y_train[reg].values.reshape(-1, 1))
+                y_test[reg] = pp.transform(y_test[reg].values.reshape(-1, 1))
+                scalers[reg] = pp  # スケーラーを保存
+            elif tr == 'log':
+                from sklearn.preprocessing import FunctionTransformer
+                pp = FunctionTransformer(func=np.log1p, inverse_func=np.expm1)
+                pp = pp.fit(y_train[reg].values.reshape(-1, 1))
+                y_train[reg] = pp.transform(y_train[reg].values.reshape(-1, 1))
+                y_test[reg] = pp.transform(y_test[reg].values.reshape(-1, 1))
+                scalers[reg] = pp  # スケーラーを保存
+            elif tr == 'QT':
+                from sklearn.preprocessing import QuantileTransformer
+                pp = QuantileTransformer(output_distribution='normal')
+                pp = pp.fit(y_train[reg].values.reshape(-1, 1))
+                y_train[reg] = pp.transform(y_train[reg].values.reshape(-1, 1))
+                y_test[reg] = pp.transform(y_test[reg].values.reshape(-1, 1))
+                scalers[reg] = pp  # スケーラーを保存
+            elif tr == 'MM':
+                from sklearn.preprocessing import MinMaxScaler
+                pp = MinMaxScaler()
+                pp = pp.fit(y_train[reg].values.reshape(-1, 1))
+                y_train[reg] = pp.transform(y_train[reg].values.reshape(-1, 1))
+                y_test[reg] = pp.transform(y_test[reg].values.reshape(-1, 1))
+                scalers[reg] = pp  # スケーラーを保存
+            elif tr == 'YJ':
+                pp = PowerTransformer()
+                pp = pp.fit(y_train[reg].values.reshape(-1, 1))
+                y_train[reg] = pp.transform(y_train[reg].values.reshape(-1, 1))
+                y_test[reg] = pp.transform(y_test[reg].values.reshape(-1, 1))
+                scalers[reg] = pp  # スケーラーを保存
+
+            plt.figure(figsize=(10, 6))
+            # ヒストグラムを描画
+            # alphaは透明度で、重なりが見やすくなります。
+            # binsは棒の数（階級の数）です。データの性質に合わせて調整してください。
+            plt.hist(y_train[reg], bins=30, alpha=0.7, color='blue', label='Train')
+            plt.hist(y_test[reg], bins=30, alpha=0.7, color='green', label='Test')
+            # グラフのタイトルと軸ラベルを設定
+            #plt.title('目的変数の分布の比較', fontsize=16)
+            plt.xlabel(f'{reg}', fontsize=12)
+            plt.ylabel('Frequency', fontsize=12)
+            # 凡例を表示
+            plt.legend()
+            plt.grid(True, linestyle='--', alpha=0.6)
+            plt.tight_layout()
+            if tr is not None:
+                target_hist_dir = os.path.join(fold, f'hist_{reg}.png')
+            else:
+                target_hist_dir = os.path.join(fold, f'hist_{reg}_{tr}.png')
+            plt.savefig(target_hist_dir)
+            plt.close()
+        
+        else:
+            combined_df = pd.concat([y_train, y_test], axis=0).reset_index(drop=True)
+            le = LabelEncoder()
+            le = le.fit(combined_df[reg])
+            y_train[reg] = le.transform(y_train[reg])
+            y_test[reg] = le.transform(y_test[reg])
+            label_encoders[reg] = le
+        
+        plot_path = os.path.join(fold, f't_SNE_{reg}')
+        save_tsne_plot(x_train, y_train[reg], x_test, y_test[reg], plot_path)
+
+    return x_train, y_train, x_test, y_test, scalers, label_encoders
+
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.manifold import TSNE
+import os
+
+def save_tsne_plot(X_train, Y_train, X_test, Y_test, save_path):
+    """
+    t-SNEを用いて次元削減を行い、学習/テストデータとラベルを可視化して保存する。
+    """
+    # 1. データの統合（学習 + テスト）
+    X_combined = pd.concat([X_train, X_test], axis=0)
+    n_train = len(X_train)
+    
+    # Yの統合（色のラベル用）
+    Y_combined = pd.concat([Y_train, Y_test], axis=0)
+    
+    # 2. t-SNEの実行
+    print("t-SNEを実行中...（データ量により時間がかかる場合があります）")
+    tsne = TSNE(n_components=2, random_state=42)
+    X_embedded = tsne.fit_transform(X_combined)
+    
+    # 3. プロット用データの準備
+    df_plot = pd.DataFrame(X_embedded, columns=['Dimension 1', 'Dimension 2'])
+    df_plot['Label'] = Y_combined.values
+    df_plot['Dataset'] = ['Train'] * n_train + ['Test'] * len(X_test)
+    
+    # 4. 描画設定
+    plt.figure(figsize=(12, 8))
+    
+    # Yが数値（連続値）か、カテゴリ（離散値）かを判定
+    is_continuous = np.issubdtype(Y_combined.dtype, np.number) and len(Y_combined.unique()) > 20
+
+    if is_continuous:
+        # 連続値の場合：カラーバーを使用
+        scatter = plt.scatter(
+            df_plot['Dimension 1'], 
+            df_plot['Dimension 2'],
+            c=df_plot['Label'], 
+            cmap='viridis',
+            marker='o', # デフォルト（後で上書き不可のため、全体を描画）
+            alpha=0.6
+        )
+        plt.colorbar(scatter, label='Value')
+        
+        # 学習/テストの形状分け（連続値の場合は個別に重ね描き）
+        plt.clf() # 一旦クリア
+        # 学習データ
+        plt.scatter(X_embedded[:n_train, 0], X_embedded[:n_train, 1], 
+                    c=Y_train, marker='o', cmap='viridis', label='Train (o)', alpha=0.6)
+        # テストデータ
+        plt.scatter(X_embedded[n_train:, 0], X_embedded[n_train:, 1], 
+                    c=Y_test, marker='x', cmap='viridis', label='Test (x)', alpha=0.8)
+        plt.colorbar(label='Value')
+        plt.legend()
+    else:
+        # 離散値の場合：seabornで凡例表示
+        sns.scatterplot(
+            data=df_plot,
+            x='Dimension 1',
+            y='Dimension 2',
+            hue='Label',
+            style='Dataset',
+            markers={'Train': 'o', 'Test': 'X'},
+            palette='deep',
+            alpha=0.7
+        )
+        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+
+    plt.title('t-SNE Visualization: Train vs Test')
+    plt.tight_layout()
+    
+    # 5. 保存
+    # ディレクトリが存在しない場合は作成
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    plt.savefig(save_path)
+    plt.close()
+    print(f"グラフを保存しました: {save_path}")

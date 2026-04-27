@@ -1,4 +1,4 @@
-from src.test.fold_eval import fold_evaluate, domain_evaluate
+from src.test.fold_eval import fold_evaluate, domain_evaluate, fold_evaluate_table
 #from src.test.fold_eval import loop_evaluate
 import yaml
 import os
@@ -104,7 +104,8 @@ def main(Cross_val = config['Cross_val'], LOGO = config['LOGO']):
         reg_list = [s.replace('.', '_') for s in reg_list]
         #fold_evaluate(reg_list = reg_list, output_dir = config['result_dir'], device = device)
         if Cross_val:
-            fold_evaluate(reg_list = reg_list, output_dir = fold_dir, device = device)
+            #fold_evaluate(reg_list = reg_list, output_dir = fold_dir, device = device)
+            fold_evaluate_table(reg_list = reg_list, output_dir = fold_dir,)
         if LOGO:
             domain_evaluate(reg_list = reg_list, output_dir = domain_dir, device = device, domains = config['domains'])
 
@@ -114,7 +115,8 @@ def main(Cross_val = config['Cross_val'], LOGO = config['LOGO']):
             reg = [s.replace('.', '_') for s in reg]
             #fold_evaluate(reg_list = reg, output_dir = config['result_dir'], device = device)
             if Cross_val:
-                fold_evaluate(reg_list = reg, output_dir = fold_dir, device = device)
+                #fold_evaluate(reg_list = reg, output_dir = fold_dir, device = device)
+                fold_evaluate_table(reg_list = reg, output_dir = fold_dir,)
             if LOGO:
                 domain_evaluate(reg_list = reg, output_dir = domain_dir, device = device, domains = config['domains'])
             #loop_evaluate(reg_list = reg, output_dir = config['result_dir'], device = device)

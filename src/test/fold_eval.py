@@ -545,7 +545,7 @@ def fold_evaluate(reg_list, output_dir, device,
                   method_add_features = config['method_add_features'], 
                   features_plot = config['features_plot'], 
                   hyper_optimize = config['hyper_optimize'], 
-                  shap_comppute = config['shap_comppute'], 
+                  shap_compute = config['shap_compute'], 
                   augment_method = config['augment_method'], 
                   ):
     #if feature_selection_all:
@@ -974,7 +974,7 @@ def fold_evaluate(reg_list, output_dir, device,
                                         reg_encoders = reg_encoders,
                                         eval_reg = eval_reg,
                                         eval_class = eval_class, test_ids = test_ids, label_encoders = reg_encoders, 
-                                        optimize = hyper_optimize, shap_comppute =shap_comppute, 
+                                        optimize = hyper_optimize, shap_comppute =shap_compute, 
                                         )
             for method_name, regs in stats_scores.items():
                 for reg_name, dict in regs.items():
@@ -1155,7 +1155,7 @@ def domain_evaluate(reg_list, output_dir, device,
 
                   skip_domains = config['skip_domains'], 
                   hyper_optimize = config['hyper_optimize'],
-                  shap_comppute = config['shap_comppute'],
+                  shap_compute = config['shap_compute'],
                   add_columns = config['add_columns'],
                   features_plot = config['features_plot'],
                   num_features_to_select_lgb = config['num_features_to_select_lgb'],
@@ -1583,7 +1583,7 @@ def domain_evaluate(reg_list, output_dir, device,
                                     reg_encoders = reg_encoders,
                                     eval_reg = eval_reg,
                                     eval_class = eval_class, test_ids = test_ids, label_encoders = reg_encoders, 
-                                    optimize = hyper_optimize, shap_comppute =shap_comppute, 
+                                    optimize = hyper_optimize, shap_comppute =shap_compute, 
                                     )
             #print(stats_scores)
             for method_name, regs in stats_scores.items():
@@ -1774,3 +1774,175 @@ def save_prediction_plot(y_true, y_pred, file_name="prediction_analysis.png"):
     plt.savefig(file_name)
     plt.close()
     print(f"グラフを {file_name} として保存しました。")
+
+from src.test.test_tabpfn_table import train_and_test_tabpfn
+from src.datasets.dataset import data_create_table
+from src.datasets.dataset import transform_after_split_table
+from src.test.statsmodel_test import stats_models_result_table
+
+def fold_evaluate_table(reg_list, output_dir,
+                  transformer = config['transformer'],
+                  #feature_path = config['feature_path'], target_path = config['target_path'], 
+                  exclude_ids = config['exclude_ids'],
+                  k = config['k_fold'], 
+                  #output_dir = config['result_dir'], 
+                  csv_path = config['result_fold'], 
+                  final_output = config['result_average'], model_name = config['model_name'], reduced_feature_path = config['reduced_feature'],
+                  comp_method = config['comp_method'], corr_calc = config['carr_calc'], feature_selection_all = config['feature_selection_all'], 
+                  selection_ratio = config['selection_ratio'],
+                  fsdir = config['feature_selection_dir'],
+                  feature_selection = config['feature_selection'],
+                  num_features_to_select = config['num_selected_features'],
+                  marginal_hist = config['marginal_hist'],
+                  data_inte = config['data_inte'],
+                  loss_fanctions = config['reg_loss_fanction'],
+                  labels = config['labels'],
+                  embedding = config['embedding'], 
+                  latent_dim = config['latent_dim'], 
+                  embedding_size = config['embedding_size'], 
+                  eval_reg = config['eval_reg'], 
+                  eval_class = config['eval_class'], 
+                  normalize = config['feature_normalize'],
+                  selection_method = config['selection'],
+                  num_features_to_select_lgb = config['num_features_to_select_lgb'],
+                  add_columns = config['add_columns'], 
+                  method_add_features = config['method_add_features'], 
+                  features_plot = config['features_plot'], 
+                  hyper_optimize = config['hyper_optimize'], 
+                  shap_compute = config['shap_compute'], 
+                  augment_method = config['augment_method'], 
+                  ):
+    #if feature_selection_all:
+    #   output_dir = os.path.join(fsdir, output_dir)
+
+    os.makedirs(output_dir,exist_ok=True)
+    sub_dir = os.path.join(output_dir, f'{reg_list}')
+    os.makedirs(sub_dir,exist_ok=True)
+
+    dest_config_path = os.path.join(sub_dir, 'config_saved.yaml')
+    # shutil.copy() を使ってファイルをコピー
+    shutil.copy(yaml_path, dest_config_path)
+
+    csv_dir = os.path.join(sub_dir, csv_path)
+    final_dir = os.path.join(sub_dir, final_output)
+    if os.path.exists(csv_dir):
+        os.remove(csv_dir)
+
+    # OS名を取得します
+    os_name = platform.system()
+    if os_name == 'Linux':
+        feature_path = config['feature_path_linux']
+        target_path = config['target_path_linux']
+    elif os_name == 'Windows':
+        feature_path = config['feature_path_windows']
+        target_path = config['target_path_windows']
+
+    X,Y = data_create_table(feature_path, target_path, reg_list, exclude_ids=exclude_ids)
+
+    if k == 'LOOCV':
+        kf = LeaveOneOut()
+    else:
+        if len(reg_list) > 1:
+            kf = KFold(n_splits=k, shuffle=True, random_state=42)
+        else:
+            #kf = StratifiedKFold(n_splits=k, shuffle=True, random_state=42)
+            kf = ContinuousStratifiedKFold(n_splits=k, shuffle=True, random_state=42)
+            #kf = KFold(n_splits=k, shuffle=True, random_state=42)
+    scores = {}
+
+    # if labels != None:
+    #     target_columns = reg_list + labels
+    # else:
+    #     target_columns = reg_list
+    #target_columns = reg_list + (labels if labels is not None else [])
+
+    #save_tsne_plots(X, Y, target_columns, save_dir = sub_dir)
+    
+    # cls_labels = get_kmeans_labels(X, n_clusters=3)
+    # target_columns = ['cluster_label']
+    # save_tsne_plots(X, cls_labels, target_columns, save_dir = sub_dir)
+
+    #for fold, (train_index, test_index) in enumerate(kf.split(X, Y['crop'])):
+    for fold, (train_index, test_index) in enumerate(kf.split(X,Y[reg_list[0]])):
+        index = [f'fold{fold+1}']
+        X_train, X_test = X.iloc[train_index], X.iloc[test_index]
+        Y_train, Y_test = Y.iloc[train_index], Y.iloc[test_index]
+
+        fold_dir = os.path.join(sub_dir, index[0])
+        os.makedirs(fold_dir,exist_ok=True)
+
+        X_train, Y_train, X_test, Y_test, scalers, label_encoders = transform_after_split_table(X_train, X_test, Y_train, Y_test,reg_list, transformer, 
+                                                                                                fold = fold_dir
+                                                                                                )
+
+        method = 'TabPFN'
+
+        vis_dir = os.path.join(fold_dir, method)
+        os.makedirs(vis_dir,exist_ok=True)
+
+        for i,r in enumerate(reg_list):
+
+            result_scores, model, trues, predictions = train_and_test_tabpfn(X_train = X_train, Y_train = Y_train, X_test = X_test, Y_test = Y_test,
+                                                                    reg = r, output_dir = vis_dir, result_dir = csv_dir,eval_reg = eval_reg, eval_class = eval_class, index = index, model_name = method, 
+                                                                    scalers = scalers, 
+                                                                    shap_compute = shap_compute, 
+                                                                    label_encoders = label_encoders, 
+                                                                    )
+            
+            for method_name, regs in result_scores.items():
+                for reg_name, dict in regs.items():
+                    for metrics, value in dict.items():
+                        scores.setdefault(metrics, {}).setdefault(method_name, {}).setdefault(reg_name, []).append(value)
+
+            stats_scores = stats_models_result_table(X_train = X_train, Y_train = Y_train, 
+                                        X_test = X_test, Y_test = Y_test, scalers = scalers, reg = r, 
+                                        result_dir = csv_dir, index = index, 
+                                        reg_encoders = label_encoders,
+                                        eval_reg = eval_reg,
+                                        eval_class = eval_class, 
+                                        optimize = hyper_optimize, shap_compute =shap_compute, 
+                                        )
+            
+            for method_name, regs in stats_scores.items():
+                for reg_name, dict in regs.items():
+                    for metrics, value in dict.items():
+                        scores.setdefault(metrics, {}).setdefault(method_name, {}).setdefault(reg_name, []).append(value)
+
+    #pprint.pprint(reduced)
+    pprint.pprint(scores) 
+
+    # 平均値を格納する辞書
+    avg_std = {}
+    avg_dict = {}
+    std_dict = {}
+    for metrics,models in scores.items():
+        for method_name,regs in models.items():
+            for target,values in regs.items():
+                #avg = f'{np.average(values):.3f}'
+                avg = f'{np.average(values)}'
+                avg_dict.setdefault(metrics, {}).setdefault(method_name, {})[target] = np.average(values)
+                #std = f'{np.std(values):.3f}'
+                std = f'{np.std(values)}'
+                std_dict.setdefault(metrics, {}).setdefault(method_name, {})[target] = np.std(values)
+                result = f'{avg}±{std}'
+                avg_std.setdefault(metrics, {}).setdefault(method_name, {})[target] = result
+
+    pprint.pprint(avg_std)
+
+    with open(final_dir, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        
+        # ヘッダー（Metric、Model、reg_listのカラム）
+        header = ["Metric", "Model"] + reg_list
+        writer.writerow(header)
+
+        # データの書き込み
+        #for metric, models in sorted_avg_std.items():
+        for metric, models in avg_std.items():
+            for model, values in models.items():
+                row = [metric, model] + [values[col] for col in reg_list]
+                writer.writerow(row)
+
+    print(f"CSVファイル '{final_output}' を作成しました。")
+
+    return avg_dict, std_dict

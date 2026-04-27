@@ -355,18 +355,7 @@ def statsmodel_test(X, Y, train_x_original, train_y_original, models, scalers, r
             plt.savefig(met_dir)
             plt.close()
 
-            #r2 = r2_score(pred,Y_pp)
-            #r2 = r2_score(true,output)
-            # corr_matrix = np.corrcoef(Y_pp.ravel(),pred.ravel())
-            # # 相関係数（xとyの間の値）は [0, 1] または [1, 0] の位置
-            # #r2 = corr_matrix[0, 1]
-            # r2 = median_absolute_error(Y_pp, pred)
-            # #mse = mean_squared_error(pred,Y_pp)
-            # mse = mean_absolute_error(Y_pp, pred)
-            # #mse = normalized_medae_iqr(pred, Y_pp)
-            # print(f'{name}：')
-            # print(f'決定係数：{r2}')
-            # print(f'MAE：{mse}')
+
             score = eval_predictions(true, pred, eval_reg)
 
             if shap_comppute:
@@ -425,5 +414,216 @@ def stats_models_result(X_train, Y_train, X_test, Y_test, scalers, reg, result_d
                              reg_encoders=reg_encoders, 
                              eval_reg = eval_reg, eval_class = eval_class, test_ids = test_ids, 
                              label_encoders = label_encoders, shap_comppute = shap_comppute, 
+                             )
+    return scores
+
+def statsmodel_test_table(X, Y, train_x_original, train_y_original, models, scalers, reg, 
+                    result_dir, index, reg_encoders, eval_reg, eval_class, 
+                    shap_compute = True
+                    ):
+    scores = {}
+    #scores[reg] = {}
+
+    train_x = train_x_original
+    train_y = train_y_original[reg]
+    if 'crop-id' in Y.columns:
+        test_ids = Y['crop-id']
+    else:
+        test_ids = Y['index']
+
+
+    for name, model in models.items():
+        scores[name] = {}
+        scores[name][reg] = {}
+
+        re_dir = os.path.dirname(result_dir)
+        #print(index[0])
+        stats_dir = os.path.join(re_dir, index[0])
+        os.makedirs(stats_dir,exist_ok=True)
+        model_dir = os.path.join(stats_dir, name)
+        os.makedirs(model_dir,exist_ok=True)
+        reg_dir = os.path.join(model_dir, reg)
+        os.makedirs(reg_dir,exist_ok=True)
+
+        if np.issubdtype(Y[reg].dtype, np.floating):
+            #print(f'test:{reg}:{Y.dtype}')
+            # 特徴量の重要度を取得
+            if reg in scalers:
+                scaler = scalers[reg]
+                #true = scaler.inverse_transform(Y)
+                true = scaler.inverse_transform(Y[reg].values.reshape(-1, 1))
+                # if is_log1p_transformer(scaler):
+                #     y_train_pred_log1p = model.predict(train_x)
+                #     y_train_log1p = train_y
+
+                #     pred_log = model.predict(X).reshape(-1, 1)
+                #     pred, coff = apply_smearing_log1p(y_train_log1p, y_train_pred_log1p, pred_log)
+                #     print(f'対数変換のためスメアリング推定による補正を行います(係数：{coff})')
+                # elif isinstance(scaler, PowerTransformer):
+                #     y_train_pred_log1p = model.predict(train_x)
+                #     y_train_log1p = train_y
+
+                #     pred_log = model.predict(X).reshape(-1, 1)
+                #     from src.test.test import apply_smearing_yeo_johnson
+                #     pred, coff = apply_smearing_yeo_johnson(scaler,y_train_log1p, y_train_pred_log1p, pred_log)
+                #     print(f'対数変換のためスメアリング推定による補正を行います(係数：{coff})')
+                # else:
+                #     # --- 通常のスケーリング解除 ---
+                #     pred = scalers[reg].inverse_transform(model.predict(X).reshape(-1, 1))
+                    #pred = model.predict(X).reshape(-1, 1)
+                #pred = model.predict(X)
+                pred = scaler.inverse_transform(model.predict(X).reshape(-1, 1))
+                #pred = scalers[reg].inverse_transform(model.predict(X_top_features).reshape(-1, 1))
+            else:
+                true = Y[reg].values.reshape(-1, 1)
+                pred = model.predict(X).reshape(-1, 1)
+                #pred = model.predict(X_top_features).reshape(-1, 1)
+            # Y_pp = Y
+            # pred = model.predict(X)
+            
+            met_dir = os.path.join(reg_dir, f'{name}_result.png')
+
+            plt.figure()
+            plt.scatter(true,pred, label = 'prediction')
+
+            min_val = min(true.min(), pred.min())
+            max_val = max(true.max(), pred.max())
+            plt.plot([min_val, max_val], [min_val, max_val], 'r--', label = 'x=y')
+
+            plt.xlabel('true_data')
+            plt.ylabel('predicted_data')
+            plt.legend()
+            plt.tight_layout()
+            plt.savefig(met_dir)
+            plt.close()
+
+            score = eval_predictions(true, pred, eval_reg)
+
+            if shap_compute:
+                if name in ['RF','XGB','LGB']:
+                    calculate_and_save_shap_importance_table(model = model, X_test = X, X_train = train_x, output_dir = reg_dir, ids = test_ids)
+        else:
+            true = Y[reg].values.reshape(-1, 1)
+            pred = models[name].predict(X)
+
+            # r2 = accuracy_score(Y_pp,pred)
+            # mse = f1_score(Y_pp,pred, average='macro')
+
+            score = eval_predictions(true, pred, eval_class)
+
+            trues = reg_encoders[reg].inverse_transform(true)
+            preds = reg_encoders[reg].inverse_transform(pred)
+
+            # 3. 混合行列の計算
+            classes = reg_encoders[reg].classes_ # 元のラベル名のリスト
+            cm = confusion_matrix(trues, preds, labels = classes)
+            #cm = confusion_matrix(trues, preds)
+            
+            # 4. DataFrameに変換（見やすくするために行・列にラベル名を付与）
+            cm_df = pd.DataFrame(
+                cm, 
+                index=[f"True:{c}" for c in classes], 
+                columns=[f"Pred:{c}" for c in classes]
+            )
+            cm_path = os.path.join(reg_dir, f"{reg}_confusion_matrix.csv")
+            cm_df.to_csv(cm_path)
+        
+        result_path = os.path.join(reg_dir, f"{reg}_result.csv")
+        result_df = pd.DataFrame(true, index = test_ids, columns=['true'])
+        result_df['predicted'] = pred
+        #result_df[f'Pred_{reg}_{name}'] = pred
+        result_df.to_csv(result_path)
+
+        for metrics, s in score.items():
+            scores[name][reg][metrics] = s
+        write_result(scores[name], columns_list = [reg], csv_dir = result_dir, method = name, ind = index)
+
+    return scores
+
+
+def calculate_and_save_shap_importance_table(model, X_test, X_train, output_dir, ids):
+    print("SHAP分析を開始します...")
+
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    # 可視化・データフレーム用にDF化
+    #X_test_df = pd.DataFrame(X_test, columns=feature_names)
+
+    # モデルの種類を判定
+    model_type_str = str(type(model)).lower()
+    is_tree = any(x in model_type_str for x in ["tree", "forest", "boost", "catboost", "lgbm"])
+    
+    # 1. SHAP値の計算
+    # 後の統合のために「values」「base_values」「data」を保持する構造にする
+    if is_tree:
+        print("TreeExplainerを使用します...")
+        explainer = shap.TreeExplainer(model)
+        raw_shap_values = explainer.shap_values(X_test)
+        base_values = explainer.expected_value
+    else:
+        # SVMやNNなどの場合
+        print("汎用/KernelExplainerを使用します...")
+        background_data = shap.sample(X_train, 100)
+        predict_func = model.predict_proba if hasattr(model, "predict_proba") else model.predict
+        explainer = shap.KernelExplainer(predict_func, background_data)
+        raw_shap_values = explainer.shap_values(X_test)
+        base_values = explainer.expected_value
+
+    # 2. クラス選択 (分類問題の場合の次元調整)
+    # raw_shap_values がリスト(Tree)や3次元配列(Kernel)の場合、陽性クラス[1]を抽出
+    if isinstance(raw_shap_values, list):
+        final_values = raw_shap_values[1]
+        final_base_value = base_values[1] if isinstance(base_values, (list, np.ndarray)) else base_values
+    elif isinstance(raw_shap_values, np.ndarray) and len(raw_shap_values.shape) == 3:
+        final_values = raw_shap_values[:, :, 1]
+        final_base_value = base_values[1] if isinstance(base_values, (list, np.ndarray)) else base_values
+    else:
+        final_values = raw_shap_values
+        final_base_value = base_values
+
+    # 3. ★最重要：Explanationオブジェクトとして構成
+    # これにより feature_names, data, base_values が一つのパッケージになる
+    shap_explanation = shap.Explanation(
+        values=final_values,
+        base_values=final_base_value,
+        data=X_test, # 元の数値データ
+        feature_names=X_test.columns # 特徴量名
+    )
+
+    # 4. 保存 (後の統合で v.values が使える状態にする)
+    pkl_path = os.path.join(output_dir, "shap_explanation.pkl")
+    with open(pkl_path, "wb") as f:
+        pkl.dump(shap_explanation, f) # オブジェクトを丸ごと保存
+
+    # 5. CSV保存
+    shap_df = pd.DataFrame(final_values, columns=X_test.columns)
+    shap_df['id'] = ids.to_list()
+    shap_df.to_csv(os.path.join(output_dir, "shap_values.csv"), index=False)
+
+    # 6. プロット作成 (Explanationオブジェクトを直接渡せる)
+    plt.figure()
+    shap.plots.bar(shap_explanation, show=False)
+    plt.savefig(os.path.join(output_dir, "mean_shap_bar_plot.png"), bbox_inches='tight')
+    plt.close()
+
+    plt.figure()
+    shap.plots.beeswarm(shap_explanation, show=False)
+    plt.savefig(os.path.join(output_dir, "summary_plot.png"), bbox_inches='tight')
+    plt.close()
+
+    print(f"SHAP分析が完了しました。出力先: {output_dir}")
+
+from src.training.statsmodel_train import statsmodel_train_table
+
+def stats_models_result_table(X_train, Y_train, X_test, Y_test, scalers, reg, result_dir,index, reg_encoders,
+                        eval_reg, eval_class, optimize = False, shap_compute = True, 
+                        ):
+    #print(Y_train)
+    models = statsmodel_train_table(X = X_train,Y = Y_train,reg = reg, optimize = optimize)
+    scores = statsmodel_test_table(X = X_test, Y = Y_test, train_x_original = X_train, train_y_original = Y_train, models = models, 
+                             scalers = scalers, reg = reg, result_dir = result_dir, index = index, 
+                             reg_encoders=reg_encoders, 
+                             eval_reg = eval_reg, eval_class = eval_class,shap_compute = shap_compute, 
                              )
     return scores

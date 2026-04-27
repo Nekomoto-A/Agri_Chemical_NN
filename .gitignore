@@ -12,3 +12,4 @@ __pycache__/
 *.pyc
 .env
 data/raw/riken/data_detail
+catboost_info

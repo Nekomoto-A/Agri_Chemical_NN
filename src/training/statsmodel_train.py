@@ -165,3 +165,88 @@ def statsmodel_train(X, Y, reg, optimize=False):
         print(f'{name} の学習が完了しました')
 
     return trained_models
+
+
+def statsmodel_train_table(X, Y, reg, optimize=False):
+    is_regression = np.issubdtype(Y[reg].dtype, np.floating)
+    trained_models = {}
+
+    # --- Optuna用の目的関数定義 ---
+    def objective(trial, model_name):
+        if is_regression:
+            if model_name == "RF":
+                params = {
+                    "n_estimators": trial.suggest_int("n_estimators", 10, 100),
+                    "max_depth": trial.suggest_int("max_depth", 3, 10),
+                }
+                model = RandomForestRegressor(**params)
+            elif model_name == "XGB":
+                params = {
+                    "learning_rate": trial.suggest_float("learning_rate", 1e-3, 0.1, log=True),
+                    "max_depth": trial.suggest_int("max_depth", 3, 10),
+                }
+                model = XGBRegressor(**params, n_jobs=-1)
+            elif model_name == "LGB":
+                params = {
+                    "learning_rate": trial.suggest_float("learning_rate", 1e-3, 0.1, log=True),
+                    "num_leaves": trial.suggest_int("num_leaves", 2, 256),
+                }
+                model = lgb.LGBMRegressor(**params, verbose=-1)
+            elif model_name == "SVR":
+                params = {
+                    "C": trial.suggest_float("C", 1e-3, 10.0, log=True),
+                    "epsilon": trial.suggest_float("epsilon", 1e-3, 1.0, log=True),
+                    "kernel": trial.suggest_categorical('kernel', ['rbf', 'poly', 'sigmoid'])
+                }
+                model = SVR(**params)
+            else:
+                return 0 # LRなどは最適化なし
+            
+            # 負の平均二乗誤差をスコアとして使用（Optunaはこれを最大化しようとする）
+            score = cross_val_score(model, X, Y, cv=3, scoring="neg_mean_squared_error").mean()
+            
+        else: # 分類タスク
+            if model_name == "RF":
+                params = {"max_depth": trial.suggest_int("max_depth", 3, 10)}
+                model = RandomForestClassifier(**params)
+            elif model_name == "XGB":
+                params = {"max_depth": trial.suggest_int("max_depth", 3, 10)}
+                model = XGBClassifier(**params)
+            elif model_name == "SVR": # 実際はSVC
+                params = {"C": trial.suggest_float("C", 1e-3, 10.0, log=True)}
+                model = SVC(**params)
+            
+            score = cross_val_score(model, X, Y[reg], cv=5, scoring="accuracy").mean()
+            
+        return score
+
+    # --- モデルの初期化と学習 ---
+    if is_regression:
+        base_models = {
+            "RF": RandomForestRegressor(),
+            "XGB": XGBRegressor(n_jobs=-1),
+            "LGB": lgb.LGBMRegressor(verbose=-1),
+            "SVR": SVR(),
+            "LR": LinearRegression()
+        }
+    else:
+        base_models = {
+            "RF": RandomForestClassifier(),
+            "XGB": XGBClassifier(),
+            "SVR": SVC() # SVCとして扱う
+        }
+
+    for name, model in base_models.items():
+        if optimize and name not in ["LR"]:
+            print(f"{name} のパラメータ最適化を開始します...")
+            study = optuna.create_study(direction="maximize")
+            study.optimize(lambda trial: objective(trial, name), n_trials=20)
+            
+            # 最良のパラメータでモデルを再作成
+            model.set_params(**study.best_params)
+        
+        model.fit(X, Y[reg])
+        trained_models[name] = model
+        print(f'{name} の学習が完了しました')
+
+    return trained_models
