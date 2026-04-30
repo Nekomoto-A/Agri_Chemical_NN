@@ -46,6 +46,7 @@ import matplotlib.pyplot as plt
 import shap
 
 from src.test.test import write_result
+from src.datasets.dataset import composition_transform
 
 def test_tabpfn(model, X_test, y_test, X_train, Y_train, reg, output_dir, result_dir, 
                 index, model_name, 
@@ -54,7 +55,9 @@ def test_tabpfn(model, X_test, y_test, X_train, Y_train, reg, output_dir, result
         test_ids = y_test['crop-id']
     else:
         test_ids = y_test['index']
-        
+    
+    X_test = composition_transform(X_test)
+
     save_dir = os.path.join(output_dir, reg)
     os.makedirs(save_dir, exist_ok = True)
 

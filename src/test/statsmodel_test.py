@@ -156,6 +156,8 @@ def calculate_and_save_shap_importance(model, X_test, X_train, feature_names, ou
         final_values = raw_shap_values
         final_base_value = base_values
 
+    #print(final_base_value)
+
     # 3. ★最重要：Explanationオブジェクトとして構成
     # これにより feature_names, data, base_values が一つのパッケージになる
     shap_explanation = shap.Explanation(
@@ -417,6 +419,8 @@ def stats_models_result(X_train, Y_train, X_test, Y_test, scalers, reg, result_d
                              )
     return scores
 
+from src.datasets.dataset import composition_transform
+
 def statsmodel_test_table(X, Y, train_x_original, train_y_original, models, scalers, reg, 
                     result_dir, index, reg_encoders, eval_reg, eval_class, 
                     shap_compute = True
@@ -424,7 +428,8 @@ def statsmodel_test_table(X, Y, train_x_original, train_y_original, models, scal
     scores = {}
     #scores[reg] = {}
 
-    train_x = train_x_original
+    X = composition_transform(X)
+    train_x = composition_transform(train_x_original)
     train_y = train_y_original[reg]
     if 'crop-id' in Y.columns:
         test_ids = Y['crop-id']

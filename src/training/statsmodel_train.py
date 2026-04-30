@@ -166,10 +166,13 @@ def statsmodel_train(X, Y, reg, optimize=False):
 
     return trained_models
 
+from src.datasets.dataset import composition_transform
 
 def statsmodel_train_table(X, Y, reg, optimize=False):
     is_regression = np.issubdtype(Y[reg].dtype, np.floating)
     trained_models = {}
+
+    X = composition_transform(X)
 
     # --- Optuna用の目的関数定義 ---
     def objective(trial, model_name):
@@ -203,7 +206,7 @@ def statsmodel_train_table(X, Y, reg, optimize=False):
                 return 0 # LRなどは最適化なし
             
             # 負の平均二乗誤差をスコアとして使用（Optunaはこれを最大化しようとする）
-            score = cross_val_score(model, X, Y, cv=3, scoring="neg_mean_squared_error").mean()
+            score = cross_val_score(model, X, Y[reg], cv=5, scoring="neg_mean_squared_error").mean()
             
         else: # 分類タスク
             if model_name == "RF":

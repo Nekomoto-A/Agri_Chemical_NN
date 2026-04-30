@@ -511,6 +511,14 @@ def data_create_table(path_asv, path_chem, reg_list, exclude_ids, features_list 
     if sparce_drop:
         asv_data = drop_sparse_columns(asv_data, threshold = drop_threshold)
 
+    for r in reg_list:
+        ind = chem_data[chem_data[r].isna()].index
+        asv_data = asv_data.drop(ind)
+        chem_data = chem_data.drop(ind)
+
+    return asv_data, chem_data
+
+def composition_transform(asv_data, feature_transformer = config['feature_transformer']):
     if feature_transformer=='CLR':
         asv_data = asv_data.div(asv_data.sum(axis=1), axis=0)
         #asv_array = multiplicative_replacement(asv_data.values)
@@ -540,14 +548,7 @@ def data_create_table(path_asv, path_chem, reg_list, exclude_ids, features_list 
         #asv_array = multiplicative_replacement(asv_data.values)
         asv_array = asv_data.where(asv_data != 0, asv_data + 1e-100).values
         asv_feature = pd.DataFrame(asv_array, columns=asv_data.columns, index=asv_data.index)
-
-    for r in reg_list:
-        ind = chem_data[chem_data[r].isna()].index
-        asv_data = asv_data.drop(ind)
-        chem_data = chem_data.drop(ind)
-
-    return asv_feature, chem_data
-
+    return asv_feature
 
 def create_soft_labels_vectorized(values: torch.Tensor, thresholds: torch.Tensor, scale: float) -> torch.Tensor:
     """
@@ -1916,6 +1917,9 @@ def save_tsne_plot(X_train, Y_train, X_test, Y_test, save_path):
     """
     # 1. データの統合（学習 + テスト）
     X_combined = pd.concat([X_train, X_test], axis=0)
+
+    X_combined = composition_transform(X_combined)
+    
     n_train = len(X_train)
     
     # Yの統合（色のラベル用）

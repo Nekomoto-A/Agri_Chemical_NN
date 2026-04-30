@@ -6,7 +6,7 @@ dataset.py:
   non_outlier: None
   val_size: None
   level: 7
-  feature_transformer: 'CLR'
+  feature_transformer: 'CLR' #'percent' #'CLR'
   softlabel: True
   data_vis: 'visualize'
   data_augumentation: None #'smoter' #None #'smoter' #'smoter' #'smoter' #'gaussian_copula'
@@ -30,8 +30,8 @@ dataset.py:
   sparce_drop: True
   drop_threshold: 0.05
   uncultured_drop: True
-  data_restriction: 'soiltype'
-  data_restriction_list: D
+  data_restriction: None #'crop' #None #'soiltype'
+  data_restriction_list: None #'Spinach' #F
 train.py:
   early_stopping: True
   patience: 20
@@ -151,7 +151,7 @@ fold_eval.py:
   feature_selection_dir: 'result_DRA_NN'
   carr_calc: False
   marginal_hist: False
-  k_fold: 10
+  k_fold: 5
   feature_normalize: False
   model_name: 'TabPFN'
   result_average: 'result.csv'
@@ -174,15 +174,15 @@ fold_eval.py:
     '042_20_Sait_Eggp', '214_21_Miyz_Edam', '273_22_Naga_Rice', '235_21_Miyz_Spin',
 
     # P
-    '151_21_Miyz_Spin', '329_22_Niig_Pear', '330_22_Niig_Pear', '165_21_Miyz_Spin', '152_21_Miyz_Spin', '158_21_Miyz_Spin', 
-    '172_21_Miyz_Spin', '164_21_Miyz_Spin', '273_22_Naga_Rice', '163_21_Miyz_Spin', '159_21_Miyz_Spin', '171_21_Miyz_Spin', 
-    '143_21_Miyz_Spin', '203_21_Miyz_Spin', '168_21_Miyz_Spin', '354_22_Sait_Pear', '162_21_Miyz_Spin', '254_21_Sait_Spin', 
-    '236_21_Miyz_Spin', '328_22_Niig_Pear', '253_21_Sait_Spin', '167_21_Miyz_Spin', '213_21_Miyz_Edam', '327_22_Niig_Pear', 
-    '170_21_Miyz_Spin', '255_21_Sait_Spin', '142_21_Miyz_Spin', '160_21_Miyz_Spin', '214_21_Miyz_Edam', '356_22_Sait_Pear', 
-    '258_21_Sait_Spin', '263_21_Naga_Appl', '141_21_Miyz_Spin', '133_21_Akit_Edam', '146_21_Miyz_Spin', 
-    '242_21_Aommo_Appl', '150_21_Miyz_Spin', '194_21_Miyz_Spin', '244_21_Aomo_Appl', 
-    '259_21_Sait_Spin', '307_22_Hokk_Whea', '153_21_Miyz_Spin', '264_21_Naga_Appl', 
-    '145_21_Miyz_Spin', '156_21_Miyz_Spin', 
+    # '151_21_Miyz_Spin', '329_22_Niig_Pear', '330_22_Niig_Pear', '165_21_Miyz_Spin', '152_21_Miyz_Spin', '158_21_Miyz_Spin', 
+    # '172_21_Miyz_Spin', '164_21_Miyz_Spin', '273_22_Naga_Rice', '163_21_Miyz_Spin', '159_21_Miyz_Spin', '171_21_Miyz_Spin', 
+    # '143_21_Miyz_Spin', '203_21_Miyz_Spin', '168_21_Miyz_Spin', '354_22_Sait_Pear', '162_21_Miyz_Spin', '254_21_Sait_Spin', 
+    # '236_21_Miyz_Spin', '328_22_Niig_Pear', '253_21_Sait_Spin', '167_21_Miyz_Spin', '213_21_Miyz_Edam', '327_22_Niig_Pear', 
+    # '170_21_Miyz_Spin', '255_21_Sait_Spin', '142_21_Miyz_Spin', '160_21_Miyz_Spin', '214_21_Miyz_Edam', '356_22_Sait_Pear', 
+    # '258_21_Sait_Spin', '263_21_Naga_Appl', '141_21_Miyz_Spin', '133_21_Akit_Edam', '146_21_Miyz_Spin', 
+    # '242_21_Aommo_Appl', '150_21_Miyz_Spin', '194_21_Miyz_Spin', '244_21_Aomo_Appl', 
+    # '259_21_Sait_Spin', '307_22_Hokk_Whea', '153_21_Miyz_Spin', '264_21_Naga_Appl', 
+    # '145_21_Miyz_Spin', '156_21_Miyz_Spin', 
 
     #CEC
     # '239_21_Aomo_Appl', '241_21_Aomo_Appl', '243_21_Aomo_Appl', '128_20_Miyz_Spin', 
@@ -190,9 +190,9 @@ fold_eval.py:
     # '215_21_Miyz_Edam', '017_20_Akit_Soyb', '218_21_Miyz_Edam', '219_21_Miyz_Edam', '132_21_Akit_Edam'
 
     # NO3.N
-    # '213_21_Miyz_Edam', '214_21_Miyz_Edam', '121_20_Miyz_Spin', '125_20_Miyz_Spin', 
-    # '191_21_Miyz_Spin', '156_21_Miyz_Spin', '132_21_Akit_Edam', '253_21_Sait_Spin', 
-    # '190_21_Miyz_Spin', '305_22_Hokk_Whea', '327_22_Niig_Pear', '161_21_Miyz_Spin', 
+    '213_21_Miyz_Edam', '214_21_Miyz_Edam', '121_20_Miyz_Spin', '125_20_Miyz_Spin', 
+    '191_21_Miyz_Spin', '156_21_Miyz_Spin', '132_21_Akit_Edam', '253_21_Sait_Spin', 
+    '190_21_Miyz_Spin', '305_22_Hokk_Whea', '327_22_Niig_Pear', '161_21_Miyz_Spin', 
 
     #Exchangeable.K
     # '193_21_Miyz_Spin', '132_21_Akit_Edam', 
@@ -236,10 +236,10 @@ fold_eval.py:
   add_columns: [] #['crop'] #['crop', 'pref']  #['crop', 'pref'] #[] #
   method_add_features: 'target_encoding' #'label_encoding' # #None #'statistical' #'PCA' #None #
   features_plot: False
-  hyper_optimize: False
-  shap_compute: False
+  hyper_optimize: True
+  shap_compute: True
 main.py:
-  result_dir: 'result_JSSSPN_table_soilD' #'result_YJ_SS_target_encoding' #result_YJ_SS #result_YJ_CLR #result_YJ_SS #result
+  result_dir: 'result_JSSSPN_table_SHAP' #'result_YJ_SS_target_encoding' #result_YJ_SS #result_YJ_CLR #result_YJ_SS #result
   Cross_val: True
   LOGO: False
   domains: 'SoilType' #'year' #'pref-crop'
@@ -268,9 +268,9 @@ main.py:
             #['Available.P_th'],
             #[NH4.N], 
             #
-            ['Available.P'], 
-            # ['pH'], 
-            # ['NO3.N'], 
+            #['Available.P'], 
+            #['pH'], 
+            ['NO3.N'], 
             # ['EC'], 
             # ['Humus'], 
             # ['Exchangeable.K'], 

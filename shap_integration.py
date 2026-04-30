@@ -18,10 +18,10 @@ def get_last_category(full_name):
     return last_part
 
 if __name__ == "__main__":
-    result_path = 'C:\\Users\\asahi\\Agri_Chemical_NN\\result_JSSSPN_CLR_full_SHAP\\Cross-validation_results'
+    result_path = 'C:\\Users\\asahi\\Agri_Chemical_NN\\result_JSSSPN_table_SHAP\\Cross-validation_results'
     
-    reg = 'Available_P'
-    model = 'ST'
+    reg = 'NO3_N' #'pH' #'Available_P'
+    model = 'RF' #'RF' #'TabPFN'
 
     reg_path = os.path.join(result_path, f"['{reg}']",)
 
@@ -45,8 +45,9 @@ if __name__ == "__main__":
         predictions = pd.concat([predictions, pred_df], ignore_index=True)
 
         model_path = os.path.join(fold_path, model)
-        if model == 'ST':
-            shap_path = os.path.join(model_path, 'shap_results')
+        if model == 'TabPFN':
+            model_reg_path = os.path.join(model_path, reg)
+            shap_path = os.path.join(model_reg_path, 'shap_results')
             #shap_data_path = os.path.join(shap_path, f'shap_values_{reg}.csv')
             shap_data_path = os.path.join(shap_path, f'shap_values_{reg}.pkl')
         else:
@@ -67,13 +68,17 @@ if __name__ == "__main__":
     # 2. base_values (期待値) の統合
     # スカラー(単一数値)の場合と配列の場合があるため、形状を整えて結合
     base_val_list = []
+    #print(all_shap)
     for v in all_shap:
         # 期待値を取得（属性がなければ0などで代用するが、基本はあるはず）
         bv = v.base_values if hasattr(v, 'base_values') else 0
+        #print(bv)
         # サンプル数に合わせて配列化
         count = v.shape[0] if hasattr(v, 'shape') else len(v)
         base_val_list.append(np.full(count, bv) if np.isscalar(bv) else bv)
+        #print(base_val_list)
     combined_base_values = np.concatenate(base_val_list, axis=0)
+    #print(combined_base_values)
 
     # 3. data (元の特徴量データ) の統合
     if hasattr(all_shap[0], 'data'):
@@ -90,7 +95,6 @@ if __name__ == "__main__":
         feature_names=all_shap[0].feature_names if hasattr(all_shap[0], 'feature_names') else None
     )
 
-
     shap_result_path = os.path.join(reg_path, 'shap_results')
     os.makedirs(shap_result_path, exist_ok=True)
     model_shap_path = os.path.join(shap_result_path, model)
@@ -102,15 +106,6 @@ if __name__ == "__main__":
 
     # 共通の保存関数を作っておくと便利です
     def save_shap_plot(dir, plot_name):
-        #path = os.path.join(model_shap_path, f"{plot_name}.png")
-        # 現在のアクティブな軸を取得してフォントサイズを変更
-        # ax = plt.gca()
-
-        # # y軸（特徴量名）のラベルサイズを調整
-        # ax.tick_params(axis='y', labelsize=8) 
-
-        # # x軸（SHAP値）のラベルサイズを調整
-        # ax.tick_params(axis='x', labelsize=8)
 
         path = os.path.join(dir, f"{plot_name}.png")
         # bbox_inches='tight' をつけるとラベルの欠けを防げます
@@ -142,6 +137,13 @@ if __name__ == "__main__":
     scatter_dir = os.path.join(model_shap_path, 'scatter_plots')
     os.makedirs(scatter_dir, exist_ok=True)
 
+    print(f"Total samples: {len(all_shap_values)}")
+    print(f"Shape of all_shap_values: {all_shap_values.shape}")
+
+    print(f"Base values shape: {all_shap_values.base_values.shape}")
+    print(f"Values shape: {all_shap_values.values.shape}")
+    print(f"Top value: {top}")
+
     for n, i in enumerate(top_indices):
         feature_name = all_shap_values.feature_names[i]
         
@@ -151,29 +153,6 @@ if __name__ == "__main__":
                         show=False)
         
         save_shap_plot(scatter_dir, f'{n}_{i}_{(get_last_category(feature_name))}_{reg}')
-
-
-    # # 1. Explanationオブジェクトのコピーを作成（元のデータを壊さないため）
-    # vis_shap_values = all_shap_values
-    # # 2. .data（CLR値）を逆変換（組成データ：0~1の範囲）に戻す
-    # # CLRの逆変換: exp(x) / sum(exp(x))
-    # exp_data = np.exp(vis_shap_values.data)
-    # # 行ごとに合計して割る（組成に戻す）
-    # proportions = exp_data / exp_data.sum(axis=1, keepdims=True)
-
-    # # 3. データを上書き
-    # vis_shap_values.data = proportions * 100
-    # scatter_dir_per = os.path.join(model_shap_path, 'scatter_plots_per')
-    # os.makedirs(scatter_dir_per, exist_ok=True)
-    # for n, i in enumerate(top_indices):
-    #     feature_name = vis_shap_values.feature_names[i]
-        
-    #     shap.plots.scatter(vis_shap_values[:, feature_name], 
-    #                     #color=vis_shap_values, 
-    #                     color=predictions['predicted'].values,
-    #                     show=False)
-    
-    #     save_shap_plot(scatter_dir_per, f'{n}_{i}_{(get_last_category(feature_name))}_{reg}')
 
     sample_dir = os.path.join(model_shap_path, 'sample_plots')
     os.makedirs(sample_dir, exist_ok=True)

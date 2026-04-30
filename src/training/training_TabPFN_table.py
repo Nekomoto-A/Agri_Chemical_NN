@@ -6,7 +6,11 @@ from tabpfn import TabPFNClassifier, TabPFNRegressor
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from src.datasets.dataset import composition_transform
+
 def train_tabpfn(X, Y, reg, output_dir, scalers = None):
+    X = composition_transform(X)
+    
     os.environ["SCIPY_ARRAY_API"] = "1"
     yaml_path = 'tabpfn_key.yaml'
     with open(yaml_path, "r", encoding="utf-8") as file:
