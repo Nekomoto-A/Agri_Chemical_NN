@@ -503,10 +503,6 @@ def statsmodel_test_table(X, Y, train_x_original, train_y_original, models, scal
             plt.close()
 
             score = eval_predictions(true, pred, eval_reg)
-
-            if shap_compute:
-                if name in ['RF','XGB','LGB']:
-                    calculate_and_save_shap_importance_table(model = model, X_test = X, X_train = train_x, output_dir = reg_dir, ids = test_ids)
         else:
             true = Y[reg].values.reshape(-1, 1)
             pred = models[name].predict(X)
@@ -538,6 +534,10 @@ def statsmodel_test_table(X, Y, train_x_original, train_y_original, models, scal
         result_df['predicted'] = pred
         #result_df[f'Pred_{reg}_{name}'] = pred
         result_df.to_csv(result_path)
+
+        if shap_compute:
+                if name in ['RF','XGB','LGB']:
+                    calculate_and_save_shap_importance_table(model = model, X_test = X, X_train = train_x, output_dir = reg_dir, ids = test_ids)
 
         for metrics, s in score.items():
             scores[name][reg][metrics] = s

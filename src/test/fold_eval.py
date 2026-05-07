@@ -1846,8 +1846,8 @@ def fold_evaluate_table(reg_list, output_dir,
             kf = KFold(n_splits=k, shuffle=True, random_state=42)
         else:
             #kf = StratifiedKFold(n_splits=k, shuffle=True, random_state=42)
-            kf = ContinuousStratifiedKFold(n_splits=k, shuffle=True, random_state=42)
-            #kf = KFold(n_splits=k, shuffle=True, random_state=42)
+            #kf = ContinuousStratifiedKFold(n_splits=k, shuffle=True, random_state=42)
+            kf = KFold(n_splits=k, shuffle=True, random_state=42)
     scores = {}
 
     # if labels != None:

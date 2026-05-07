@@ -55,6 +55,8 @@ def test_tabpfn(model, X_test, y_test, X_train, Y_train, reg, output_dir, result
         test_ids = y_test['crop-id']
     else:
         test_ids = y_test['index']
+
+    is_regression = np.issubdtype(y_test[reg].dtype, np.floating)
     
     X_test = composition_transform(X_test)
 
@@ -69,29 +71,7 @@ def test_tabpfn(model, X_test, y_test, X_train, Y_train, reg, output_dir, result
 
     pred = model.predict(X_test)
 
-    if not pd.api.types.is_numeric_dtype(y_test[reg]):
-        true = y_test[reg]
-
-        score = eval_predictions(true, pred, eval_class)
-
-        # 3. 混合行列の計算
-        #print(pred)
-        #print(f"label_encoders: {label_encoders[reg]}")
-        classes = label_encoders[reg].classes_ # 元のラベル名のリスト
-        t = label_encoders[reg].inverse_transform(true.astype(int))
-        p = label_encoders[reg].inverse_transform(pred.astype(int))
-        cm = confusion_matrix(t, p, labels = classes)
-        
-        # 4. DataFrameに変換（見やすくするために行・列にラベル名を付与）
-        cm_df = pd.DataFrame(
-            cm, 
-            index=[f"True:{c}" for c in classes], 
-            columns=[f"Pred:{c}" for c in classes]
-        )
-
-        cm_path = os.path.join(save_dir, f"{reg}_confusion_matrix.csv")
-        cm_df.to_csv(cm_path)
-    else:
+    if is_regression:
         true = y_test[reg]
         #print(scalers)
         if reg in scalers:
@@ -139,6 +119,28 @@ def test_tabpfn(model, X_test, y_test, X_train, Y_train, reg, output_dir, result
         plt.tight_layout()
         plt.savefig(os.path.join(save_dir, 'loss_hist.png'))
         plt.close()
+    else:
+        true = y_test[reg]
+
+        score = eval_predictions(true, pred, eval_class)
+
+        # 3. 混合行列の計算
+        #print(pred)
+        #print(f"label_encoders: {label_encoders[reg]}")
+        classes = label_encoders[reg].classes_ # 元のラベル名のリスト
+        t = label_encoders[reg].inverse_transform(true.astype(int))
+        p = label_encoders[reg].inverse_transform(pred.astype(int))
+        cm = confusion_matrix(t, p, labels = classes)
+        
+        # 4. DataFrameに変換（見やすくするために行・列にラベル名を付与）
+        cm_df = pd.DataFrame(
+            cm, 
+            index=[f"True:{c}" for c in classes], 
+            columns=[f"Pred:{c}" for c in classes]
+        )
+
+        cm_path = os.path.join(save_dir, f"{reg}_confusion_matrix.csv")
+        cm_df.to_csv(cm_path)
 
     if shap_compute:
         shap_values = interpretability.shap.get_shap_values(
@@ -157,10 +159,27 @@ def test_tabpfn(model, X_test, y_test, X_train, Y_train, reg, output_dir, result
         dumps_path = os.path.join(shap_dir, f"shap_values_{reg}.pkl")
         with open(dumps_path, "wb") as f:
             pickle.dump(shap_values, f)
-        shap_df = pd.DataFrame(shap_values.values, columns=X_test.columns.tolist())
+
+        dims = shap_values.values.ndim
+        if dims == 3:
+            # 多クラス分類の場合 (n_samples, n_features, n_classes)
+            # ここでは例としてクラス0を抽出していますが、必要に応じてループ処理に変更してください
+            target_class = 0
+            print(f"Multi-class detected. Extracting SHAP values for class {target_class}.")
+            data_to_df = shap_values.values[:, :, target_class]
+        elif dims == 2:
+            # 回帰または二値分類の場合 (n_samples, n_features)
+            print("Regression/Binary-class detected.")
+            data_to_df = shap_values.values
+        else:
+            raise ValueError(f"Unexpected SHAP values shape: {shap_values.values.shape}")
+
+        #shap_df = DataFrame(shap_values.values, columns=X_test.columns.tolist())
+        shap_df = pd.DataFrame(data_to_df, columns=X_test.columns.tolist())
         shap_df['id'] = test_ids.to_list()
         shap_csv_path = os.path.join(shap_dir, f"shap_values_{reg}.csv")
         shap_df.to_csv(shap_csv_path, index=False)
+
         # 3. 描画の設定
         plt.figure(figsize=(12, 8)) # 図のサイズを調整
         # # 4. Summary Plotの作成
@@ -184,8 +203,10 @@ def test_tabpfn(model, X_test, y_test, X_train, Y_train, reg, output_dir, result
         plt.close() # メモリ解放のために閉じる
     
     pd.DataFrame({
-            'TRUE': true.flatten(),
-            'predicted': pred.flatten(),
+            #'TRUE': true.flatten(),
+            'TRUE': true,
+            #'predicted': pred.flatten(),
+            'predicted': pred,
             'crop-id': test_ids
         }).to_csv(os.path.join(save_dir, f"{reg}_result.csv"), index=False)
     

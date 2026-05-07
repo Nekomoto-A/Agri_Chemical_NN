@@ -30,8 +30,8 @@ dataset.py:
   sparce_drop: True
   drop_threshold: 0.05
   uncultured_drop: True
-  data_restriction: None #'crop' #None #'soiltype'
-  data_restriction_list: None #'Spinach' #F
+  data_restriction: None #'soiltype' #None #'crop' #None #
+  data_restriction_list: None #'F' #None #'Spinach' #F
 train.py:
   early_stopping: True
   patience: 20
@@ -190,9 +190,9 @@ fold_eval.py:
     # '215_21_Miyz_Edam', '017_20_Akit_Soyb', '218_21_Miyz_Edam', '219_21_Miyz_Edam', '132_21_Akit_Edam'
 
     # NO3.N
-    '213_21_Miyz_Edam', '214_21_Miyz_Edam', '121_20_Miyz_Spin', '125_20_Miyz_Spin', 
-    '191_21_Miyz_Spin', '156_21_Miyz_Spin', '132_21_Akit_Edam', '253_21_Sait_Spin', 
-    '190_21_Miyz_Spin', '305_22_Hokk_Whea', '327_22_Niig_Pear', '161_21_Miyz_Spin', 
+    # '213_21_Miyz_Edam', '214_21_Miyz_Edam', '121_20_Miyz_Spin', '125_20_Miyz_Spin', 
+    # '191_21_Miyz_Spin', '156_21_Miyz_Spin', '132_21_Akit_Edam', '253_21_Sait_Spin', 
+    # '190_21_Miyz_Spin', '305_22_Hokk_Whea', '327_22_Niig_Pear', '161_21_Miyz_Spin', 
 
     #Exchangeable.K
     # '193_21_Miyz_Spin', '132_21_Akit_Edam', 
@@ -239,13 +239,13 @@ fold_eval.py:
   hyper_optimize: True
   shap_compute: True
 main.py:
-  result_dir: 'result_JSSSPN_table_SHAP' #'result_YJ_SS_target_encoding' #result_YJ_SS #result_YJ_CLR #result_YJ_SS #result
+  result_dir: 'result_JSSSPN_table_crop' #'result_YJ_SS_target_encoding' #result_YJ_SS #result_YJ_CLR #result_YJ_SS #result
   Cross_val: True
   LOGO: False
   domains: 'SoilType' #'year' #'pref-crop'
   reg_list: [
            # ['pref'], 
-            #['crop'], 
+            ['crop'], 
             # ['APCP_Mar_me'],
             # ['APCP_Feb_me'],
             # ['APCP_Jan_me'],
@@ -267,10 +267,9 @@ main.py:
 
             #['Available.P_th'],
             #[NH4.N], 
-            #
-            #['Available.P'], 
-            #['pH'], 
-            ['NO3.N'], 
+            # ['Available.P'], 
+            # ['pH'], 
+            # ['NO3.N'], 
             # ['EC'], 
             # ['Humus'], 
             # ['Exchangeable.K'], 

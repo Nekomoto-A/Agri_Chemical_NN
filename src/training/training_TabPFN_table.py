@@ -5,11 +5,14 @@ import yaml
 from tabpfn import TabPFNClassifier, TabPFNRegressor
 import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
 
 from src.datasets.dataset import composition_transform
 
 def train_tabpfn(X, Y, reg, output_dir, scalers = None):
     X = composition_transform(X)
+
+    is_regression = np.issubdtype(Y[reg].dtype, np.floating)
     
     os.environ["SCIPY_ARRAY_API"] = "1"
     yaml_path = 'tabpfn_key.yaml'
@@ -28,16 +31,7 @@ def train_tabpfn(X, Y, reg, output_dir, scalers = None):
     save_dir = os.path.join(output_dir, reg)
     os.makedirs(save_dir, exist_ok = True)
 
-    if not pd.api.types.is_numeric_dtype(Y[reg]):
-        model = TabPFNClassifier(
-            device=device_name, 
-            #n_estimators = 32,
-        )
-        model.fit(X, Y[reg])
-
-        pred = model.predict(X)
-
-    else:
+    if is_regression:
         model = TabPFNRegressor(
             device=device_name, 
             )
@@ -77,5 +71,13 @@ def train_tabpfn(X, Y, reg, output_dir, scalers = None):
         plt.savefig(save_path)
         print(f"学習データに対する予測値を {save_path} に保存しました。")
         plt.close() # メモリ解放のためにプロットを閉じる
+    else:
+        model = TabPFNClassifier(
+            device=device_name, 
+            #n_estimators = 32,
+        )
+        model.fit(X, Y[reg])
+
+        pred = model.predict(X)
         
     return model

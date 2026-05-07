@@ -245,6 +245,53 @@ def save_tsne_plot(X, Y, save_dir, file_name="tsne_plot.png", perplexity=30, ran
     
     print(f"Plot saved successfully at: {save_path}")
 
+
+import pandas as pd
+from sklearn.feature_selection import mutual_info_classif
+
+def save_mutual_info_classification_csv(df_a, df_b, columns_b, output_path):
+    """
+    df_a(連続値)の全カラムと、df_b(ラベルデータ)の指定カラム間の相互情報量を計算しCSV保存する。
+    
+    引数:
+    df_a: 特徴量となるデータフレーム（連続値）
+    df_b: ターゲットとなるデータフレーム（ラベル/カテゴリ値）
+    columns_b: df_bの中で計算対象にしたいカラム名のリスト
+    output_path: 保存するCSVファイルのパス
+    """
+    
+    # 計算結果を格納する箱を作成（行：Aのカラム名、列：Bの指定カラム名）
+    mi_results = pd.DataFrame(index=df_a.columns, columns=columns_b)
+
+    # df_bの指定されたターゲットカラムごとに計算を繰り返す
+    for col_b in columns_b:
+        # 1. 計算のためにデータを一時的に結合し、欠損値(NaN)がある行を削除
+        combined = pd.concat([df_a, df_b[col_b]], axis=1).dropna()
+        
+        # 2. X(連続値データ)と y(ラベルデータ)に分ける
+        X = combined[df_a.columns]
+        y = combined[col_b]
+        
+        # 3. 相互情報量の計算
+        # discrete_features=False とすることで、Xが連続値であることを明示します
+        mi_values = mutual_info_classif(X, y, discrete_features=False, random_state=42)
+        
+        # 4. 結果をデータフレームに書き込む
+        mi_results[col_b] = mi_values
+
+    # 5. CSVファイルとして保存
+    mi_results.to_csv(output_path)
+    print(f"保存が完了しました: {output_path}")
+
+    return mi_results
+
+# --- 使いかたの例 ---
+# df_a = pd.DataFrame({'feature1': [1.2, 2.3, 3.1], 'feature2': [0.5, 1.5, 2.5]})
+# df_b = pd.DataFrame({'target_label': ['A', 'B', 'A']})
+# save_mutual_info_classification_csv(df_a, df_b, ['target_label'], 'result.csv')
+
+from src.datasets.dataset import composition_transform
+
 if __name__ == '__main__':
     # chem_path = 'C:\\Users\\asahi\\Agri_Chemical_NN\\data\\raw\\DRA015491\\chem_data.xlsx'
     # asv_path = 'C:\\Users\\asahi\\Agri_Chemical_NN\\data\\raw\\DRA015491\\lv6.csv'
@@ -284,9 +331,9 @@ if __name__ == '__main__':
     # '215_21_Miyz_Edam', '017_20_Akit_Soyb', '218_21_Miyz_Edam', '219_21_Miyz_Edam', '132_21_Akit_Edam'
 
     # NO3.N
-    '213_21_Miyz_Edam', '214_21_Miyz_Edam', '121_20_Miyz_Spin', '125_20_Miyz_Spin', 
-    '191_21_Miyz_Spin', '156_21_Miyz_Spin', '132_21_Akit_Edam', '253_21_Sait_Spin', 
-    '190_21_Miyz_Spin', '305_22_Hokk_Whea', '327_22_Niig_Pear', '161_21_Miyz_Spin', 
+    # '213_21_Miyz_Edam', '214_21_Miyz_Edam', '121_20_Miyz_Spin', '125_20_Miyz_Spin', 
+    # '191_21_Miyz_Spin', '156_21_Miyz_Spin', '132_21_Akit_Edam', '253_21_Sait_Spin', 
+    # '190_21_Miyz_Spin', '305_22_Hokk_Whea', '327_22_Niig_Pear', '161_21_Miyz_Spin', 
 
     #Exchangeable.K
     # '193_21_Miyz_Spin', '132_21_Akit_Edam', 
@@ -311,54 +358,62 @@ if __name__ == '__main__':
     os.makedirs(os.path.join(output_dir, f'{target}'),exist_ok=True)
 
     from src.datasets.dataset import data_create
-    X,Y,reg_encoders, _ = data_create(asv_path, chem_path, reg_list = target, exclude_ids=exclude_ids, output_dir=output_dir, feature_transformer = None)
+    X,Y,reg_encoders, _ = data_create(asv_path, chem_path, reg_list = target, exclude_ids=exclude_ids, output_dir=output_dir)
 
-    label = 'crop' #'crop' #'soiltype' #'experimental_purpose' #crop
-    Y['soiltype'] = Y['SoilTypeID'].str[0:1]  # 欠損値を 'Unknown' に置換
-    print(Y[label].unique())
-    filtered_label_df, filtered_other_df = sync_filter_by_index(Y[[label]], Y[target], label, min_count=4)
+    labels = ['crop', 'pref', 'soiltype']
 
-    output_dir = 'C:\\Users\\asahi\\Agri_Chemical_NN\\datas\\category_analysis\\' # # #
-    os.makedirs(output_dir, exist_ok=True)
-    save_path = os.path.join(output_dir, f'{target}_{label}_boxplot.png')
-    #os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    #print(X)
 
-    save_boxplot(filtered_label_df[label], filtered_other_df[target], save_path, title="Boxplot of Target by Label")
+    #X = composition_transform(X)
 
-    X_filtered = X.loc[filtered_other_df.index]
-    Y_filtered = Y.loc[filtered_other_df.index]
-
-    #print(X_filtered)
-    #P
-    #taxon = ['d__Archaea;p__Crenarchaeota;c__Nitrososphaeria;o__Nitrosopumilales;f__Nitrosopumilaceae;g__Nitrosarchaeum']
-    #taxon = ['d__Bacteria;p__Actinobacteriota;c__Acidimicrobiia;o__Microtrichales;f__Ilumatobacteraceae;g__Ilumatobacter']
-    #taxon = ['d__Bacteria;p__Fibrobacterota;c__Fibrobacteria;o__Fibrobacterales;f__Fibrobacterales;g__BBMC-4']
-    #taxon = ['d__Bacteria;p__Firmicutes;c__Clostridia;o__Peptostreptococcales-Tissierellales;f__Family_XI;g__Tepidimicrobium']
-
-    #pH
-    #taxon = ['d__Archaea;p__Crenarchaeota;c__Nitrososphaeria;o__Nitrosotaleales;f__Nitrosotaleaceae;g__Candidatus_Nitrosotalea']
-    #taxon = ['d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__PLTA13;f__PLTA13;g__PLTA13']
-    #taxon = ['d__Bacteria;p__Acidobacteriota;c__Acidobacteriae;o__Acidobacteriales;f__Acidobacteriaceae_(Subgroup_1);g__Terracidiphilus']
-
-    #taxon = ['d__Bacteria;p__Bacteroidota;c__Bacteroidia;o__Chitinophagales;f__Chitinophagaceae;g__Pseudoflavitalea']
-    #taxon = ['d__Bacteria;p__Nitrospinota;c__P9X2b3D02;o__P9X2b3D02;f__P9X2b3D02;g__P9X2b3D02']
-    #taxon = ['d__Bacteria;p__Acidobacteriota;c__Holophagae;o__Holophagales;f__Holophagaceae;g__Geothrix']
-    #taxon = ['d__Bacteria;p__Firmicutes;c__Bacilli;o__Caldalkalibacillales;f__Caldalkalibacillaceae;g__Caldalkalibacillus']
-
-    #taxon = ['d__Bacteria;p__Proteobacteria;c__Alphaproteobacteria;o__Caulobacterales;f__Caulobacteraceae;g__Brevundimonas']
-    #taxon = ['d__Bacteria;p__Actinobacteriota;c__Actinobacteria;o__Micrococcales;f__Micrococcaceae;g__Paenarthrobacter']
-    #taxon = ['d__Bacteria;p__Actinobacteriota;c__Actinobacteria;o__Frankiales;f__Nakamurellaceae;g__Nakamurella']
-    taxon = ['d__Bacteria;p__Fibrobacterota;c__Fibrobacteria;o__Fibrobacterales;f__Fibrobacterales;g__BBMC-4']
+    mi = save_mutual_info_classification_csv(df_a = X, df_b = Y, columns_b = labels, output_path = os.path.join(output_dir, f'mi.csv'))
 
 
-    X_filtered_taxon = X_filtered[taxon]
-    Y_filtered_target = Y_filtered[target]
+    # label = 'crop' #'crop' #'soiltype' #'experimental_purpose' #crop
+    # Y['soiltype'] = Y['SoilTypeID'].str[0:1]  # 欠損値を 'Unknown' に置換
+    # print(Y[label].unique())
+    # filtered_label_df, filtered_other_df = sync_filter_by_index(Y[[label]], Y[target], label, min_count=4)
 
-    taxon_path = os.path.join(output_dir, f'{target}_{taxon}_{label}_boxplot.png')
-    save_boxplot(Y_filtered[label], X_filtered[taxon], taxon_path, title="Boxplot of Target by Label")
+    # output_dir = 'C:\\Users\\asahi\\Agri_Chemical_NN\\datas\\category_analysis\\' # # #
+    # os.makedirs(output_dir, exist_ok=True)
+    # save_path = os.path.join(output_dir, f'{target}_{label}_boxplot.png')
+    # #os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+    # save_boxplot(filtered_label_df[label], filtered_other_df[target], save_path, title="Boxplot of Target by Label")
+
+    # X_filtered = X.loc[filtered_other_df.index]
+    # Y_filtered = Y.loc[filtered_other_df.index]
+
+    # #print(X_filtered)
+    # #P
+    # #taxon = ['d__Archaea;p__Crenarchaeota;c__Nitrososphaeria;o__Nitrosopumilales;f__Nitrosopumilaceae;g__Nitrosarchaeum']
+    # #taxon = ['d__Bacteria;p__Actinobacteriota;c__Acidimicrobiia;o__Microtrichales;f__Ilumatobacteraceae;g__Ilumatobacter']
+    # #taxon = ['d__Bacteria;p__Fibrobacterota;c__Fibrobacteria;o__Fibrobacterales;f__Fibrobacterales;g__BBMC-4']
+    # #taxon = ['d__Bacteria;p__Firmicutes;c__Clostridia;o__Peptostreptococcales-Tissierellales;f__Family_XI;g__Tepidimicrobium']
+
+    # #pH
+    # #taxon = ['d__Archaea;p__Crenarchaeota;c__Nitrososphaeria;o__Nitrosotaleales;f__Nitrosotaleaceae;g__Candidatus_Nitrosotalea']
+    # #taxon = ['d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__PLTA13;f__PLTA13;g__PLTA13']
+    # #taxon = ['d__Bacteria;p__Acidobacteriota;c__Acidobacteriae;o__Acidobacteriales;f__Acidobacteriaceae_(Subgroup_1);g__Terracidiphilus']
+
+    # #taxon = ['d__Bacteria;p__Bacteroidota;c__Bacteroidia;o__Chitinophagales;f__Chitinophagaceae;g__Pseudoflavitalea']
+    # #taxon = ['d__Bacteria;p__Nitrospinota;c__P9X2b3D02;o__P9X2b3D02;f__P9X2b3D02;g__P9X2b3D02']
+    # #taxon = ['d__Bacteria;p__Acidobacteriota;c__Holophagae;o__Holophagales;f__Holophagaceae;g__Geothrix']
+    # #taxon = ['d__Bacteria;p__Firmicutes;c__Bacilli;o__Caldalkalibacillales;f__Caldalkalibacillaceae;g__Caldalkalibacillus']
+
+    # #taxon = ['d__Bacteria;p__Proteobacteria;c__Alphaproteobacteria;o__Caulobacterales;f__Caulobacteraceae;g__Brevundimonas']
+    # #taxon = ['d__Bacteria;p__Actinobacteriota;c__Actinobacteria;o__Micrococcales;f__Micrococcaceae;g__Paenarthrobacter']
+    # #taxon = ['d__Bacteria;p__Actinobacteriota;c__Actinobacteria;o__Frankiales;f__Nakamurellaceae;g__Nakamurella']
+    # taxon = ['d__Bacteria;p__Fibrobacterota;c__Fibrobacteria;o__Fibrobacterales;f__Fibrobacterales;g__BBMC-4']
+
+
+    # X_filtered_taxon = X_filtered[taxon]
+    # Y_filtered_target = Y_filtered[target]
+
+    # taxon_path = os.path.join(output_dir, f'{target}_{taxon}_{label}_boxplot.png')
+    # save_boxplot(Y_filtered[label], X_filtered[taxon], taxon_path, title="Boxplot of Target by Label")
     
-    # plt.figure(figsize=(10, 6))
-    # sns.scatterplot(x=X_filtered_taxon, y=Y_filtered_target[target[0]], hue=Y_filtered[label], palette='viridis')
-    # plt.show()
+    # # plt.figure(figsize=(10, 6))
+    # # sns.scatterplot(x=X_filtered_taxon, y=Y_filtered_target[target[0]], hue=Y_filtered[label], palette='viridis')
+    # # plt.show()
 
-    
