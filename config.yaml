@@ -245,7 +245,7 @@ main.py:
   domains: 'SoilType' #'year' #'pref-crop'
   reg_list: [
            # ['pref'], 
-            ['crop'], 
+            #['crop'], 
             # ['APCP_Mar_me'],
             # ['APCP_Feb_me'],
             # ['APCP_Jan_me'],
