@@ -203,10 +203,10 @@ def test_tabpfn(model, X_test, y_test, X_train, Y_train, reg, output_dir, result
         plt.close() # メモリ解放のために閉じる
     
     pd.DataFrame({
-            #'TRUE': true.flatten(),
-            'TRUE': true,
-            #'predicted': pred.flatten(),
-            'predicted': pred,
+            'TRUE': true.flatten(),
+            #'TRUE': true,
+            'predicted': pred.flatten(),
+            #'predicted': pred,
             'crop-id': test_ids
         }).to_csv(os.path.join(save_dir, f"{reg}_result.csv"), index=False)
     

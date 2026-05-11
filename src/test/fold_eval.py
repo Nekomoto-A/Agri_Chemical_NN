@@ -1775,6 +1775,83 @@ def save_prediction_plot(y_true, y_pred, file_name="prediction_analysis.png"):
     plt.close()
     print(f"グラフを {file_name} として保存しました。")
 
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import os
+from sklearn.decomposition import PCA
+from sklearn.ensemble import IsolationForest
+
+from src.datasets.dataset import composition_transform
+
+def filter_anomalies_with_pca_extended(X, Y, reg_list, n_components=2, contamination=0.1, random_state=42, save_dir='output'):
+    """
+    XをPCAで次元削減し、Yを結合したデータに対してIsolation Forestで異常検知を行い、
+    異常値を除去したXとYを返す。累積寄与率のプロットと異常スコアのCSV保存機能付き。
+    """
+    # 保存用ディレクトリの作成
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    # 1. Xに対してPCAを実行
+
+    X_tr = composition_transform(X)
+
+    pca = PCA(n_components=n_components, random_state=random_state)
+    X_pca = pca.fit_transform(X_tr)
+    X_pca_df = pd.DataFrame(X_pca, index=X.index, columns=[f'PC{i+1}' for i in range(n_components)])
+    
+    # 2. 累積寄与率の計算とプロット
+    explained_variance = np.cumsum(pca.explained_variance_ratio_)
+    plt.figure(figsize=(8, 5))
+    plt.plot(range(1, len(explained_variance) + 1), explained_variance, marker='o', linestyle='--')
+    plt.title('Cumulative Explained Variance Ratio')
+    plt.xlabel('Number of Components')
+    plt.ylabel('Cumulative Explained Variance')
+    plt.grid(True)
+    plot_path = os.path.join(save_dir, 'pca_variance_plot.png')
+    plt.savefig(plot_path)
+    plt.close()
+    
+    # 3. PCA後のデータとYを結合
+    combined_data = pd.concat([X_pca_df, Y[reg_list]], axis=1)
+    
+    # 4. Isolation Forestによる異常検知
+    iso_forest = IsolationForest(contamination=contamination, random_state=random_state)
+    # 異常判定（1: 正常, -1: 異常）
+    outlier_labels = iso_forest.fit_predict(combined_data)
+    # 異常度（スコア）の取得（低いほど異常）
+    anomaly_scores = iso_forest.decision_function(combined_data)
+    
+    # 5. 異常スコアの保存
+    scores_df = pd.DataFrame({
+        'anomaly_score': anomaly_scores,
+        'is_outlier': outlier_labels
+    }, index=X.index)
+    scores_path = os.path.join(save_dir, 'anomaly_scores.csv')
+    scores_df.to_csv(scores_path)
+    
+    # 6. 正常なデータのみを抽出
+    is_normal = (outlier_labels == 1)
+    X_filtered = X[is_normal].copy()
+    Y_filtered = Y[is_normal].copy()
+    
+    return X_filtered, Y_filtered, plot_path, scores_path
+
+# ダミーデータの生成とテスト実行
+# np.random.seed(42)
+# X_dummy = pd.DataFrame(np.random.rand(100, 10), columns=[f'feat_{i}' for i in range(10)])
+# Y_dummy = pd.DataFrame(np.random.rand(100, 1), columns=['target'])
+
+# # 異常を混ぜる
+# X_dummy.iloc[0] = 5.0 
+
+# X_f, Y_f, p_path, s_path = filter_anomalies_with_pca_extended(X_dummy, Y_dummy, n_components=5)
+
+# print(f"Plot saved to: {p_path}")
+# print(f"CSV saved to: {s_path}")
+# print(f"Original size: {len(X_dummy)}, Filtered size: {len(X_f)}")
+
 from src.test.test_tabpfn_table import train_and_test_tabpfn
 from src.datasets.dataset import data_create_table
 from src.datasets.dataset import transform_after_split_table
@@ -1787,30 +1864,11 @@ def fold_evaluate_table(reg_list, output_dir,
                   k = config['k_fold'], 
                   #output_dir = config['result_dir'], 
                   csv_path = config['result_fold'], 
-                  final_output = config['result_average'], model_name = config['model_name'], reduced_feature_path = config['reduced_feature'],
-                  comp_method = config['comp_method'], corr_calc = config['carr_calc'], feature_selection_all = config['feature_selection_all'], 
-                  selection_ratio = config['selection_ratio'],
-                  fsdir = config['feature_selection_dir'],
-                  feature_selection = config['feature_selection'],
-                  num_features_to_select = config['num_selected_features'],
-                  marginal_hist = config['marginal_hist'],
-                  data_inte = config['data_inte'],
-                  loss_fanctions = config['reg_loss_fanction'],
-                  labels = config['labels'],
-                  embedding = config['embedding'], 
-                  latent_dim = config['latent_dim'], 
-                  embedding_size = config['embedding_size'], 
+                  final_output = config['result_average'],  
                   eval_reg = config['eval_reg'], 
                   eval_class = config['eval_class'], 
-                  normalize = config['feature_normalize'],
-                  selection_method = config['selection'],
-                  num_features_to_select_lgb = config['num_features_to_select_lgb'],
-                  add_columns = config['add_columns'], 
-                  method_add_features = config['method_add_features'], 
-                  features_plot = config['features_plot'], 
                   hyper_optimize = config['hyper_optimize'], 
-                  shap_compute = config['shap_compute'], 
-                  augment_method = config['augment_method'], 
+                  shap_compute = config['shap_compute'],  
                   ):
     #if feature_selection_all:
     #   output_dir = os.path.join(fsdir, output_dir)
@@ -1838,6 +1896,9 @@ def fold_evaluate_table(reg_list, output_dir,
         target_path = config['target_path_windows']
 
     X,Y = data_create_table(feature_path, target_path, reg_list, exclude_ids=exclude_ids)
+    
+    # anomaly_dir = os.path.join(sub_dir, 'anomaly_detection')
+    # X,Y,_,_ = filter_anomalies_with_pca_extended(X, Y, reg_list = reg_list, n_components=150, contamination=0.1, random_state=42, save_dir=anomaly_dir)
 
     if k == 'LOOCV':
         kf = LeaveOneOut()
@@ -1849,18 +1910,6 @@ def fold_evaluate_table(reg_list, output_dir,
             #kf = ContinuousStratifiedKFold(n_splits=k, shuffle=True, random_state=42)
             kf = KFold(n_splits=k, shuffle=True, random_state=42)
     scores = {}
-
-    # if labels != None:
-    #     target_columns = reg_list + labels
-    # else:
-    #     target_columns = reg_list
-    #target_columns = reg_list + (labels if labels is not None else [])
-
-    #save_tsne_plots(X, Y, target_columns, save_dir = sub_dir)
-    
-    # cls_labels = get_kmeans_labels(X, n_clusters=3)
-    # target_columns = ['cluster_label']
-    # save_tsne_plots(X, cls_labels, target_columns, save_dir = sub_dir)
 
     #for fold, (train_index, test_index) in enumerate(kf.split(X, Y['crop'])):
     for fold, (train_index, test_index) in enumerate(kf.split(X,Y[reg_list[0]])):

@@ -30,8 +30,8 @@ dataset.py:
   sparce_drop: True
   drop_threshold: 0.05
   uncultured_drop: True
-  data_restriction: None #'soiltype' #None #'crop' #None #
-  data_restriction_list: None #'F' #None #'Spinach' #F
+  data_restriction: 'crop' #'soiltype' #None #'soiltype' #None #'crop' #None #
+  data_restriction_list: 'Spinach' #'Rice' #'D' #None #'F' #None #'Spinach' #F
 train.py:
   early_stopping: True
   patience: 20
@@ -151,7 +151,7 @@ fold_eval.py:
   feature_selection_dir: 'result_DRA_NN'
   carr_calc: False
   marginal_hist: False
-  k_fold: 5
+  k_fold: 10
   feature_normalize: False
   model_name: 'TabPFN'
   result_average: 'result.csv'
@@ -174,15 +174,15 @@ fold_eval.py:
     '042_20_Sait_Eggp', '214_21_Miyz_Edam', '273_22_Naga_Rice', '235_21_Miyz_Spin',
 
     # P
-    # '151_21_Miyz_Spin', '329_22_Niig_Pear', '330_22_Niig_Pear', '165_21_Miyz_Spin', '152_21_Miyz_Spin', '158_21_Miyz_Spin', 
-    # '172_21_Miyz_Spin', '164_21_Miyz_Spin', '273_22_Naga_Rice', '163_21_Miyz_Spin', '159_21_Miyz_Spin', '171_21_Miyz_Spin', 
-    # '143_21_Miyz_Spin', '203_21_Miyz_Spin', '168_21_Miyz_Spin', '354_22_Sait_Pear', '162_21_Miyz_Spin', '254_21_Sait_Spin', 
-    # '236_21_Miyz_Spin', '328_22_Niig_Pear', '253_21_Sait_Spin', '167_21_Miyz_Spin', '213_21_Miyz_Edam', '327_22_Niig_Pear', 
-    # '170_21_Miyz_Spin', '255_21_Sait_Spin', '142_21_Miyz_Spin', '160_21_Miyz_Spin', '214_21_Miyz_Edam', '356_22_Sait_Pear', 
-    # '258_21_Sait_Spin', '263_21_Naga_Appl', '141_21_Miyz_Spin', '133_21_Akit_Edam', '146_21_Miyz_Spin', 
-    # '242_21_Aommo_Appl', '150_21_Miyz_Spin', '194_21_Miyz_Spin', '244_21_Aomo_Appl', 
-    # '259_21_Sait_Spin', '307_22_Hokk_Whea', '153_21_Miyz_Spin', '264_21_Naga_Appl', 
-    # '145_21_Miyz_Spin', '156_21_Miyz_Spin', 
+    '151_21_Miyz_Spin', '329_22_Niig_Pear', '330_22_Niig_Pear', '165_21_Miyz_Spin', '152_21_Miyz_Spin', '158_21_Miyz_Spin', 
+    '172_21_Miyz_Spin', '164_21_Miyz_Spin', '273_22_Naga_Rice', '163_21_Miyz_Spin', '159_21_Miyz_Spin', '171_21_Miyz_Spin', 
+    '143_21_Miyz_Spin', '203_21_Miyz_Spin', '168_21_Miyz_Spin', '354_22_Sait_Pear', '162_21_Miyz_Spin', '254_21_Sait_Spin', 
+    '236_21_Miyz_Spin', '328_22_Niig_Pear', '253_21_Sait_Spin', '167_21_Miyz_Spin', '213_21_Miyz_Edam', '327_22_Niig_Pear', 
+    '170_21_Miyz_Spin', '255_21_Sait_Spin', '142_21_Miyz_Spin', '160_21_Miyz_Spin', '214_21_Miyz_Edam', '356_22_Sait_Pear', 
+    '258_21_Sait_Spin', '263_21_Naga_Appl', '141_21_Miyz_Spin', '133_21_Akit_Edam', '146_21_Miyz_Spin', 
+    '242_21_Aommo_Appl', '150_21_Miyz_Spin', '194_21_Miyz_Spin', '244_21_Aomo_Appl', 
+    '259_21_Sait_Spin', '307_22_Hokk_Whea', '153_21_Miyz_Spin', '264_21_Naga_Appl', 
+    '145_21_Miyz_Spin', '156_21_Miyz_Spin', 
 
     #CEC
     # '239_21_Aomo_Appl', '241_21_Aomo_Appl', '243_21_Aomo_Appl', '128_20_Miyz_Spin', 
@@ -239,7 +239,7 @@ fold_eval.py:
   hyper_optimize: True
   shap_compute: True
 main.py:
-  result_dir: 'result_JSSSPN_table_crop' #'result_YJ_SS_target_encoding' #result_YJ_SS #result_YJ_CLR #result_YJ_SS #result
+  result_dir: 'result_JSSSPN_table_Spin' #'result_YJ_SS_target_encoding' #result_YJ_SS #result_YJ_CLR #result_YJ_SS #result
   Cross_val: True
   LOGO: False
   domains: 'SoilType' #'year' #'pref-crop'
@@ -267,9 +267,9 @@ main.py:
 
             #['Available.P_th'],
             #[NH4.N], 
-            # ['Available.P'], 
-            # ['pH'], 
-            # ['NO3.N'], 
+            ['Available.P'], 
+            #['pH'], 
+            #['NO3.N'], 
             # ['EC'], 
             # ['Humus'], 
             # ['Exchangeable.K'], 

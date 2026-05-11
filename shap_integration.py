@@ -18,10 +18,11 @@ def get_last_category(full_name):
     return last_part
 
 if __name__ == "__main__":
-    result_path = 'C:\\Users\\asahi\\Agri_Chemical_NN\\result_JSSSPN_table_SHAP\\Cross-validation_results'
+    result_path = 'C:\\Users\\asahi\\Agri_Chemical_NN\\result_JSSSPN_table_Rice\\Cross-validation_results'
     
-    reg = 'NO3_N' #'pH' #'Available_P'
-    model = 'RF' #'RF' #'TabPFN'
+    reg = 'NO3_N' #'NO3_N' #'pH' #'Available_P'
+    model = 'TabPFN' #'RF' #'TabPFN'
+    k = 10
 
     reg_path = os.path.join(result_path, f"['{reg}']",)
 
@@ -30,7 +31,7 @@ if __name__ == "__main__":
     #all_shap = pd.DataFrame()
     all_shap = []
 
-    for i in range(5):
+    for i in range(k):
         fold = i+1
         fold_path = os.path.join(reg_path, f"fold{fold}")
 
