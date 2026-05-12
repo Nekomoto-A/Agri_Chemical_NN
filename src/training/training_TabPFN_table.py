@@ -8,9 +8,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from src.datasets.dataset import composition_transform
+from src.datasets.table_augmentation import data_augment
 
 def train_tabpfn(X, Y, reg, output_dir, scalers = None):
     X = composition_transform(X)
+
+    X_train, Y_train = data_augment(X, Y[reg], reg, output_dir)
 
     is_regression = np.issubdtype(Y[reg].dtype, np.floating)
     
@@ -36,7 +39,8 @@ def train_tabpfn(X, Y, reg, output_dir, scalers = None):
             device=device_name, 
             )
 
-        model.fit(X, Y[reg])
+        #model.fit(X, Y[reg])
+        model.fit(X_train, Y_train)
 
         pred = model.predict(X)
 
@@ -76,7 +80,7 @@ def train_tabpfn(X, Y, reg, output_dir, scalers = None):
             device=device_name, 
             #n_estimators = 32,
         )
-        model.fit(X, Y[reg])
+        model.fit(X_train, Y_train)
 
         pred = model.predict(X)
         

@@ -77,7 +77,6 @@ def test_tabpfn(model, X_test, y_test, X_train, Y_train, reg, output_dir, result
         if reg in scalers:
             true = scalers[reg].inverse_transform(true.values.reshape(-1, 1))
             pred = scalers[reg].inverse_transform(pred.reshape(-1, 1))
-        
         else:
             # スケーラーなし
             pred = pred.reshape(-1, 1)

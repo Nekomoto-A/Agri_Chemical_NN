@@ -18,15 +18,16 @@ def get_last_category(full_name):
     return last_part
 
 if __name__ == "__main__":
-    result_path = 'C:\\Users\\asahi\\Agri_Chemical_NN\\result_JSSSPN_table_all_10\\Cross-validation_results'
+    result_path = 'C:\\Users\\asahi\\Agri_Chemical_NN\\result_JSSSPN_table_Rice\\Cross-validation_results'
     
-    reg = 'Available_P' #'NO3_N' #'pH' #'Available_P'
-    model = 'TabPFN' #'RF' #'TabPFN'
+    reg = 'NO3_N' #'NO3_N' #'pH' #'Available_P'
+    model = 'RF' #'RF' #'TabPFN'
     k = 10
 
     reg_path = os.path.join(result_path, f"['{reg}']",)
 
     features = pd.DataFrame()
+    chems = pd.DataFrame()
     predictions = pd.DataFrame()
     #all_shap = pd.DataFrame()
     all_shap = []
@@ -38,6 +39,10 @@ if __name__ == "__main__":
         features_path = os.path.join(fold_path, 'test_feature.csv')
         features_df = pd.read_csv(features_path, index_col=0)
         features = pd.concat([features, features_df], ignore_index=True)
+
+        chem_path = os.path.join(fold_path, 'test_chem.csv')
+        chem_df = pd.read_csv(chem_path, index_col=0)
+        chems = pd.concat([chems, chem_df], ignore_index=True)
 
         model_path = os.path.join(fold_path, model)
         model_pred_path = os.path.join(model_path, reg)
@@ -96,18 +101,26 @@ if __name__ == "__main__":
         feature_names=all_shap[0].feature_names if hasattr(all_shap[0], 'feature_names') else None
     )
 
-    shap_result_path = os.path.join(reg_path, 'shap_results')
+    target_column = 'crop'  # 実際のCSV内のカラム名に書き換えてください
+    target_value = 'Rice' # 抽出したいラベルの値（数値や文字列）に書き換えてください
+
+    # 2. マスクを作成（条件に合う行が True になるリスト）
+    # chemsは各フォールドの test_chem.csv を結合したデータフレームです
+    mask = (chems[target_column] == target_value).values
+
+    filtered_shap_values = all_shap_values[mask]
+
+    shap_result_path = os.path.join(reg_path, f'shap_results_{target_column}_{target_value}')
     os.makedirs(shap_result_path, exist_ok=True)
     model_shap_path = os.path.join(shap_result_path, model)
     os.makedirs(model_shap_path, exist_ok=True)
     # all_shap.to_csv(os.path.join(model_shap_path, f'all_shap_values_{reg}.csv'), index=False)
     # print(f"All SHAP values for {reg} saved to {os.path.join(model_shap_path, f'all_shap_values_{reg}.csv')}")
     with open(os.path.join(model_shap_path, f'all_shap_values_{reg}.pkl'), "wb") as f:
-        pickle.dump(all_shap_values, f)
+        pickle.dump(filtered_shap_values, f)
 
     # 共通の保存関数を作っておくと便利です
     def save_shap_plot(dir, plot_name):
-
         path = os.path.join(dir, f"{plot_name}.png")
         # bbox_inches='tight' をつけるとラベルの欠けを防げます
         plt.savefig(path, bbox_inches='tight', dpi=300)
@@ -116,7 +129,7 @@ if __name__ == "__main__":
     
     # 1. 各特徴量の重要度（SHAP値の絶対値平均）を計算
     # valuesの形状が (サンプル数, 特徴量数) なので、軸0で平均をとる
-    importance = np.abs(all_shap_values.values).mean(0)
+    importance = np.abs(filtered_shap_values.values).mean(0)
 
     top = 30
     # 2. 重要度が高い順にインデックスを並び替え、上位20件を取得
@@ -124,7 +137,7 @@ if __name__ == "__main__":
 
     # 3. Explanationオブジェクトをスライス
     # all_shap_values[サンプル指定, 特徴量指定]
-    top_shap_values = all_shap_values[:, top_indices]
+    top_shap_values = filtered_shap_values[:, top_indices]
 
     shap.plots.beeswarm(top_shap_values, max_display=top, show=False)
     save_shap_plot(model_shap_path, f'shap_beeswarm_{reg}')
@@ -138,17 +151,17 @@ if __name__ == "__main__":
     scatter_dir = os.path.join(model_shap_path, 'scatter_plots')
     os.makedirs(scatter_dir, exist_ok=True)
 
-    print(f"Total samples: {len(all_shap_values)}")
-    print(f"Shape of all_shap_values: {all_shap_values.shape}")
+    print(f"Total samples: {len(filtered_shap_values)}")
+    print(f"Shape of all_shap_values: {filtered_shap_values.shape}")
 
-    print(f"Base values shape: {all_shap_values.base_values.shape}")
-    print(f"Values shape: {all_shap_values.values.shape}")
+    print(f"Base values shape: {filtered_shap_values.base_values.shape}")
+    print(f"Values shape: {filtered_shap_values.values.shape}")
     print(f"Top value: {top}")
 
     for n, i in enumerate(top_indices):
-        feature_name = all_shap_values.feature_names[i]
+        feature_name = filtered_shap_values.feature_names[i]
         
-        shap.plots.scatter(all_shap_values[:, feature_name], 
+        shap.plots.scatter(filtered_shap_values[:, feature_name], 
                         #color=all_shap_values, 
                         color=predictions['predicted'].values,
                         show=False)
@@ -162,17 +175,17 @@ if __name__ == "__main__":
     force_dir = os.path.join(sample_dir, 'force_plots')
     os.makedirs(force_dir, exist_ok=True)
 
-    for i in range(len(all_shap_values)):
+    for i in range(len(filtered_shap_values)):
         id = predictions['crop-id'][i]
         pred = predictions['predicted'][i]
         #shap.plots.waterfall(all_shap_values[i], max_display=top, show=False)
         #shap.plots.waterfall(top_shap_values[i], max_display=top, show=False)
-        shap.plots.waterfall(all_shap_values[i], max_display=top, show=False)
+        shap.plots.waterfall(filtered_shap_values[i], max_display=top, show=False)
         # 軸ラベルのフォントサイズを小さく設定 (fontsizeで調整)
         plt.xlabel("Feature Value", fontsize=5)
         plt.ylabel("SHAP Value", fontsize=5)
         save_shap_plot(water_dir, f'{pred}_{id}_{reg}')
 
-        shap.plots.force(all_shap_values[i], matplotlib=True, show=False)
+        shap.plots.force(filtered_shap_values[i], matplotlib=True, show=False)
         save_shap_plot(force_dir, f'{pred}_{id}_{reg}')
 
