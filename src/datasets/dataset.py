@@ -1927,7 +1927,8 @@ def save_tsne_plot(X_train, Y_train, X_test, Y_test, save_path):
     
     # 2. t-SNEの実行
     print("t-SNEを実行中...（データ量により時間がかかる場合があります）")
-    tsne = TSNE(n_components=2, random_state=42)
+    current_perplexity = min(30, n_train - 1)
+    tsne = TSNE(n_components=2, perplexity=current_perplexity, random_state=42)
     X_embedded = tsne.fit_transform(X_combined)
     
     # 3. プロット用データの準備

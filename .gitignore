@@ -13,3 +13,4 @@ __pycache__/
 .env
 data/raw/riken/data_detail
 catboost_info
+corr_*

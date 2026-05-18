@@ -18,11 +18,11 @@ def get_last_category(full_name):
     return last_part
 
 if __name__ == "__main__":
-    result_path = 'C:\\Users\\asahi\\Agri_Chemical_NN\\result_JSSSPN_table_all_10\\Cross-validation_results'
+    result_path = 'C:\\Users\\asahi\\Agri_Chemical_NN\\result_JSSSPN_table_Apple\\Cross-validation_results'
     
-    reg = 'Available_P' #'NO3_N' #'pH' #'Available_P'
+    reg = 'pH' #'NO3_N' #'pH' #'Available_P'
     model = 'TabPFN' #'RF' #'TabPFN'
-    k = 10
+    k = 25
 
     reg_path = os.path.join(result_path, f"['{reg}']",)
 
@@ -66,20 +66,41 @@ if __name__ == "__main__":
     val_list = [v.values if hasattr(v, 'values') else v for v in all_shap]
     combined_values = np.concatenate(val_list, axis=0)
 
-    # 2. base_values (期待値) の統合
-    # スカラー(単一数値)の場合と配列の場合があるため、形状を整えて結合
-    base_val_list = []
-    #print(all_shap)
-    for v in all_shap:
-        # 期待値を取得（属性がなければ0などで代用するが、基本はあるはず）
-        bv = v.base_values if hasattr(v, 'base_values') else 0
-        #print(bv)
-        # サンプル数に合わせて配列化
-        count = v.shape[0] if hasattr(v, 'shape') else len(v)
-        base_val_list.append(np.full(count, bv) if np.isscalar(bv) else bv)
-        #print(base_val_list)
-    combined_base_values = np.concatenate(base_val_list, axis=0)
+    # # 2. base_values (期待値) の統合
+    # # スカラー(単一数値)の場合と配列の場合があるため、形状を整えて結合
+    # base_val_list = []
+    # #print(all_shap)
+    # for v in all_shap:
+    #     # 期待値を取得（属性がなければ0などで代用するが、基本はあるはず）
+    #     bv = v.base_values if hasattr(v, 'base_values') else 0
+    #     #print(bv)
+    #     # サンプル数に合わせて配列化
+    #     count = v.shape[0] if hasattr(v, 'shape') else len(v)
+    #     base_val_list.append(np.full(count, bv) if np.isscalar(bv) else bv)
+    #     #print(base_val_list)
+    # combined_base_values = np.concatenate(base_val_list, axis=0)
     #print(combined_base_values)
+    # 2. base_values (期待値) の統合
+    base_val_list = []
+    for v in all_shap:
+        # 期待値を取得
+        bv = v.base_values if hasattr(v, 'base_values') else 0
+        
+        # サンプル数（行数）を取得
+        count = v.shape[0] if hasattr(v, 'shape') else len(v)
+        
+        # --- 修正ポイント ---
+        # bv が 1つの値（スカラーや要素1の配列）なら、行数分リピートする
+        # bv.size == 1 は、配列でもスカラーでも「中身が1つ」なら True になります
+        if np.array(bv).size == 1:
+            # スカラー値を取り出して、行数分埋める
+            target_bv = np.array(bv).item() # item()で純粋な数値を取り出す
+            base_val_list.append(np.full(count, target_bv))
+        else:
+            # すでに行数分ある場合はそのまま
+            base_val_list.append(bv)
+            
+    combined_base_values = np.concatenate(base_val_list, axis=0)
 
     # 3. data (元の特徴量データ) の統合
     if hasattr(all_shap[0], 'data'):
@@ -107,12 +128,45 @@ if __name__ == "__main__":
 
     # 共通の保存関数を作っておくと便利です
     def save_shap_plot(dir, plot_name):
-
         path = os.path.join(dir, f"{plot_name}.png")
         # bbox_inches='tight' をつけるとラベルの欠けを防げます
         plt.savefig(path, bbox_inches='tight', dpi=300)
         plt.close() # メモリ解放のため必ず閉じる
         print(f"Saved: {path}")
+
+    #print(filtered_predictions)
+    if model == 'TabPFN':
+        trues = predictions['TRUE']
+        predicted = predictions['predicted']
+        # R = filtered_predictions['TRUE'].corr(filtered_predictions['predicted'])
+        # MAPE = np.mean(np.abs((filtered_predictions['TRUE'] - filtered_predictions['predicted']) / filtered_predictions['TRUE']))
+    else:
+        trues = predictions['true']
+        predicted = predictions['predicted']
+    R = trues.corr(predicted)
+    MAPE = np.mean(np.abs((trues - predicted) / trues))
+
+    # 1. ファイル名と書き込みたい内容を変数に代入します
+    file_name = os.path.join(model_shap_path, 'eval.txt')
+    content = f"R={R}, MAPE={MAPE}"
+
+    # 2. 'with' 構文を使ってファイルを開きます
+    # 'w' は write（上書きモード）を意味します
+    with open(file_name, mode="w", encoding="utf-8") as f:
+        # 3. 指定した内容をファイルに書き込みます
+        f.write(content)
+    plt.figure(figsize=(8, 6))   
+    plt.scatter(trues, predicted)
+    min_val = min(np.min(trues), np.min(predicted))
+    max_val = max(np.max(trues), np.max(predicted))
+    plt.plot([min_val, max_val], [min_val, max_val], 'r--', label='y=x')
+    plt.xlabel('True')
+    plt.ylabel('Predicted')
+    plt.tight_layout()
+    plt.savefig(os.path.join(model_shap_path, 'scatter_plot.png'))
+    plt.close()
+
+    print(f"{file_name} への書き込みが完了しました！")
     
     # 1. 各特徴量の重要度（SHAP値の絶対値平均）を計算
     # valuesの形状が (サンプル数, 特徴量数) なので、軸0で平均をとる
@@ -125,6 +179,19 @@ if __name__ == "__main__":
     # 3. Explanationオブジェクトをスライス
     # all_shap_values[サンプル指定, 特徴量指定]
     top_shap_values = all_shap_values[:, top_indices]
+
+    # 1. ファイル名と書き込みたい内容を変数に代入します
+    feature_file_name = os.path.join(model_shap_path, f'top{top}_features.txt')
+    
+    # 2. 'with' 構文を使ってファイルを開きます
+    # 'w' は write（上書きモード）を意味します
+    # 5. テキストファイルへの書き出し
+    feature_names = np.array(top_shap_values.feature_names)
+    with open(feature_file_name, mode='w', encoding='utf-8') as f:
+        #f.write(f"Label: {target_value} における上位 {top_n} 個の特徴量\n")
+        #f.write("-" * 30 + "\n")
+        for i, name in enumerate(feature_names, 1):
+            f.write(f"{i}. {name}")
 
     shap.plots.beeswarm(top_shap_values, max_display=top, show=False)
     save_shap_plot(model_shap_path, f'shap_beeswarm_{reg}')

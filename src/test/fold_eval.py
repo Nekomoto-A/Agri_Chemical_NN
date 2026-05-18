@@ -1869,6 +1869,7 @@ def fold_evaluate_table(reg_list, output_dir,
                   eval_class = config['eval_class'], 
                   hyper_optimize = config['hyper_optimize'], 
                   shap_compute = config['shap_compute'],  
+                  p_features = config['p_features'], 
                   ):
     #if feature_selection_all:
     #   output_dir = os.path.join(fsdir, output_dir)
@@ -1930,6 +1931,17 @@ def fold_evaluate_table(reg_list, output_dir,
         os.makedirs(vis_dir,exist_ok=True)
 
         for i,r in enumerate(reg_list):
+            if p_features:
+                import json
+                data_path = 'C:\\Users\\asahi\\Agri_Chemical_NN\\data\\raw\\riken'
+                load_path = os.path.join(data_path, f'{r}_0.3_0.05.json')
+                with open(load_path, "r", encoding="utf-8") as f:
+                    # 手順3: json.load() を使って、ファイルの内容をリストとして読み込みます
+                    retrieved_list = json.load(f)
+
+                X_train, X_test = X_train[retrieved_list], X_test[retrieved_list]
+                print(f'学習データ：{X_train.shape}')
+                print(f'テストデータ：{X_test.shape}')
 
             result_scores, model, trues, predictions = train_and_test_tabpfn(X_train = X_train, Y_train = Y_train, X_test = X_test, Y_test = Y_test,
                                                                     reg = r, output_dir = vis_dir, result_dir = csv_dir,eval_reg = eval_reg, eval_class = eval_class, index = index, model_name = method, 
