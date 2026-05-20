@@ -1925,12 +1925,31 @@ def fold_evaluate_table(reg_list, output_dir,
                                                                                                 fold = fold_dir
                                                                                                 )
 
+        method_pca = 'TabPFN_pca'
+
+        vis_dir_pca = os.path.join(fold_dir, method_pca)
+        os.makedirs(vis_dir_pca,exist_ok=True)
+
         method = 'TabPFN'
 
         vis_dir = os.path.join(fold_dir, method)
         os.makedirs(vis_dir,exist_ok=True)
 
         for i,r in enumerate(reg_list):
+            from src.test.test_tabpfn_table_pca import train_and_test_tabpfn_pca
+            result_scores_pca, model_pca, trues, predictions = train_and_test_tabpfn_pca(X_train = X_train, Y_train = Y_train, X_test = X_test, Y_test = Y_test,
+                                                                        reg = r, output_dir = vis_dir_pca, result_dir = csv_dir,eval_reg = eval_reg, eval_class = eval_class, 
+                                                                        index = index, model_name = method_pca, 
+                                                                        scalers = scalers, 
+                                                                        shap_compute = shap_compute, 
+                                                                        label_encoders = label_encoders, 
+                                                                        )
+                
+            for method_name, regs in result_scores_pca.items():
+                for reg_name, dict in regs.items():
+                    for metrics, value in dict.items():
+                        scores.setdefault(metrics, {}).setdefault(method_name, {}).setdefault(reg_name, []).append(value)
+
             if p_features:
                 import json
                 data_path = 'C:\\Users\\asahi\\Agri_Chemical_NN\\data\\raw\\riken'

@@ -1,0 +1,229 @@
+import os
+from sklearn.decomposition import PCA
+import pandas as pd
+import numpy as np
+
+import os
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+
+
+def analyze_and_save_pca(
+    df, output_dir="output", graph_name="pca_variance.png", csv_name="pca_loadings.csv"
+):
+    """高次元のデータに対してPCAを実行し、累積寄与率のグラフと因子負荷量の表を保存する関数。
+
+    Parameters:
+    df (pd.DataFrame): 分析対象のデータフレーム（数値データのみ）
+    output_dir (str): ファイルを保存するディレクトリのパス
+    graph_name (str): 保存するグラフのファイル名 (.png)
+    csv_name (str): 保存する因子負荷量のファイル名 (.csv)
+    """
+    # 0. 保存先ディレクトリの作成（存在しない場合は自動作成）
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        print(f"ディレクトリを作成しました: {output_dir}")
+
+    # 1. PCAの実行
+    # 特徴量の数と同じ数だけ主成分を計算します
+    n_components = df.shape[0]
+    pca = PCA(n_components=n_components)
+    pca.fit(df)
+
+    # ss = StandardScaler()
+    # df_scaled = pd.DataFrame(ss.fit_transform(df), columns=df.columns)
+
+    #X_pca = pca.transform(df_scaled)
+    X_pca = pca.transform(df)
+
+    # 2. 累積寄与率の計算とグラフ保存
+    # 各主成分の寄与率を取得し、累積和を計算します
+    explained_variance_ratio = pca.explained_variance_ratio_
+    cumulative_variance_ratio = np.cumsum(explained_variance_ratio)
+
+    # グラフの描画
+    plt.figure(figsize=(8, 5))
+    # 累積寄与率を折れ線グラフでプロット
+    plt.plot(
+        range(1, n_components + 1),
+        cumulative_variance_ratio,
+        marker="o",
+        linestyle="--",
+        label="Cumulative",
+    )
+    # 各主成分単体の寄与率を棒グラフでプロット
+    plt.bar(
+        range(1, n_components + 1), explained_variance_ratio, alpha=0.5, label="Individual"
+    )
+
+    plt.xlabel("Principal Components (Dimensions)")
+    plt.ylabel("Explained Variance Ratio")
+    plt.title("PCA Explained Variance")
+    plt.xticks(range(1, n_components + 1))
+    plt.grid(True, linestyle=":", alpha=0.6)
+    plt.legend(loc="best")
+
+    # グラフをPNGとして保存
+    graph_path = os.path.join(output_dir, graph_name)
+    plt.savefig(graph_path, dpi=300, bbox_inches="tight")
+    plt.close()  # メモリ解放のためにグラフを閉じる
+    print(f"累積寄与率のグラフを保存しました: {graph_path}")
+
+    # 3. 因子負荷量の計算とCSV保存
+    # 因子負荷量 = 固有ベクトルの各成分 × 主成分の標準偏差（固有値の平方根）
+    # pca.components_ は (主成分数, 特徴量数) の形状なので、転置(.T)して (特徴量数, 主成分数) にします
+    loadings = pca.components_.T * np.sqrt(pca.explained_variance_)
+
+    # 列名（カラム名）を 'PC1', 'PC2', ... に設定
+    columns = [f"PC{i}" for i in range(1, n_components + 1)]
+
+    # データフレームにまとめる（インデックスは元の特徴量名）
+    loadings_df = pd.DataFrame(loadings, index=df.columns, columns=columns)
+
+    PCA_df = pd.DataFrame(X_pca, columns=columns)
+    csv_path = os.path.join(output_dir, 'PCA_result.csv')
+    PCA_df.to_csv(csv_path)
+
+    # CSVとして保存
+    csv_path = os.path.join(output_dir, csv_name)
+    loadings_df.to_csv(csv_path)
+    print(f"因子負荷量の表を保存しました: {csv_path}")
+
+    return loadings_df, PCA_df
+
+import pandas as pd
+from scipy import stats
+
+
+def filter_significant_features(X, Y, alpha=0.05):
+    """Xの各特徴量とYの間でスピアマンの相関検定を行い、有意な特徴量のみを抽出する関数。
+
+    Parameters:
+    -----------
+    X : pandas.DataFrame
+        特徴量が含まれるデータフレーム
+    Y : pandas.Series or array-like
+        ターゲット（目的変数）のデータ
+    alpha : float, default 0.05
+        有意水準（この値よりp値が小さければ有意とみなす）
+
+    Returns:
+    --------
+    pandas.DataFrame
+        有意な相関が見られた特徴量のみで構成された新しいデータフレーム
+    """
+    # 有意と判定された列名を保存するためのリスト
+    significant_columns = []
+
+    # Xの各列（特徴量）についてループ処理を行う
+    for col in X.columns:
+        # scipyのspearmanrを使って、相関係数(correlation)とp値(p_value)を計算
+        # nan_policy='omit' を指定することで、欠損値がある場合は除外して計算します
+        correlation, p_value = stats.spearmanr(
+            X[col], Y, nan_policy="omit"
+        )
+
+        # p値が有意水準(alpha)未満であるかチェック
+        if p_value < alpha:
+            significant_columns.append(col)
+
+    # 有意な列だけを抽出した新しいデータフレームを返す
+    return X[significant_columns]
+
+if __name__ == '__main__':
+    # dra_asv = '/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/lv6.csv' 
+    # dra_chem = '/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/chem_data.xlsx' 
+
+    riken_asv = 'C:\\Users\\asahi\\Agri_Chemical_NN\\data\\raw\\riken\\taxon_data\\lv6_filtered.csv' #'C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\lv6.csv' #
+    riken_chem = 'C:\\Users\\asahi\\Agri_Chemical_NN\\data\\raw\\riken\\chem_filtered.xlsx' #'C:\Users\v' #'C:\Users\asahi\Agri_Chemical_NN\data\raw\DRA015491\chem_data.xlsx' #
+
+    exclude_ids = [
+    #'042_20_Sait_Eggp'
+    #'042_20_Sait_Eggp','235_21_Miyz_Spin', '360_22_Miee_Soyb', '121_20_Miyz_Spin', '125_20_Miyz_Spin', #'161_21_Miyz_Spin' #☓
+    
+    '041_20_Sait_Carr', '043_20_Sait_Carr', '046_20_Sait_Burd', '047_20_Sait_Burd', 
+    '044_20_Sait_Broc', '045_20_Sait_Broc', '061_20_Naga_Barl', '062_20_Naga_Barl', 
+    '331_22_Niig_jpea', '332_22_Niig_jpea', 
+    '067_20_Naga_Pump', '050_20_Sait_Stra', '048_20_Sait_Yama',  '049_20_Sait_Yama', 
+    '063_20_Naga_Onio', '064_20_Naga_Onio', '065_20_Naga_Onio', '066_20_Naga_Onio',
+
+    '042_20_Sait_Eggp', '214_21_Miyz_Edam', '273_22_Naga_Rice', '235_21_Miyz_Spin',
+
+    # P
+    '151_21_Miyz_Spin', '329_22_Niig_Pear', '330_22_Niig_Pear', '165_21_Miyz_Spin', '152_21_Miyz_Spin', '158_21_Miyz_Spin', 
+    '172_21_Miyz_Spin', '164_21_Miyz_Spin', '273_22_Naga_Rice', '163_21_Miyz_Spin', '159_21_Miyz_Spin', '171_21_Miyz_Spin', 
+    '143_21_Miyz_Spin', '203_21_Miyz_Spin', '168_21_Miyz_Spin', '354_22_Sait_Pear', '162_21_Miyz_Spin', '254_21_Sait_Spin', 
+    '236_21_Miyz_Spin', '328_22_Niig_Pear', '253_21_Sait_Spin', '167_21_Miyz_Spin', '213_21_Miyz_Edam', '327_22_Niig_Pear', 
+    '170_21_Miyz_Spin', '255_21_Sait_Spin', '142_21_Miyz_Spin', '160_21_Miyz_Spin', '214_21_Miyz_Edam', '356_22_Sait_Pear', 
+    '258_21_Sait_Spin', '263_21_Naga_Appl', '141_21_Miyz_Spin', '133_21_Akit_Edam', '146_21_Miyz_Spin', 
+    '242_21_Aommo_Appl', '150_21_Miyz_Spin', '194_21_Miyz_Spin', '244_21_Aomo_Appl', 
+    '259_21_Sait_Spin', '307_22_Hokk_Whea', '153_21_Miyz_Spin', '264_21_Naga_Appl', 
+    '145_21_Miyz_Spin', '156_21_Miyz_Spin', 
+
+    # P-Rice
+    '274_22_Naga_Rice', 
+
+    #CEC
+    # '239_21_Aomo_Appl', '241_21_Aomo_Appl', '243_21_Aomo_Appl', '128_20_Miyz_Spin', 
+    # '011_20_Akit_Rice', '122_20_Miyz_Spin', '124_20_Miyz_Spin', '347_22_Yama_Rice', '223_21_Miyz_Edam', 
+    # '215_21_Miyz_Edam', '017_20_Akit_Soyb', '218_21_Miyz_Edam', '219_21_Miyz_Edam', '132_21_Akit_Edam'
+
+    # NO3.N
+    # '213_21_Miyz_Edam', '214_21_Miyz_Edam', '121_20_Miyz_Spin', '125_20_Miyz_Spin', 
+    # '191_21_Miyz_Spin', '156_21_Miyz_Spin', '132_21_Akit_Edam', '253_21_Sait_Spin', 
+    # '190_21_Miyz_Spin', '305_22_Hokk_Whea', '327_22_Niig_Pear', '161_21_Miyz_Spin', 
+
+    #Exchangeable.K
+    # '193_21_Miyz_Spin', '132_21_Akit_Edam', 
+    # '256_21_Ait_Spin', '019_20_Akit_Soyb', '246_21_Aomo_Appl', '136_21_Akit_Soyb', 
+    # '169_20_Akit_Soyb', '250_21_Aomo_Appl', '213_21_Miyz_Edam', 
+    # '256_21_Sait_Spin', '244_21_Aomo_Appl', '252_21_Aomo_Appl', '330_22_Niig_Pear', 
+    # '273_22_Naga_Rice', '264_21_Naga_Appl', '133_21_Akit_Edam', 
+    # '214_21_Miyz_Edam', '240_21_Aomo_Appl', 
+    # '132_21_Akit_Edam', 
+
+    #pH
+    # '167_21_Miyz_Spin', '137_21_Akit_Soyb', '354_22_Sait_Pear', '163_21_Miyz_Spin', '253_21_Sait_Spin', 
+    # '254_21_Sait_Spin', '190_21_Miyz_Spin', '258_21_Sait_Spin', '164_21_Miyz_Spin', '231_21_Miyz_Edam', 
+    # '069_20_Naga_Rice', 
+
+    #EC
+    # '161_21_Miyz_Spin', '121_20_Miyz_Spin', '125_20_Miyz_Spin', '122_20_Miyz_Spin'
+    ]
+
+    target_col = 'pH' #'Available_P' #pH #'Available_P'
+    #target_col = 'Exangeable_K'
+    labels = 'crop'
+    rest = 'Rice'
+    from src.datasets.dataset import data_create_table
+    X,Y = data_create_table(riken_asv,riken_chem,reg_list = [target_col], exclude_ids = exclude_ids, 
+                            #data_restriction = labels, data_restriction_list = rest, 
+                      )
+    
+    from src.datasets.dataset import composition_transform
+    X_tr = composition_transform(X,)
+
+    out = 'corr_PCA'
+    if not os.path.exists(out):
+        os.makedirs(out)
+
+    X_tr = filter_significant_features(X_tr, Y[target_col], alpha=0.05)
+    print(X_tr.shape)
+
+    X_t =X[X_tr.columns]
+    X_tr = composition_transform(X_t,)
+
+    Load, PCA_df = analyze_and_save_pca(
+            df = X_tr, output_dir=out, graph_name="pca_variance.png", csv_name="pca_loadings.csv"
+        )
+
+    print(PCA_df)
+    
+    plt.figure()
+    plt.scatter(PCA_df['PC1'], Y[target_col])
+    plt.xlabel('PC1')
+    plt.ylabel(target_col)
+    plt.show()
