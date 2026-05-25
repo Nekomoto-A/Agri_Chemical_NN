@@ -1925,35 +1925,38 @@ def fold_evaluate_table(reg_list, output_dir,
                                                                                                 fold = fold_dir
                                                                                                 )
 
-        method_pca = 'TabPFN_pca'
+        # method_pca = 'TabPFN_pca'
 
-        vis_dir_pca = os.path.join(fold_dir, method_pca)
-        os.makedirs(vis_dir_pca,exist_ok=True)
+        # vis_dir_pca = os.path.join(fold_dir, method_pca)
+        # os.makedirs(vis_dir_pca,exist_ok=True)
 
         method = 'TabPFN'
 
         vis_dir = os.path.join(fold_dir, method)
         os.makedirs(vis_dir,exist_ok=True)
 
+
+        print(f'fold:{fold+1}/{kf.get_n_splits()}')
         for i,r in enumerate(reg_list):
-            from src.test.test_tabpfn_table_pca import train_and_test_tabpfn_pca
-            result_scores_pca, model_pca, trues, predictions = train_and_test_tabpfn_pca(X_train = X_train, Y_train = Y_train, X_test = X_test, Y_test = Y_test,
-                                                                        reg = r, output_dir = vis_dir_pca, result_dir = csv_dir,eval_reg = eval_reg, eval_class = eval_class, 
-                                                                        index = index, model_name = method_pca, 
-                                                                        scalers = scalers, 
-                                                                        shap_compute = shap_compute, 
-                                                                        label_encoders = label_encoders, 
-                                                                        )
+            # from src.test.test_tabpfn_table_pca import train_and_test_tabpfn_pca
+            # result_scores_pca, model_pca, trues, predictions = train_and_test_tabpfn_pca(X_train = X_train, Y_train = Y_train, X_test = X_test, Y_test = Y_test,
+            #                                                             reg = r, output_dir = vis_dir_pca, result_dir = csv_dir,eval_reg = eval_reg, eval_class = eval_class, 
+            #                                                             index = index, model_name = method_pca, 
+            #                                                             scalers = scalers, 
+            #                                                             shap_compute = shap_compute, 
+            #                                                             label_encoders = label_encoders, 
+            #                                                             )
                 
-            for method_name, regs in result_scores_pca.items():
-                for reg_name, dict in regs.items():
-                    for metrics, value in dict.items():
-                        scores.setdefault(metrics, {}).setdefault(method_name, {}).setdefault(reg_name, []).append(value)
+            # for method_name, regs in result_scores_pca.items():
+            #     for reg_name, dict in regs.items():
+            #         for metrics, value in dict.items():
+            #             scores.setdefault(metrics, {}).setdefault(method_name, {}).setdefault(reg_name, []).append(value)
 
             if p_features:
                 import json
                 data_path = 'C:\\Users\\asahi\\Agri_Chemical_NN\\data\\raw\\riken'
-                load_path = os.path.join(data_path, f'{r}_0.3_0.05.json')
+                #load_path = os.path.join(data_path, f'{r}_0.3_0.05.json')
+                load_path = os.path.join(data_path, f'{r}_all_0.4_0.05.json')
                 with open(load_path, "r", encoding="utf-8") as f:
                     # 手順3: json.load() を使って、ファイルの内容をリストとして読み込みます
                     retrieved_list = json.load(f)

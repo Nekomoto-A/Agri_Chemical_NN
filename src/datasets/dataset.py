@@ -520,9 +520,9 @@ def data_create_table(path_asv, path_chem, reg_list, exclude_ids, features_list 
 
 def composition_transform(asv_data, feature_transformer = config['feature_transformer']):
     if feature_transformer=='CLR':
-        asv_data = asv_data.div(asv_data.sum(axis=1), axis=0)
+        #asv_data = asv_data.div(asv_data.sum(axis=1), axis=0)
         #asv_array = multiplicative_replacement(asv_data.values)
-        asv_array = asv_data.where(asv_data != 0, asv_data + 1e-100).values
+        asv_array = asv_data.where(asv_data != 0, asv_data + 1e-6).values
         #print(asv_data)
         
         clr_array = clr(asv_array)
@@ -533,9 +533,9 @@ def composition_transform(asv_data, feature_transformer = config['feature_transf
 
         #print(len(asv_data.columns))
         #print(asv_data.columns)
-        asv_data = asv_data.div(asv_data.sum(axis=1), axis=0)
+        #asv_data = asv_data.div(asv_data.sum(axis=1), axis=0)
         #asv_array = multiplicative_replacement(asv_data.values)
-        asv_array = asv_data.where(asv_data != 0, asv_data + 1e-100).values
+        asv_array = asv_data.where(asv_data != 0, asv_data + 1e-6).values
         ilr_array = ilr_transform(asv_array)
         #print(ilr_array.shape)
         # 結果をDataFrameに戻す
@@ -546,7 +546,7 @@ def composition_transform(asv_data, feature_transformer = config['feature_transf
     else:
         asv_data = asv_data.div(asv_data.sum(axis=1), axis=0)
         #asv_array = multiplicative_replacement(asv_data.values)
-        asv_array = asv_data.where(asv_data != 0, asv_data + 1e-100).values
+        asv_array = asv_data.where(asv_data != 0, asv_data + 1e-6).values
         asv_feature = pd.DataFrame(asv_array, columns=asv_data.columns, index=asv_data.index)
     return asv_feature
 

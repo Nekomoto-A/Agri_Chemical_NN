@@ -133,6 +133,72 @@ def filter_significant_features(X, Y, alpha=0.05):
     # 有意な列だけを抽出した新しいデータフレームを返す
     return X[significant_columns]
 
+import os
+import pandas as pd
+from scipy import stats  # 統計計算のためのライブラリを追加
+
+def save_spearman_corr_with_pvalue(
+    X: pd.DataFrame,
+    Y: pd.DataFrame,
+    label_col: str,
+    target_col: str,
+    save_dir: str,
+    file_name: str = "spearman_pvalue_results.csv",
+):
+    """pandas形式のデータから、ラベルごとにスピアマン相関係数とp値を計算し、
+
+    特徴量名をインデックスとしてCSVで保存する関数。
+    """
+    # 1. XとYの一部の列を結合して、処理しやすい1つの表にします
+    combined_df = pd.concat([X, Y[[label_col, target_col]]], axis=1)
+
+    # 結果を格納するための空の辞書
+    results_dict = {}
+
+    # 2. 指定されたラベル列でデータをグループ分けします
+    grouped = combined_df.groupby(label_col)
+
+    for label_name, group_data in grouped:
+        # このラベルにおける目的変数
+        Y_target = group_data[target_col]
+
+        # 相関係数（rho）とp値を格納するための仮の辞書（このラベル専用）
+        rho_dict = {}
+        p_dict = {}
+
+        # Xの各特徴量を1つずつループ処理して計算します
+        for feature in X.columns:
+            X_feature = group_data[feature]
+
+            # scipyを使ってスピアマン相関係数とp値を計算
+            # データの欠損値(NaN)がある場合は自動で除外して計算します
+            rho, p_value = stats.spearmanr(
+                X_feature, Y_target, nan_policy="omit"
+            )
+
+            # 特徴量名をキーにして結果を記録
+            rho_dict[feature] = rho
+            p_dict[feature] = p_value
+
+        # カラム名を指定の形式（{ラベル名}_rho, {ラベル名}_p）にして全体の辞書に追加
+        results_dict[f"{label_name}_rho"] = pd.Series(rho_dict)
+        results_dict[f"{label_name}_p"] = pd.Series(p_dict)
+
+    # 3. 辞書から最終的なDataFrame（表）を作成
+    final_df = pd.DataFrame(results_dict)
+
+    # 保存先ディレクトリの存在チェックと自動作成
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+        print(f"ディレクトリを作成しました: {save_dir}")
+
+    # CSVファイルとして保存
+    save_path = os.path.join(save_dir, file_name)
+    final_df.to_csv(save_path, index=True)
+
+    print(f"無事にp値付きのCSVファイルが保存されました: {save_path}")
+    return final_df
+
 if __name__ == '__main__':
     # dra_asv = '/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/lv6.csv' 
     # dra_chem = '/home/nomura/Agri_Chemical_NN/data/raw/DRA015491/chem_data.xlsx' 
@@ -219,11 +285,15 @@ if __name__ == '__main__':
     Load, PCA_df = analyze_and_save_pca(
             df = X_tr, output_dir=out, graph_name="pca_variance.png", csv_name="pca_loadings.csv"
         )
-
-    print(PCA_df)
     
-    plt.figure()
-    plt.scatter(PCA_df['PC1'], Y[target_col])
-    plt.xlabel('PC1')
-    plt.ylabel(target_col)
-    plt.show()
+    # output = 'corr_0521'
+
+    # save_spearman_corr_by_label(
+    #         X = X_tr,
+    #         Y = Y,
+    #         label_col = labels,
+    #         target_col = target_col,
+    #         save_dir = output,
+    #         file_name = f"spearman_results_{target_col}.csv",
+    #     )
+    

@@ -18,11 +18,11 @@ def get_last_category(full_name):
     return last_part
 
 if __name__ == "__main__":
-    result_path = 'C:\\Users\\asahi\\Agri_Chemical_NN\\result_JSSSPN_table_Apple\\Cross-validation_results'
+    result_path = 'C:\\Users\\asahi\\Agri_Chemical_NN\\result_JSSSPN_table_r_Rice\\Cross-validation_results'
     
-    reg = 'pH' #'NO3_N' #'pH' #'Available_P'
+    reg = 'Available_P' #'NO3_N' #'pH' #'Available_P'
     model = 'TabPFN' #'RF' #'TabPFN'
-    k = 25
+    k = 10
 
     reg_path = os.path.join(result_path, f"['{reg}']",)
 
