@@ -11,6 +11,8 @@ from sklearn.decomposition import PCA
 from src.datasets.dataset import composition_transform
 from src.datasets.table_augmentation import data_augment
 
+
+
 def train_tabpfn_pca(X, Y, reg, output_dir, scalers = None):
     X = composition_transform(X)
 

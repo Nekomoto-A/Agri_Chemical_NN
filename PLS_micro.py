@@ -222,6 +222,7 @@ if __name__ == '__main__':
         os.makedirs(out)
 
     df, optimal_n_comp, final_pls, total_variance_x, r2_y_total = analyze_with_pls(X_tr, Y[target_col], max_components=20, cv_splits=10, vip_threshold=1.0)
+    #df, optimal_n_comp, final_pls, total_variance_x, r2_y_total = analyze_with_sparse_pls(X_tr, Y[target_col], max_components=20, cv_splits=10, vip_threshold=1.0)
     print(df)
     df.to_csv(os.path.join(out, f'PLS_VIP_{target_col}.csv'), index=False)
 
